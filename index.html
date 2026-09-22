@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="description" content="HR Management System with Firebase and GitHub-ready static deployment">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MOSTAFA'S MYTH — إدارة متكاملة للموارد البشرية</title>
+<link rel="preconnect" href="https://db.onlinewebfonts.com">
+<link href="https://db.onlinewebfonts.com/c/7d411bb0357d6fd29347455b7d207995?family=JF+Flat+Regular" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">ش</div>
+      <div class="brand-text"><b>MOSTAFA'S MYTH</b><span>إدارة متكاملة للموارد البشرية</span></div>
+    </div>
+    <nav class="navlist" id="navlist">
+      <a class="navlink" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        الرئيسية
+      </a>
+
+      <div class="nav-group" data-group="general">
+        <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h16M4 12h16M4 19h16"/></svg>بيانات عامة</span><b>⌄</b></button>
+        <div class="nav-submenu">
+          <a class="navlink nav-child" data-view="regions"><span>المناطق</span></a>
+          <a class="navlink nav-child" data-view="projects"><span>المشاريع</span></a>
+          <a class="navlink nav-child" data-view="departments"><span>الأقسام والوظائف</span></a>
+        </div>
+      </div>
+
+      <div class="nav-group" data-group="employees">
+        <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="8.5" r="2.5"/><path d="M15.5 14.2c2.6.4 4.5 2.6 4.5 5.3"/></svg>الموظفين</span><b>⌄</b></button>
+        <div class="nav-submenu">
+          <a class="navlink nav-child" data-view="add"><span>إضافة موظف</span></a>
+          <a class="navlink nav-child" data-view="contracts"><span>عقود الموظفين</span></a>
+          <a class="navlink nav-child" data-view="allcontracts"><span>كل العقود</span></a>
+        </div>
+      </div>
+
+      <a class="navlink" data-view="coverage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 20c0-3-2.5-5-5-5s-5 2-5 5"/><circle cx="12" cy="8" r="4"/><path d="M2 12l3-3m0 0l3 3m-3-3v8"/></svg>
+        التغطيات
+      </a>
+
+      <div class="nav-group" data-group="payroll">
+        <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>الرواتب</span><b>⌄</b></button>
+        <div class="nav-submenu">
+          <a class="navlink nav-child" data-view="attendance"><span>الحضور والانصراف</span></a>
+          <a class="navlink nav-child" data-view="actions"><span>إجراءات الموظفين</span></a>
+        </div>
+      </div>
+
+      <div class="nav-group" data-group="reports">
+        <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19V9M11 19V4M18 19v-7"/></svg>تقارير</span><b>⌄</b></button>
+        <div class="nav-submenu">
+          <a class="navlink nav-child" data-view="reports" data-report="payroll"><span>تقارير الرواتب</span></a>
+          <a class="navlink nav-child" data-view="reports" data-report="employees"><span>تقارير الموظفين</span></a>
+          <a class="navlink nav-child" data-view="reports" data-report="projects"><span>تقارير المشاريع</span></a>
+          <a class="navlink nav-child" data-view="reports" data-report="coverage"><span>تقارير التغطيات</span></a>
+        </div>
+      </div>
+
+      <div class="nav-group" data-group="documents">
+        <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>مذكرات ومستندات</span><b>⌄</b></button>
+        <div class="nav-submenu">
+          <a class="navlink nav-child" data-view="documents"><span>المستندات</span></a>
+        </div>
+      </div>
+
+      <div class="nav-group" data-group="calculators">
+        <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 11h2M14 11h2M8 15h2M14 15h2M8 19h2M14 19h2"/></svg>حاسبات</span><b>⌄</b></button>
+        <div class="nav-submenu">
+          <a class="navlink nav-child" data-view="projectaccounts"><span>حسابات المشاريع</span></a>
+          <a class="navlink nav-child" data-view="projectaccounts" data-scroll="pa-eos-card"><span>حاسبة مكافأة نهاية الخدمة</span></a>
+          <a class="navlink nav-child" data-view="projectaccounts" data-scroll="pa-leave-card"><span>حاسبة الإجازات السنوية</span></a>
+        </div>
+      </div>
+
+      <div class="nav-section-label">البيانات</div>
+      <a class="navlink" id="exportBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/></svg>
+        تصدير CSV
+      </a>
+      <a class="navlink" id="importBtnNav">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21V9m0 0l-4 4m4-4l4 4M4 5h16"/></svg>
+        استيراد بيانات
+      </a>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+    </nav>
+    <div class="sidebar-foot">
+      البيانات محفوظة محلياً في متصفحك فقط.
+      <br><button class="theme-toggle" id="themeToggle">تبديل المظهر الداكن/الفاتح</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <!-- ===== DASHBOARD ===== -->
+    <section id="view-dashboard">
+      <div class="topbar dashboard-topbar">
+        <div class="pagetitle">
+          <h1>الرئيسية</h1>
+          <p id="dashDate"></p>
+        </div>
+        <div class="dashboard-clock-wrap">
+          <div class="dashboard-clock" id="dashClock">00:00 PM</div>
+          <div class="dashboard-live">الوقت الحالي</div>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn mobile-menu-btn icon-btn" id="menuBtn">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="dashboard-hero-title">
+        <div class="dashboard-hero-glow"></div>
+        <h2>MOSTAFA'S MYTH</h2>
+        <span>إدارة متكاملة للموارد البشرية</span>
+      </div>
+
+      <div class="stat-grid">
+        <div class="card stat-card accent">
+          <div class="n" id="statTotal">0</div>
+          <div class="l">إجمالي الموظفين</div>
+        </div>
+        <div class="card stat-card">
+          <div class="n" id="statActive">0</div>
+          <div class="l">عقود سارية</div>
+        </div>
+        <div class="card stat-card warn">
+          <div class="n" id="statExpiring">0</div>
+          <div class="l">عقود/وثائق تنتهي خلال 30 يوم</div>
+        </div>
+        <div class="card stat-card gold">
+          <div class="n mono" id="statPayroll">0</div>
+          <div class="l">إجمالي الرواتب الشهرية (ريال)</div>
+        </div>
+        <div class="card stat-card stat-no-contracts" id="statNoContractsCard">
+          <div class="n" id="statNoContracts">0</div>
+          <div class="l">موظفون بدون عقود</div>
+        </div>
+      </div>
+
+      <div class="dashboard-quick-actions">
+        <div class="quick-action-title">الإدخالات السريعة</div>
+        <div class="quick-action-grid">
+          <button type="button" class="quick-action-card" id="quickAddEmployee" data-quick-view="add">
+            <span class="quick-icon">＋</span><span>إضافة موظف جديد</span>
+          </button>
+          <button type="button" class="quick-action-card" data-quick-view="regions" data-quick-click="addRegionBtn">
+            <span class="quick-icon">⌖</span><span>إضافة منطقة جديدة</span>
+          </button>
+          <button type="button" class="quick-action-card" data-quick-view="projects" data-quick-click="addProjectBtn">
+            <span class="quick-icon">▣</span><span>إضافة مشروع جديد</span>
+          </button>
+          <button type="button" class="quick-action-card" data-quick-view="departments" data-quick-click="addDepartmentBtn">
+            <span class="quick-icon">☷</span><span>إضافة قسم جديد</span>
+          </button>
+          <button type="button" class="quick-action-card" data-quick-view="contracts" data-quick-click="newContractBtn">
+            <span class="quick-icon">▤</span><span>إضافة عقد جديد</span>
+          </button>
+          <button type="button" class="quick-action-card" data-quick-view="coverage">
+            <span class="quick-icon">◉</span><span>إضافة تغطية جديدة</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card section-card">
+          <h3>التوزيع حسب القسم</h3>
+          <div id="depList"></div>
+        </div>
+        <div class="card section-card">
+          <h3>تنبيهات انتهاء الوثائق والعقود</h3>
+          <div id="expiringList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== REGIONS ===== -->
+    <section id="view-regions" style="display:none">
+      <div class="topbar"><div class="pagetitle"><h1>المناطق</h1><p>إدارة المناطق والمدن وإضافة منطقة جديدة</p></div><div class="topbar-actions"><button class="btn btn-primary" id="addRegionBtn">+ إضافة منطقة</button></div></div>
+      <div class="card section-card full-page-card"><div class="master-grid">
+        <div><h3>إضافة / تعديل منطقة</h3><form id="regionForm" class="field-grid"><div class="field full"><label>اسم المنطقة أو المدينة</label><input id="regionName" required></div><div class="field full"><label>ملاحظات</label><input id="regionNotes"></div><div class="field full"><button class="btn btn-primary" type="submit">حفظ المنطقة</button></div></form></div>
+        <div><h3>قائمة المناطق والمدن</h3><div id="regionsList" class="master-list"></div></div>
+      </div></div>
+    </section>
+
+    <!-- ===== PROJECTS ===== -->
+    <section id="view-projects" style="display:none">
+      <div class="topbar"><div class="pagetitle"><h1>المشاريع</h1><p>البيانات الأساسية والإيرادات والتكاليف الخاصة بكل مشروع</p></div><div class="topbar-actions"><button class="btn btn-primary" id="addProjectBtn">+ إضافة مشروع</button></div></div>
+      <form id="projectForm">
+        <input type="hidden" id="projectId">
+        <input type="hidden" id="projectBasic"><input type="hidden" id="projectHousing"><input type="hidden" id="projectTransport"><input type="hidden" id="projectOther">
+        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>1 — البيانات الأساسية للمشروع</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="basic">↻ إعادة ضبط القسم</button></div><div class="field-grid project-basic-grid">
+          <div class="field"><label>اسم المشروع <span class="req">*</span></label><input id="projectName" required></div>
+          <div class="field"><label>اختيار المنطقة <span class="req">*</span></label><select id="projectRegion" required></select></div>
+        </div></div>
+
+
+        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>2 — الإيرادات</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="revenue">↻ إعادة ضبط القسم</button></div>
+          <div class="project-options-title">العناصر المتوفرة في المشروع</div>
+          <div class="project-check-grid">
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="guards" checked><span>حارس أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="guardsFemale"><span>حارسات أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="supervisors"><span>مشرفين</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="managers"><span>مدير أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="patrols"><span>دوريات أمنية</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="devices"><span>أجهزة اتصالات</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="uniforms"><span>بدل أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="extras"><span>ملحقات مشروع</span></label>
+          </div>
+          <div id="projectRevenueDetails" class="project-dynamic-grid"></div>
+        </div>
+
+        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>3 — التكاليف</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="cost">↻ إعادة ضبط القسم</button></div>
+          <div class="project-options-title">العناصر المتوفرة في المشروع</div>
+          <div class="project-check-grid">
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="guards" checked><span>حارس أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="guardsFemale"><span>حارسات أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="supervisors"><span>مشرفين</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="managers"><span>مدير أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="patrols"><span>دوريات أمنية</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="devices"><span>أجهزة اتصالات</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="uniforms"><span>بدل أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="extras"><span>ملحقات مشروع</span></label>
+          </div>
+          <div id="projectCostDetails" class="project-dynamic-grid"></div>
+        </div>
+
+        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>4 — الملاحظات والحفظ</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="notes">↻ إعادة ضبط القسم</button></div><div class="field"><label>ملاحظات</label><input id="projectNotes"></div><div class="project-form-actions"><button class="btn btn-primary" type="submit">حفظ المشروع</button><button class="btn" type="button" id="newProjectEntryBtn">+ إدخالات جديدة</button><button class="btn" type="button" id="cancelProjectBtn">إلغاء</button></div></div>
+      </form>
+      <div class="card section-card project-summary-card">
+        <div class="project-summary-title">ملخص المشروع الشهري</div>
+        <div class="project-summary-grid">
+          <div class="project-summary-box revenue-summary"><div class="project-summary-label">كل إيرادات المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryRevenuePerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryRevenueTotal">0 ريال</b></div></div>
+          <div class="project-summary-box cost-summary"><div class="project-summary-label">كل تكاليف المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryCostPerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryCostTotal">0 ريال</b></div></div>
+          <div class="project-summary-box profit-summary"><div class="project-summary-label">هامش ربح المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryProfitPerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryProfitTotal">0 ريال</b></div></div>
+        </div>
+        <div class="project-summary-note">متوسط الفرد محسوب على إجمالي عدد الأفراد في المشروع.</div>
+      </div>
+      <div class="card section-card full-page-card"><div class="filters" style="margin:0 0 16px"><div class="search-box" style="max-width:420px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="search" id="projectSearch" placeholder="بحث باسم المشروع"></div><span class="pill pill-gray" id="projectCount">0 مشروع</span></div><h3>قائمة المشاريع</h3><div class="table-wrap"><table class="payroll-table projects-table"><colgroup><col class="col-project"><col class="col-region"><col class="col-guards"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-action"></colgroup><thead><tr><th>المشروع</th><th>المنطقة</th><th>الحراس</th><th>إيرادات الحراس</th><th>تكاليف الحراس</th><th>إجمالي الإيرادات</th><th>إجمالي التكاليف</th><th>الإجراء</th></tr></thead><tbody id="projectsTableBody"></tbody></table></div></div>
+    </section>
+
+    <!-- ===== EMPLOYEES ===== -->
+    <section id="view-employees" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle">
+          <h1>الموظفون</h1>
+          <p id="empCount">0 موظف</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn mobile-menu-btn icon-btn" data-menu>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <button class="btn btn-primary" data-view="add">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            إضافة موظف
+          </button>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input type="search" id="searchInput" placeholder="ابحث بالاسم، رقم الهوية، أو الرقم الوظيفي...">
+        </div>
+        <select id="filterDept"><option value="">كل الأقسام</option></select>
+        <select id="filterStatus">
+          <option value="">كل حالات العقد</option>
+          <option value="ساري">ساري</option>
+          <option value="بدون عقد">بدون عقد</option>
+        </select>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>الموظف</th>
+              <th>القسم</th>
+              <th>المسمى الوظيفي</th>
+              <th>حالة العقد</th>
+              <th>الراتب الأساسي</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="empTableBody"></tbody>
+        </table>
+      </div>
+      <p class="empty-note" id="empEmptyNote" style="display:none">لا توجد نتائج مطابقة.</p>
+    </section>
+
+    <!-- ===== DEPARTMENTS ===== -->
+    <section id="view-departments" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle"><h1>الأقسام والوظائف</h1><p>إدارة الأقسام وإضافة الوظائف وربطها بالموظفين</p></div>
+        <div class="topbar-actions"><button class="btn btn-primary" id="addDepartmentBtn">+ إضافة قسم جديد</button><span class="pill pill-gray" id="deptSummaryCount">0 قسم</span></div>
+      </div>
+      <div class="card section-card dept-editor-card" id="departmentEditor" style="display:none;margin-bottom:16px">
+        <h3 id="departmentEditorTitle">إضافة قسم جديد</h3>
+        <form id="departmentForm">
+          <input type="hidden" id="departmentId"><input type="hidden" id="departmentOldJob">
+          <div class="field-grid">
+            <div class="field"><label>اسم القسم <span class="req">*</span></label><input id="departmentName" required placeholder="مثال: الموارد البشرية"></div>
+            <div class="field"><label>الوظيفة الجديدة</label><input id="departmentJob" placeholder="مثال: مسؤول موارد بشرية"></div>
+          </div>
+          <div class="action-row"><button class="btn btn-primary" type="submit">حفظ</button><button class="btn" type="button" id="cancelDepartmentBtn">إلغاء</button></div>
+        </form>
+      </div>
+      <div class="filters">
+        <div class="search-box" style="max-width:420px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input type="search" id="deptSearch" placeholder="بحث باسم القسم أو الوظيفة...">
+        </div>
+      </div>
+      <div class="card section-card full-page-card">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th style="width:35%">القسم</th><th>الوظيفة</th><th>عدد الموظفين</th><th>إجراء</th></tr></thead>
+            <tbody id="departmentsTableBody"></tbody>
+          </table>
+        </div>
+        <p class="empty-note" id="departmentsEmptyNote" style="display:none">لا توجد أقسام أو وظائف مطابقة.</p>
+      </div>
+    </section>
+
+    <!-- ===== ADD / EDIT FORM ===== -->
+    <section id="view-add" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle">
+          <h1 id="formTitle">إضافة موظف جديد</h1>
+          <p>عبّئ بيانات الموظف عبر الأقسام الثلاثة أدناه</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn mobile-menu-btn icon-btn" data-menu>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <form class="card" id="empForm" style="padding:20px 22px;">
+        <input type="hidden" id="f_id">
+        <div class="tabs">
+          <div class="tab active" data-tab="personal">البيانات الشخصية</div>
+          <div class="tab" data-tab="job">البيانات الوظيفية</div>
+          <div class="tab" data-tab="pay">الرواتب والماليات</div>
+          <div class="tab" data-tab="bank">بيانات بنكية</div>
+        </div>
+
+        <div class="tabpanel active" data-panel="personal">
+          <div class="field-grid">
+            <div class="name-row-compact">
+              <div class="field"><label>الاسم <span class="req">*</span></label><input type="text" id="f_firstname" required></div>
+              <div class="field"><label>الأب <span class="req">*</span></label><input type="text" id="f_fathername" required></div>
+              <div class="field"><label>الجد <span class="req">*</span></label><input type="text" id="f_grandname" required></div>
+              <div class="field"><label>العائلة <span class="req">*</span></label><input type="text" id="f_familyname" required></div>
+            </div>
+            <div class="field full"><label>الاسم الكامل</label><input type="text" id="f_fullname" readonly class="name-summary"></div>
+            <div class="personal-identity-row">
+              <div class="field id-field-compact"><label>رقم الهوية / الإقامة <span class="req">*</span></label><input type="text" id="f_idnum" class="mono" inputmode="numeric" maxlength="10" pattern="\d{10}" required></div>
+              <div class="field nationality-field-compact"><label>الجنسية <span class="req">*</span></label><select id="f_nationality" required><option value="">اختر الجنسية</option></select></div>
+              <div class="field id-photo-compact"><label>صورة الهوية</label><button type="button" class="btn btn-sm id-photo-btn" id="idPhotoBtn">تحميل الصورة</button><input type="file" id="f_idphoto" accept="image/*" hidden><div class="id-photo-name" id="idPhotoName"></div></div>
+              <div class="field gender-field"><label>الجنس</label><select id="f_gender"><option value="">اختر</option><option>ذكر</option><option>أنثى</option></select></div>
+            </div>
+            <div class="field"><label>تاريخ الميلاد</label><input type="date" id="f_dob"></div>
+            <div class="field"><label>تاريخ إصدار الهوية</label><input type="date" id="f_iddate_issue"></div>
+            <div class="field"><label>تاريخ انتهاء الهوية</label><input type="date" id="f_iddate_expiry"></div>
+            <div class="field"><label>مكان الإصدار <span class="req">*</span></label><select id="f_idplace" required><option value="">اختر المنطقة</option></select></div>
+            <div class="field"><label>رقم الهاتف المحمول <span class="req">*</span></label><div class="phone-split"><input type="text" value="+966" readonly class="phone-code mono"><input type="tel" id="f_phone9" class="mono" inputmode="numeric" maxlength="9" placeholder="537013542" required></div></div>
+            <div class="field"><label>البريد الإلكتروني</label><input type="email" id="f_email" class="mono"></div>
+            <div class="field full"><label>عنوان السكن الحالي</label><input type="text" id="f_address"></div>
+            <div class="field"><label>اسم شخص الطوارئ</label><input type="text" id="f_emname"></div>
+            <div class="field"><label>رقم هاتف الطوارئ</label><input type="tel" id="f_emphone" class="mono"></div>
+          </div>
+        </div>
+
+        <div class="tabpanel" data-panel="job">
+          <div class="field-grid">
+            <div class="field"><label>الرقم الوظيفي / كود الموظف</label><input type="text" id="f_empcode" class="mono" readonly placeholder="يُنشأ تلقائياً"></div>
+            <div class="field"><label>القسم / الإدارة <span class="req">*</span></label><div class="inline-control"><select id="f_dept" required><option value="">اختر القسم / الإدارة</option></select><button type="button" class="btn btn-sm" id="addDepartmentFromEmployeeBtn" title="إضافة قسم جديد">+</button></div></div>
+            <div class="field"><label>المسمى الوظيفي <span class="req">*</span></label><select id="f_jobtitle" required><option value="">اختر الوظيفة</option></select></div>
+            <div class="field start-date-field"><label>تاريخ المباشرة</label><div class="derived-action-row"><input type="date" id="f_startdate" readonly><button type="button" class="btn btn-sm" id="addStartDateBtn">إضافة تاريخ مباشرة</button></div></div>
+            <div class="field"><label>حالة العقد</label><input type="text" id="f_contractstatus_display" readonly class="derived-field" value="بدون عقد"></div>
+            <div class="field"><label>المنطقة / المدينة</label><select id="f_region"></select></div>
+            <div class="field"><label>المشروع</label><select id="f_project"></select></div>
+          </div>
+        </div>
+
+        <div class="tabpanel" data-panel="pay">
+          <div class="field-grid">
+            <div class="field"><label>الراتب الأساسي (ريال)</label><input type="number" id="f_basicsalary" min="0" step="0.01"></div>
+            <div class="field"><label>بدل السكن</label><div class="allowance-input"><input type="number" id="f_housing_pct" class="allowance-pct" min="0" step="0.01" placeholder="%"><input type="number" id="f_housing" min="0" step="0.01" readonly></div></div>
+            <div class="field"><label>بدل المواصلات</label><div class="allowance-input"><input type="number" id="f_transport_pct" class="allowance-pct" min="0" step="0.01" placeholder="%"><input type="number" id="f_transport" min="0" step="0.01" readonly></div></div>
+            <div class="field"><label>بدلات أخرى</label><div class="allowance-input"><input type="number" id="f_otherallow_pct" class="allowance-pct" min="0" step="0.01" placeholder="%"><input type="number" id="f_otherallow" min="0" step="0.01" readonly></div></div>
+            <div class="field"><label>استقطاعات أخرى</label><input type="number" id="f_otherded" min="0" step="0.01"></div>
+            <div class="field"><label>الأجر الأخير (إجمالي الراتب)</label><input type="number" id="f_lastwage" min="0" step="0.01" readonly class="derived-field"></div>
+          </div>
+        </div>
+
+        <div class="tabpanel" data-panel="bank">
+          <div class="field-grid bank-data-grid">
+            <div class="field full"><label>نوع الحساب البنكي</label><div class="bank-account-type-box"><label><input type="radio" name="bankAccountType" value="حساب شخصي" checked> حساب شخصي</label><label><input type="radio" name="bankAccountType" value="تفويض بنكي"> تفويض بنكي</label></div></div>
+            <div class="field full delegate-only"><label>اسم المفوض</label><input type="text" id="f_delegate_name" placeholder="اسم المفوض"></div>
+            <div class="field delegate-only"><label>مذكرة التفويض</label><div class="delegate-memo-row"><button type="button" class="btn btn-sm" id="delegateMemoBtn">تحميل مذكرة التفويض</button><input type="file" id="f_delegate_memo" accept=".pdf,.jpg,.jpeg,.png" hidden><span id="delegateMemoName"></span></div></div>
+            <div class="field"><label>رقم الايبان البنكي <span class="req">*</span></label><input type="text" id="f_iban" class="mono" placeholder="SA..." maxlength="24" inputmode="text" required></div>
+            <div class="field"><label>اسم البنك</label><input type="text" id="f_bankname" readonly></div>
+            <div class="field"><label>رقم الحساب البنكي</label><input type="text" id="f_accountno" class="mono" readonly></div>
+            <div class="field"><label>رمز البنك</label><input type="text" id="f_bankcode" class="mono" readonly></div>
+            <div class="field full bank-memo-nav"><button type="button" class="btn" id="delegationNotesBtn">الانتقال إلى مذكرات التفويض لاحقاً</button></div>
+          </div>
+        </div>
+
+        <div class="form-foot">
+          <button type="submit" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12l5 5L20 7"/></svg>
+            حفظ بيانات الموظف
+          </button>
+          <button type="button" class="btn" id="cancelFormBtn">إلغاء</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ===== ATTENDANCE ===== -->
+    <section id="view-attendance" style="display:none">
+      <div class="topbar"><div class="pagetitle"><h1>الحضور والانصراف</h1><p>سجل الحضور والانصراف الشهري للموظفين حسب المشروع</p></div><div class="topbar-actions"><button class="btn mobile-menu-btn icon-btn" data-menu><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button></div></div>
+      <div class="card section-card full-page-card">
+        <h3>سجل الحضور الشهري</h3>
+        <div class="att-toolbar attendance-filters">
+          <label style="font-size:12.5px;color:var(--ink-soft);">الشهر:</label>
+          <input type="month" id="attMonth">
+          <input type="search" id="attNameSearch" placeholder="بحث بالاسم">
+          <input type="search" id="attCodeSearch" placeholder="بحث بالكود">
+          <select id="attRegionFilter"><option value="">كل المناطق</option></select>
+          <select id="attProjectFilter"><option value="">كل المشاريع</option></select>
+          <button class="btn btn-sm" id="attExportBtn">تصدير الشهر CSV</button>
+        </div>
+        <div class="legend"><span><i style="background:var(--teal)"></i> ح = حضور</span><span><i style="background:var(--red)"></i> غ = غياب</span><span><i style="background:#C1522F"></i> ج = جزاء</span><span><i style="background:#3B4F9E"></i> ط = تغطية</span><span><i style="background:var(--gold)"></i> راحة</span><span><i style="background:#5A3E9E"></i> اضافي</span><span><i style="background:#8E3A78"></i> انسحاب</span><span><i style="background:#146B54"></i> عيد</span></div>
+        <div class="table-wrap"><table class="att-table"><thead><tr id="attHeadRow"></tr></thead><tbody id="attBody"></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- ===== EMPLOYEE ACTIONS ===== -->
+    <section id="view-actions" style="display:none">
+      <div class="topbar"><div class="pagetitle"><h1>إجراءات الموظفين</h1><p>تسجيل ومتابعة الجزاءات والإجراءات الخاصة بالموظفين</p></div><div class="topbar-actions"><button class="btn mobile-menu-btn icon-btn" data-menu><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button></div></div>
+      <div class="card section-card full-page-card">
+        <h3>سجل الإجراءات والجزاءات</h3>
+        <div class="reason-presets"><span class="reason-chip" data-days="2" data-type="غياب مفاجئ بدون إذن">غياب مفاجئ بدون إذن — خصم يومين</span><span class="reason-chip" data-days="1" data-type="مخالفة الزي الرسمي">مخالفة الزي الرسمي — خصم يوم</span><span class="reason-chip" data-days="3" data-type="الانسحاب من الموقع">الانسحاب من الموقع — خصم 3 أيام</span><span class="reason-chip" data-days="0" data-type="أخرى">أخرى</span></div>
+        <form id="penaltyForm" class="field-grid" style="margin-bottom:16px"><div class="field"><label>الموظف</label><select id="p_emp" required></select></div><div class="field"><label>التاريخ</label><input type="date" id="p_date" required></div><div class="field"><label>سبب الإجراء</label><input type="text" id="p_type" required></div><div class="field"><label>عدد أيام الخصم</label><input type="number" id="p_days" min="0" step="0.5"></div><div class="field full"><label>ملاحظات</label><input type="text" id="p_notes"></div><div class="field full" style="flex-direction:row"><button type="submit" class="btn btn-primary btn-sm">إضافة إجراء</button></div></form>
+        <div class="table-wrap"><table><thead><tr><th>الموظف</th><th>التاريخ</th><th>السبب / الإجراء</th><th>أيام الخصم</th><th>ملاحظات</th><th></th></tr></thead><tbody id="penaltyTableBody"></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- ===== COVERAGE (تغطيات) -->
+    <section id="view-coverage" style="display:none">
+      <div class="topbar"><div class="pagetitle"><h1>التغطيات</h1><p>سجل تغطية المواقع والمستحقات المترتبة عليها</p></div><div class="topbar-actions"><button class="btn mobile-menu-btn icon-btn" data-menu>☰</button><button class="btn" id="covExportBtn">تصدير CSV</button></div></div>
+      <div class="card section-card" style="margin-bottom:18px;">
+        <div class="section-head-row"><h3>إضافة / تعديل تغطية</h3><button type="button" class="btn btn-sm" id="covNewBtn">+ إضافة جديدة</button></div>
+        <form id="coverageForm" class="field-grid">
+          <input type="hidden" id="c_id">
+          <div class="field field-with-action"><label>اسم الحارس القائم بالتغطية</label><div class="inline-control"><select id="c_guard" required></select><button type="button" class="btn btn-sm" id="covAddGuardBtn">+ إضافة حارس</button></div></div>
+          <div class="field field-with-action"><label>الوردية</label><div class="inline-control"><select id="c_shift" required></select><button type="button" class="btn btn-sm" id="covAddShiftBtn">+ إضافة وردية</button></div></div>
+          <div class="field"><label>الموقع</label><select id="c_location" required></select></div>
+          <div class="field"><label>تاريخ التغطية</label><input type="date" id="c_date" required></div>
+          <div class="field"><label>اسم الحارس الغائب (الذي تمت تغطيته)</label><select id="c_absent" required></select></div>
+          <div class="field"><label>الحالة</label><select id="c_status" required><option>غياب</option><option>انسحاب</option><option>راحة</option><option>اجازة سنوية</option><option>اجازة مرضية</option><option>اخرى</option></select></div>
+          <div class="field"><label>المستحق (ريال)</label><div class="inline-control"><input type="number" id="c_amount" min="0" step="0.01"><button type="button" class="btn btn-sm" id="covOtherAmountBtn">+ مبلغ آخر</button></div><small id="covAmountHint" class="field-note">يُحسب تلقائيًا من راتب الحارس في المشروع ÷ 30.</small></div>
+          <div class="field"><label>اسم صاحب الحساب</label><div class="inline-control"><input type="text" id="c_holder" readonly><label class="check-inline"><input type="checkbox" id="c_delegate"> تفويض</label></div><input type="text" id="c_delegate_holder" placeholder="اكتب اسم صاحب الحساب الجديد" style="display:none;margin-top:8px"></div>
+          <div class="field"><label>رقم الآيبان البنكي</label><input type="text" id="c_iban" class="mono" maxlength="24" placeholder="SAxxxxxxxxxxxxxxxxxxxxxx" inputmode="text"></div>
+          <div class="field"><label>البنك</label><input type="text" id="c_bank" readonly></div>
+          <div class="field"><label>رقم الحساب</label><input type="text" id="c_account" class="mono" readonly></div>
+          <div class="field full"><label>ملاحظات</label><input type="text" id="c_notes"></div>
+          <div class="field full" style="flex-direction:row;gap:8px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary btn-sm">حفظ التغطية</button><button type="button" class="btn btn-sm" id="covSaveNewBtn">حفظ وإضافة جديدة</button><button type="button" class="btn btn-sm" id="covResetBtn">إضافة جديدة</button></div>
+        </form>
+      </div>
+      <div class="filters"><select id="covFilterStatus"><option value="">كل الحالات</option><option>غياب</option><option>انسحاب</option><option>راحة</option><option>اجازة سنوية</option><option>اجازة مرضية</option><option>اخرى</option></select><div style="margin-inline-start:auto;font-size:13px;color:var(--ink-soft);">إجمالي المستحقات: <b class="mono" id="covTotal">0</b> ﷼</div></div>
+      <div class="table-wrap"><table><thead><tr><th>الحارس المغطّي</th><th>الوردية</th><th>الموقع</th><th>التاريخ</th><th>الحارس الغائب</th><th>الحالة</th><th>المستحق</th><th>صاحب الحساب</th><th>البنك</th><th>رقم الحساب</th><th></th></tr></thead><tbody id="covTableBody"></tbody></table></div>
+    </section>
+
+    <!-- ===== EMPLOYEE CONTRACTS ===== -->
+    <section id="view-contracts" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle"><h1>عقود الموظفين</h1><p>إنشاء عقد عمل للموظف وتجهيزه للطباعة</p></div>
+        <div class="topbar-actions"><button class="btn btn-secondary" id="newContractBtn">إضافة عقد جديد</button><button class="btn btn-primary" id="printContractBtn">طباعة العقد</button></div>
+      </div>
+      <div class="contracts-layout">
+        <div class="card contract-controls">
+          <h3>بيانات العقد</h3>
+          <div class="field"><label>الموظف</label><select id="contract_emp"></select></div>
+          <div class="field"><label>رقم العقد</label><input type="text" id="contract_code" readonly placeholder="يُنشأ تلقائياً عند اختيار الموظف"></div>
+          <div class="field"><label>مدة العقد</label><input type="text" id="contract_duration" readonly placeholder="تُحسب تلقائياً من تاريخ البداية والنهاية"><small id="contractDurationNote" class="empty-note">أدخل تاريخ البداية والنهاية ليتم حساب مدة العقد تلقائياً.</small></div>
+          <div class="field"><label>تاريخ بداية العقد</label><input type="date" id="contract_start"></div>
+          <div class="field"><label>تاريخ نهاية العقد</label><input type="date" id="contract_end"></div>
+          <div class="field"><label>مكان العمل</label><input id="contract_location" placeholder="المشروع / المنطقة"></div>
+          <div class="field"><label>عدد ساعات العمل اليومية</label><input type="number" id="contract_hours" min="0" step="0.5" value="8"></div>
+          <div class="field"><label>ساعات العمل الأسبوعية</label><input type="number" id="contract_week_hours" min="0" step="1" value="48"></div>
+          <div class="field"><label>مدة فترة التجربة (بالأشهر)</label><input type="number" id="contract_probation" min="0" step="1" value="6"></div>
+          <div class="field"><label>مدة الإشعار قبل الإنهاء (بالأيام)</label><input type="number" id="contract_notice" min="0" step="1" value="30"></div>
+          <div class="field"><label>قيمة التعويض عن يوم الإخلال بالإشعار</label><input type="number" id="contract_notice_comp" min="0" step="0.01" value="300"></div>
+          <div class="field"><label>مهلة إشعار الاستقالة (بالأيام)</label><input type="number" id="contract_resign_notice" min="0" step="1" value="15"></div>
+          <div class="field full"><label>شروط أو ملاحظات إضافية للعقد</label><textarea id="contract_notes" rows="3"></textarea></div>
+          <div class="field full"><label>تحرير نص العقد</label><div class="empty-note">يمكن تعديل أي بند أو نص مباشرة داخل ورقة العقد. استخدم «إعادة إنشاء النموذج» للعودة للنص الأصلي.</div></div>
+          <div class="action-row"><button class="btn btn-primary" id="saveContractBtn">حفظ العقد</button><button class="btn btn-secondary" id="rebuildContractBtn" type="button">إعادة إنشاء النموذج</button></div>
+          <div id="contractSavedNote" class="empty-note" style="margin-top:10px"></div>
+        </div>
+        <div class="contract-preview"><div class="contract-sheet" id="contractSheet"></div></div>
+      </div>
+    </section>
+
+    <!-- ===== ALL EMPLOYEE CONTRACTS ===== -->
+    <section id="view-allcontracts" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle"><h1>كل العقود</h1><p>عرض جميع العقود التي تم إنشاؤها وحفظها مع إمكانية التصفية والتعديل</p></div>
+      </div>
+      <div class="card all-contracts-card">
+        <div class="all-contracts-filters">
+          <div class="field"><label>المنطقة</label><select id="allContractsRegion"><option value="">كل المناطق</option></select></div>
+          <div class="field"><label>المشروع</label><select id="allContractsProject"><option value="">كل المشاريع</option></select></div>
+          <div class="field"><label>القسم</label><select id="allContractsDept"><option value="">كل الأقسام</option></select></div>
+          <div class="field"><label>بحث</label><input type="text" id="allContractsSearch" placeholder="اسم الموظف أو الرقم الوظيفي أو المسمى"></div>
+        </div>
+        <div class="all-contracts-summary"><span>العقود المحفوظة</span><b id="allContractsCount">0</b></div>
+        <div class="table-wrap">
+          <table class="all-contracts-table"><colgroup><col class="ac-code"><col class="ac-empcode"><col class="ac-name"><col class="ac-region"><col class="ac-project"><col class="ac-dept"><col class="ac-job"><col class="ac-date"><col class="ac-date"><col class="ac-duration"><col class="ac-action"></colgroup>
+            <thead><tr><th>رقم العقد</th><th>الرقم الوظيفي</th><th>الموظف</th><th>المنطقة</th><th>المشروع</th><th>القسم</th><th>المسمى الوظيفي</th><th>بداية العقد</th><th>نهاية العقد</th><th>مدة العقد</th><th>إجراء</th></tr></thead>
+            <tbody id="allContractsTableBody"></tbody>
+          </table>
+        </div>
+        <div id="allContractsEmpty" class="empty-note" style="display:none;text-align:center;padding:25px">لا توجد عقود محفوظة تطابق الفلاتر الحالية.</div>
+      </div>
+    </section>
+
+    <!-- ===== DOCUMENTS ===== -->
+    <section id="view-documents" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle">
+          <h1>المستندات</h1>
+          <p>إصدار وطباعة مستندات الموظف جاهزة للتعبئة والتوقيع</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn mobile-menu-btn icon-btn" data-menu>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <button class="btn btn-primary" id="printDocBtn">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-5a1 1 0 011-1h16a1 1 0 011 1v5a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
+            طباعة المستند
+          </button>
+        </div>
+      </div>
+
+      <div class="card section-card no-print" style="margin-bottom:16px;">
+        <h3>بيانات الشركة (تظهر في المستندات)</h3>
+        <div class="field-grid">
+          <div class="field"><label>اسم الشركة</label><input type="text" id="s_company"></div>
+          <div class="field"><label>رقم السجل التجاري</label><input type="text" id="s_cr" class="mono"></div>
+          <div class="field"><label>اسم المدير العام</label><input type="text" id="s_manager"></div>
+          <div class="field"><label>جوال المدير العام</label><input type="tel" id="s_managerphone" class="mono"></div>
+        </div>
+      </div>
+
+      <div class="doc-layout">
+        <div class="card doc-picker no-print">
+          <div class="field"><label>الموظف</label><select id="doc_emp"></select></div>
+          <div class="doc-type-btn active" data-doc="contract">عقد عمل</div>
+          <div class="doc-type-btn" data-doc="penalties">لائحة الجزاءات والخصومات</div>
+          <div class="doc-type-btn" data-doc="directwork">مباشرة عمل</div>
+          <div class="doc-type-btn" data-doc="fileundertaking">تعهد بإكمال ملف التوظيف</div>
+          <div class="doc-type-btn" data-doc="guarantee">كفالة حضورية وغرم</div>
+          <div class="doc-type-btn" data-doc="medical">استمارة كشف طبي</div>
+          <div class="doc-type-btn" data-doc="salarytransfer">إقرار تحويل راتب</div>
+        </div>
+        <div class="doc-sheet-wrap">
+          <div class="doc-sheet" id="docSheet"></div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ===== PROJECT ACCOUNTS ===== -->
+    <section id="view-projectaccounts" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle"><h1>حسابات المشاريع</h1><p>حاسبة تكاليف المناقصات وسعر العرض قبل الضريبة</p></div>
+        <div class="topbar-actions"><button class="btn" id="resetProjectAccountBtn">حساب جديد</button><button class="btn btn-primary" id="saveProjectAccountBtn">حفظ الحساب</button><button class="btn" id="printProjectAccountBtn">طباعة الحساب</button></div>
+      </div>
+
+      <div class="project-account-grid">
+        <div class="card section-card">
+          <h3>بيانات المشروع</h3>
+          <div class="field-grid">
+            <div class="field full"><label>اسم المشروع</label><input id="pa_name" placeholder="مثال: مشروع حراسة مجمع..." /></div>
+            <div class="field"><label>مدة المشروع (أيام)</label><input type="number" id="pa_days" min="0" step="1" value="30"></div>
+            <div class="field"><label>مدة المشروع (أشهر)</label><input type="number" id="pa_months" min="0" step="0.01" value="1"></div>
+            <div class="field"><label>عدد الحراس</label><input type="number" id="pa_guards" min="0" step="1" value="0"></div>
+            <div class="field"><label>عدد المشرفين</label><input type="number" id="pa_supervisors" min="0" step="1" value="0"></div>
+            <div class="field"><label>عدد الدوريات</label><input type="number" id="pa_patrols" min="0" step="1" value="0"></div>
+            <div class="field"><label>عدد الأجهزة</label><input type="number" id="pa_devices" min="0" step="1" value="0"></div>
+            <div class="field"><label>عدد البدل</label><input type="number" id="pa_uniforms" min="0" step="1" value="0"></div>
+            <div class="field"><label>عدد مدراء الأمن</label><input type="number" id="pa_security_managers" min="0" step="1" value="0"></div>
+            <div class="field"><label>عدد أقماع وملحقات أخرى</label><input type="number" id="pa_cones" min="0" step="1" value="0"></div>
+            <div class="field"><label>هامش الربح المطلوب (ريال)</label><input type="number" id="pa_profit" min="0" value="500" step="0.01"></div>
+          </div>
+          <div class="pa-role-summary" id="pa_role_summary"></div>
+        </div>
+
+        <div class="card section-card">
+          <h3>1 — تكاليف الرواتب</h3>
+          <p class="pa-help">تظهر تفاصيل كل فئة تلقائيًا حسب العدد الموجود في بيانات المشروع. إذا كان العدد صفرًا لا تظهر الفئة في الحساب.</p>
+          <div id="pa_salary_roles" class="pa-role-sections"></div>
+          <div class="pa-results three-results">
+            <div><span>إجمالي الرواتب / شهر</span><b id="pa_salary_all_month">0 ريال</b></div>
+            <div><span>إجمالي الرواتب / مدة المشروع</span><b id="pa_salary_total_view">0 ريال</b></div>
+            <div><span>إجمالي الأفراد</span><b id="pa_total_personnel">0</b></div>
+          </div>
+          <input id="pa_salary_total" type="hidden">
+          <input id="pa_headcount" type="hidden" value="0">
+          <input id="pa_basic" type="hidden" value="0">
+        </div>
+
+        <div class="card section-card">
+          <h3>2 — تكاليف التأمينات الاجتماعية</h3>
+          <label class="check-line"><input type="checkbox" id="pa_gosi_enabled"> تفعيل التأمينات الاجتماعية</label>
+          <div class="field-grid">
+            <div class="field"><label>حصة الموظف %</label><input type="number" id="pa_gosi_employee_pct" min="0" value="0" step="0.01"></div>
+            <div class="field"><label>حصة الشركة %</label><input type="number" id="pa_gosi_company_pct" min="0" value="0" step="0.01"></div>
+          </div>
+          <div id="pa_gosi_roles" class="pa-role-sections"></div>
+          <div class="pa-results three-results"><div><span>إجمالي حصة الشركة / شهر</span><b id="pa_gosi_all_month">0 ريال</b></div><div><span>إجمالي حصة الشركة / مدة المشروع</span><b id="pa_gosi_total_view">0 ريال</b></div><div><span>إجمالي خصم الموظفين / مدة المشروع</span><b id="pa_gosi_employee_total_view">0 ريال</b></div></div>
+          <input id="pa_gosi_total" type="hidden">
+        </div>
+
+        <div class="card section-card" id="pa-leave-card">
+          <h3>3 — مخصص الإجازات</h3>
+          <label class="check-line"><input type="checkbox" id="pa_leave_enabled"> تفعيل مخصص الإجازات</label>
+          <div class="field-grid">
+            <div class="field"><label>الإجازة السنوية المستحقة (يوم)</label><select id="pa_leave_days"><option value="21">21</option><option value="30">30</option></select></div>
+          </div>
+          <div id="pa_leave_roles" class="pa-role-sections"></div>
+          <div class="pa-results three-results"><div><span>إجمالي مخصص الإجازات / شهر (مكافئ)</span><b id="pa_leave_all_month">0 ريال</b></div><div><span>إجمالي مخصص الإجازات / مدة المشروع</span><b id="pa_leave_total_view">0 ريال</b></div><div><span>أيام الاستحقاق خلال المشروع</span><b id="pa_leave_accrued">0</b></div></div>
+          <input id="pa_leave_total" type="hidden">
+          <input id="pa_leave_total_emp" type="hidden">
+        </div>
+
+        <div class="card section-card">
+          <h3>4 — بديل الراحات</h3>
+          <p class="pa-help">يمكن إدخال تكلفة بديل الراحات لكل فئة، وتُحسب تلقائيًا حسب عدد أفراد الفئة.</p>
+          <div id="pa_rest_roles" class="pa-role-sections"></div>
+          <div class="pa-results three-results"><div><span>إجمالي / شهر</span><b id="pa_rest_all_month">0 ريال</b></div><div><span>إجمالي / مدة المشروع</span><b id="pa_rest_total_view">0 ريال</b></div><div><span>إجمالي الأفراد</span><b id="pa_rest_personnel">0</b></div></div>
+          <input id="pa_rest" type="hidden"><input id="pa_rest_total" type="hidden">
+        </div>
+
+        <div class="card section-card">
+          <h3>5 — التأمين الطبي</h3>
+          <p class="pa-help">أدخل تكلفة التأمين السنوية للفرد لكل فئة. الفئات تظهر تلقائيًا حسب أعداد المشروع.</p>
+          <div id="pa_medical_roles" class="pa-role-sections"></div>
+          <div class="pa-results three-results"><div><span>إجمالي / شهر</span><b id="pa_medical_all_month">0 ريال</b></div><div><span>إجمالي / مدة المشروع</span><b id="pa_medical_total_view">0 ريال</b></div><div><span>عدد الأفراد</span><b id="pa_medical_personnel">0</b></div></div>
+          <input id="pa_medical" type="hidden"><input id="pa_medical_total" type="hidden">
+        </div>
+
+        <div class="card section-card">
+          <h3>6 — بدل الأمن والبدلات</h3>
+          <div class="field-grid"><div class="field"><label>عدد البدل في بيانات المشروع</label><input id="pa_uniforms_view" readonly></div></div>
+          <div class="type-list" id="pa_security_types">
+            <div class="type-row pa-uniform-row" data-type-row>
+              <div class="field"><label>نوع البدل</label><input type="text" class="pa-security-name" value="صيفي"></div>
+              <div class="field"><label>السعر / بدلة</label><input type="number" class="pa-security-price" min="0" value="0" step="0.01"></div>
+              <div class="field"><label>حراس / فرد</label><input type="number" class="pa-security-guards" min="0" value="1" step="1"></div>
+              <div class="field"><label>مشرفون / فرد</label><input type="number" class="pa-security-supervisors" min="0" value="0" step="1"></div>
+              <div class="field"><label>مدراء أمن / فرد</label><input type="number" class="pa-security-managers" min="0" value="0" step="1"></div>
+              <button type="button" class="small-btn danger remove-type" title="حذف">×</button>
+            </div>
+          </div>
+          <button type="button" class="small-btn add-type" id="addSecurityTypeBtn">+ إضافة نوع بدل</button>
+          <div class="pa-results three-results"><div><span>إجمالي / شهر (مكافئ)</span><b id="pa_security_all_month">0 ريال</b></div><div><span>إجمالي / مدة المشروع</span><b id="pa_security_total_view">0 ريال</b></div><div><span>إجمالي البدل المحسوب</span><b id="pa_security_units_total_view">0</b></div></div>
+          <input id="pa_security_total" type="hidden">
+        </div>
+
+        <div class="card section-card">
+          <h3>7 — أجهزة الاتصالات (برافو)</h3>
+          <div class="field-grid"><div class="field"><label>عدد الأجهزة في بيانات المشروع</label><input id="pa_devices_view" readonly></div></div>
+          <div class="type-list" id="pa_comms_types">
+            <div class="type-row pa-uniform-row" data-type-row>
+              <div class="field"><label>نوع الجهاز</label><input type="text" class="pa-comms-name" value="Zain"></div>
+              <div class="field"><label>السعر / جهاز</label><input type="number" class="pa-comms-price" min="0" value="0" step="0.01"></div>
+              <div class="field"><label>حراس / فرد</label><input type="number" class="pa-comms-guards" min="0" value="1" step="1"></div>
+              <div class="field"><label>مشرفون / فرد</label><input type="number" class="pa-comms-supervisors" min="0" value="0" step="1"></div>
+              <div class="field"><label>مدراء أمن / فرد</label><input type="number" class="pa-comms-managers" min="0" value="0" step="1"></div>
+              <button type="button" class="small-btn danger remove-type" title="حذف">×</button>
+            </div>
+          </div>
+          <button type="button" class="small-btn add-type" id="addCommsTypeBtn">+ إضافة نوع جهاز</button>
+          <div class="pa-results three-results"><div><span>إجمالي / شهر (مكافئ)</span><b id="pa_comms_all_month">0 ريال</b></div><div><span>إجمالي / مدة المشروع</span><b id="pa_comms_total_view">0 ريال</b></div><div><span>إجمالي الأجهزة المحسوب</span><b id="pa_comms_units_total_view">0</b></div></div>
+          <input id="pa_comms_total" type="hidden">
+        </div>
+
+        <div class="card section-card" id="pa-eos-card">
+          <h3>8 — مكافأة نهاية الخدمة</h3>
+          <label class="check-line"><input type="checkbox" id="pa_eos_enabled"> تفعيل مخصص نهاية الخدمة</label>
+          <div id="pa_eos_roles" class="pa-role-sections"></div>
+          <div class="pa-results three-results"><div><span>إجمالي / شهر (مكافئ)</span><b id="pa_eos_all_month">0 ريال</b></div><div><span>إجمالي / مدة المشروع</span><b id="pa_eos_total_view">0 ريال</b></div><div><span>مدة الخدمة المحتسبة</span><b id="pa_eos_years">0</b></div></div>
+          <input id="pa_eos_emp" type="hidden"><input id="pa_eos_total" type="hidden">
+        </div>
+
+        <div class="card section-card">
+          <h3>9 — الدوريات والسيارات</h3>
+          <p class="pa-help">يظهر عدد الدوريات تلقائيًا من بيانات المشروع، وتُدخل تكلفة الدورية/السيارة حسب عرض المشروع.</p>
+          <div class="field-grid">
+            <div class="field"><label>عدد الدوريات</label><input id="pa_patrols_view" readonly></div>
+            <div class="field"><label>تكلفة الدورية / السيارة / شهر</label><input type="number" id="pa_patrol_price" min="0" value="0" step="0.01"></div>
+          </div>
+          <div class="pa-results three-results"><div><span>الإجمالي / شهر</span><b id="pa_patrols_all_month">0 ريال</b></div><div><span>الإجمالي / مدة المشروع</span><b id="pa_patrols_total_view">0 ريال</b></div><div><span>عدد الدوريات</span><b id="pa_patrols_count_view">0</b></div></div>
+          <input id="pa_patrols_total" type="hidden">
+        </div>
+
+        <div class="card section-card">
+          <h3>9 — الأقماع والملحقات الأخرى</h3>
+          <div class="field-grid">
+            <div class="field"><label>عدد الأقماع والملحقات</label><input id="pa_cones_view" readonly></div>
+            <div class="field"><label>التكلفة / قطعة</label><input type="number" id="pa_cones_price" min="0" value="0" step="0.01"></div>
+          </div>
+          <div class="pa-results three-results"><div><span>الإجمالي / شهر (مكافئ)</span><b id="pa_cones_all_month">0 ريال</b></div><div><span>الإجمالي / مدة المشروع</span><b id="pa_cones_total_view">0 ريال</b></div><div><span>العدد</span><b id="pa_cones_count_view">0</b></div></div>
+          <input id="pa_cones_total" type="hidden">
+        </div>
+      </div>
+
+      <div class="card section-card project-offer-card">
+        <h3>ملخص المناقصة والعرض</h3>
+        <div class="tender-table" id="pa_tender_table"></div>
+        <div class="offer-grid">
+          <div><span>إجمالي تكلفة المشروع</span><b id="pa_cost_total">0 ريال</b></div>
+          <div><span>هامش الربح</span><b id="pa_profit_total">0 ريال</b></div>
+          <div class="offer-final"><span>العرض المطلوب قبل الضريبة</span><b id="pa_offer_total">0 ريال</b></div>
+        </div>
+        <div class="final-cost-summary">
+  <div><span>التكلفة للفرد الواحد / شهر</span><b id="pa_final_emp_month">0 ريال</b></div>
+  <div><span>تكلفة جميع الأفراد / شهر</span><b id="pa_final_all_month">0 ريال</b></div>
+  <div><span>إجمالي تكلفة جميع الأفراد / مدة العقد</span><b id="pa_final_contract">0 ريال</b></div>
+</div>
+<div class="account-breakdown" id="pa_breakdown"></div>
+      </div>
+    </section>
+
+    <!-- ===== PAYROLL ===== -->
+    <section id="view-reports" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle">
+          <h1>مسير الرواتب</h1>
+          <p>مسير الرواتب بتصميم مطابق للمسير المرفق مع ربطه بالحضور والانصراف</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn mobile-menu-btn icon-btn" data-menu>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+          <button class="btn" id="printReportBtn">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-5a1 1 0 011-1h16a1 1 0 011 1v5a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
+            طباعة الكشف
+          </button>
+        </div>
+      </div>
+      <div class="card section-card full-page-data-card" style="margin-bottom:18px;">
+        <div class="att-toolbar">
+          <input type="month" id="payrollMonth" style="min-width:170px;">
+          <input type="search" id="payrollSearch" placeholder="بحث بالاسم أو الكود أو المنطقة أو المشروع" style="min-width:320px;">
+          <span class="pill pill-gray" id="payrollCount">0 موظف</span>
+        </div>
+        <div class="table-wrap">
+          <table class="payroll-table payroll-statement-table">
+            <thead><tr><th>م</th><th>الاسم</th><th>الموقع</th><th>الوظيفة</th><th>اليوم</th><th>اساسي</th><th>بدلات</th><th>اضافي</th><th>الاجمال</th><th>خصومات</th><th>غيابات</th><th>جزاء</th><th>بدلة</th><th>صحيفة</th><th>انسحاب</th><th>اخري</th><th>خصم</th><th>الصافي</th><th>البنك</th><th>السبب</th><th>الإجراء</th></tr></thead>
+            <tbody id="reportTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- profile drawer -->
+<div class="overlay" id="profileOverlay">
+  <div class="drawer">
+    <div class="drawer-head">
+      <h2>ملف الموظف</h2>
+      <div style="display:flex; gap:6px;">
+        <button class="btn btn-sm" id="profileEditBtn">تعديل</button>
+        <button class="btn btn-sm btn-danger" id="profileDeleteBtn">حذف</button>
+        <button class="btn icon-btn btn-ghost" id="profileCloseBtn">✕</button>
+      </div>
+    </div>
+    <div class="drawer-body" id="profileBody"></div>
+  </div>
+</div>
+
+<!-- delete confirm -->
+<div class="overlay" id="confirmOverlay">
+  <div class="card confirm-box">
+    <h3>تأكيد الحذف</h3>
+    <p id="confirmText">هل أنت متأكد من حذف بيانات هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.</p>
+    <div class="confirm-actions">
+      <button class="btn btn-danger" id="confirmDeleteYes">نعم، احذف</button>
+      <button class="btn" id="confirmDeleteNo">تراجع</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/firebase-init.js" type="module"></script>
+<script src="js/data.js" defer></script>
+<script src="js/app.js" defer></script>
+<script>
+(function(){
+  function fallbackEmployeeCancel(e){
+    if(e){ e.preventDefault(); e.stopImmediatePropagation(); }
+    var sections=document.querySelectorAll('main > section[id^="view-"]');
+    sections.forEach(function(sec){sec.style.display='none';});
+    var emp=document.getElementById('view-employees');
+    if(emp) emp.style.display='';
+    try{ if(typeof window.renderEmployeeTable==='function') window.renderEmployeeTable(); }catch(err){}
+  }
+  document.addEventListener('click',function(e){
+    if(e.target && e.target.closest && e.target.closest('#cancelFormBtn')) fallbackEmployeeCancel(e);
+  },true);
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Escape') return;
+    var add=document.getElementById('view-add');
+    if(!add || add.style.display==='none') return;
+    fallbackEmployeeCancel(e);
+  },true);
+})();
+</script>
+</body>
+</html>

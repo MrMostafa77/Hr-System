@@ -1,0 +1,107 @@
+// Firebase Authentication + Firestore bootstrap.
+// No npm/build step is required; this project is static and GitHub/Firebase Hosting ready.
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyBy0jJ6FVqNJBvdEhRd2Zv3prYaSchwL_w',
+  authDomain: 'mostafa-s-myth.firebaseapp.com',
+  projectId: 'mostafa-s-myth',
+  storageBucket: 'mostafa-s-myth.firebasestorage.app',
+  messagingSenderId: '131950634248',
+  appId: '1:131956634248:web:7dcae2a4e72b5caeedb8bd',
+  measurementId: 'G-D44B5N4WZW'
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const firestore = getFirestore(app);
+const stateRef = doc(firestore, 'hr_system', 'main');
+
+window.FB = {
+  app, auth, firestore,
+  hydrateState: async (fallbackState) => {
+    const snap = await getDoc(stateRef);
+    if (snap.exists()) return snap.data();
+    await setDoc(stateRef, { ...fallbackState, updatedAt: new Date().toISOString() });
+    return fallbackState;
+  },
+  saveState: async (state) => setDoc(stateRef, { ...state, updatedAt: new Date().toISOString() }),
+  startRealtimeSync: (callback) => onSnapshot(stateRef, snap => callback(snap.exists() ? snap.data() : null), err => console.error('Firestore realtime sync failed:', err))
+};
+
+function ensureLoginUI(){
+  if(document.getElementById('firebaseLogin')) return;
+  const box=document.createElement('div');
+  box.id='firebaseLogin';
+  box.innerHTML=`
+    <div class="firebase-login-card">
+      <div class="firebase-login-mark">HR</div>
+      <div class="firebase-login-kicker">HR MANAGEMENT SYSTEM</div>
+      <h2>تسجيل الدخول</h2>
+      <p>أدخل بيانات حساب Firebase للوصول إلى النظام.</p>
+      <form id="firebaseLoginForm" autocomplete="on">
+        <label>البريد الإلكتروني<input id="firebaseEmail" type="email" autocomplete="username" required placeholder="البريد الإلكتروني"></label>
+        <label>كلمة المرور<input id="firebasePassword" type="password" autocomplete="current-password" required placeholder="كلمة المرور"></label>
+        <button class="btn btn-primary firebase-login-btn" type="submit">دخول</button>
+        <div id="firebaseLoginError" class="firebase-login-error" role="alert"></div>
+      </form>
+    </div>`;
+  document.body.appendChild(box);
+  const form=document.getElementById('firebaseLoginForm');
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
+    const email=document.getElementById('firebaseEmail').value.trim();
+    const password=document.getElementById('firebasePassword').value;
+    const err=document.getElementById('firebaseLoginError');
+    const btn=form.querySelector('button[type=submit]');
+    err.textContent=''; btn.disabled=true; btn.textContent='جارٍ الدخول...';
+    try{ await signInWithEmailAndPassword(auth,email,password); }
+    catch(ex){
+      const map={
+        'auth/invalid-credential':'البريد الإلكتروني أو كلمة المرور غير صحيحة.',
+        'auth/invalid-email':'صيغة البريد الإلكتروني غير صحيحة.',
+        'auth/user-disabled':'هذا الحساب معطّل.',
+        'auth/too-many-requests':'تمت محاولات كثيرة. حاول مرة أخرى لاحقاً.',
+        'auth/network-request-failed':'تعذر الاتصال بالإنترنت.'
+      };
+      err.textContent=map[ex?.code]||'تعذر تسجيل الدخول. تحقق من إعدادات Firebase.';
+    } finally { btn.disabled=false; btn.textContent='دخول'; }
+  });
+}
+
+function showLogin(){
+  ensureLoginUI();
+  document.body.classList.add('firebase-locked');
+  document.getElementById('firebaseLogin').classList.add('show');
+}
+function installUserBar(user){
+  const side=document.querySelector('.side-bottom');
+  if(!side || document.getElementById('firebaseUserBar')) return;
+  const wrap=document.createElement('div');
+  wrap.id='firebaseUserBar'; wrap.className='firebase-user-bar';
+  wrap.innerHTML='<span id="firebaseUserEmail"></span><button type="button" id="firebaseLogoutBtn" class="btn btn-sm">خروج</button>';
+  side.parentNode.insertBefore(wrap,side);
+  document.getElementById('firebaseLogoutBtn').onclick=window.firebaseSignOut;
+}
+function showApp(user){
+  ensureLoginUI();
+  document.body.classList.remove('firebase-locked');
+  document.getElementById('firebaseLogin').classList.remove('show');
+  installUserBar(user);
+  const badge=document.getElementById('firebaseUserEmail');
+  if(badge) badge.textContent=user?.email||'';
+}
+window.firebaseSignOut=async()=>{ await signOut(auth); location.reload(); };
+
+window.firebaseUserReady = new Promise(resolve=>{
+  let resolved=false;
+  onAuthStateChanged(auth,user=>{
+    if(user){ showApp(user); if(!resolved){resolved=true;resolve(user);} }
+    else showLogin();
+  });
+});
+
+if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',ensureLoginUI,{once:true});
+else ensureLoginUI();
