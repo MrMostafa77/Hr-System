@@ -5,13 +5,12 @@ import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyBy0jJ6FVqNJBvdEhRd2Zv3prYaSchwL_w',
-  authDomain: 'mostafa-s-myth.firebaseapp.com',
-  projectId: 'mostafa-s-myth',
-  storageBucket: 'mostafa-s-myth.firebasestorage.app',
-  messagingSenderId: '131950634248',
-  appId: '1:131956634248:web:7dcae2a4e72b5caeedb8bd',
-  measurementId: 'G-D44B5N4WZW'
+  apiKey: 'AIzaSyCnUTSCdtYjQg-OIH8D9GwdKjcow_LTK-k',
+  authDomain: 'mostafa-s-myth-hr.firebaseapp.com',
+  projectId: 'mostafa-s-myth-hr',
+  storageBucket: 'mostafa-s-myth-hr.firebasestorage.app',
+  messagingSenderId: '518432597475',
+  appId: '1:518432597475:web:890fe91da72c7ea1aeecd6'
 };
 
 const app = initializeApp(firebaseConfig);
