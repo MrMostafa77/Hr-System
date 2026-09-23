@@ -144,11 +144,27 @@
   .search-box{position:relative; flex:1; min-width:200px;}
   .search-box input{width:100%; padding:9px 34px 9px 12px;}
   .search-box svg{position:absolute; right:11px; top:50%; transform:translateY(-50%); width:15px; height:15px; opacity:.55;}
-  select, input[type=text], input[type=search], input[type=date], input[type=number], input[type=email], input[type=tel], textarea{
-    font-family:inherit; font-size:13.4px; padding:9px 11px; border-radius:8px; border:1px solid var(--border);
+  /* Unified form controls: used consistently across all add/edit forms */
+  select, input[type=text], input[type=search], input[type=date], input[type=number], input[type=email], input[type=tel], input[type=month], textarea{
+    box-sizing:border-box; width:100%; min-height:40px;
+    font-family:inherit; font-size:13.4px; line-height:1.4;
+    padding:9px 12px; border-radius:9px; border:1px solid var(--border);
     background:var(--surface); color:var(--ink); outline:none;
+    transition:border-color .18s ease, box-shadow .18s ease, background .18s ease;
+  }
+  select{cursor:pointer; padding-inline-start:11px; padding-inline-end:34px;}
+  input::placeholder, textarea::placeholder{color:#9aa4b2; opacity:1;}
+  select:hover, input[type=text]:hover, input[type=search]:hover, input[type=date]:hover, input[type=number]:hover, input[type=email]:hover, input[type=tel]:hover, input[type=month]:hover, textarea:hover{
+    border-color:#c7d0dc;
   }
   select:focus, input:focus, textarea:focus{border-color:var(--teal); box-shadow:0 0 0 3px var(--teal-soft);}
+  input:disabled, input[readonly], select:disabled, textarea:disabled{background:var(--border-soft); color:var(--ink-soft);}
+
+  /* The department/job editor follows the same spacing and control proportions. */
+  .dept-editor-card .field-grid{gap:14px;}
+  .dept-editor-card input, .dept-editor-card select{min-height:42px;}
+  .dept-editor-card .field label{margin-bottom:1px;}
+  .dept-editor-card .action-row{margin-top:4px;}
 
   .table-wrap{overflow-x:auto; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface);}
   table{width:100%; border-collapse:collapse; min-width:760px;}
