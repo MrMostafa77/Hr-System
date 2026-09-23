@@ -149,7 +149,8 @@
     box-sizing:border-box; width:100%; min-height:40px;
     font-family:inherit; font-size:13.4px; line-height:1.4;
     padding:9px 12px; border-radius:9px; border:1px solid var(--border);
-    background:var(--surface); color:var(--ink); outline:none;
+    background:#14233D; color:#fff; outline:none;
+    caret-color:#fff;
     transition:border-color .18s ease, box-shadow .18s ease, background .18s ease;
   }
   select{cursor:pointer; padding-inline-start:11px; padding-inline-end:34px;}
@@ -158,7 +159,7 @@
     border-color:#c7d0dc;
   }
   select:focus, input:focus, textarea:focus{border-color:var(--teal); box-shadow:0 0 0 3px var(--teal-soft);}
-  input:disabled, input[readonly], select:disabled, textarea:disabled{background:var(--border-soft); color:var(--ink-soft);}
+  input:disabled, input[readonly], select:disabled, textarea:disabled{background:#10203A; color:#fff; opacity:.82;}
 
   /* The department/job editor follows the same spacing and control proportions. */
   .dept-editor-card .field-grid{gap:14px;}
@@ -445,9 +446,9 @@
 .project-account-grid .field input,
 .project-account-grid .field select,
 .project-account-grid .field textarea{
-  background:#123d73 !important;
+  background:#14233D !important;
   color:#fff !important;
-  border-color:#2f6fb4 !important;
+  border-color:#334B70 !important;
   caret-color:#fff;
 }
 .project-account-grid .field input::placeholder,
@@ -455,12 +456,12 @@
 .project-account-grid .field input:focus,
 .project-account-grid .field select:focus,
 .project-account-grid .field textarea:focus{
-  background:#164b88 !important;
+  background:#123d73 !important;
   color:#fff !important;
   border-color:#5b9fe6 !important;
   box-shadow:0 0 0 2px rgba(91,159,230,.22) !important;
 }
-.project-account-grid .field input[readonly]{background:#0f315c !important;color:#fff !important;opacity:1}
+.project-account-grid .field input[readonly]{background:#10203A !important;color:#fff !important;opacity:1}
 .project-account-grid .field-grid{grid-template-columns:repeat(4,minmax(0,1fr));align-items:end}
 .project-account-grid .field.full{grid-column:1/-1}
 @media(max-width:1100px){.project-account-grid .field-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
@@ -1362,3 +1363,38 @@ body::after{
 
 /* Department action buttons */
 .dept-row-actions{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+
+/* ===== Unified input appearance =====
+   All text-entry controls use the same dark field, the same project font,
+   and white entered text. Focus/typing does not change the field background. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+select,
+textarea{
+  font-family:'JF Flat Regular','JF Flat','Segoe UI',Tahoma,sans-serif !important;
+  color:#fff !important;
+  background:#14233D !important;
+  caret-color:#fff !important;
+  border-color:#334B70 !important;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
+select:focus,
+textarea:focus{
+  color:#fff !important;
+  background:#14233D !important;
+  border-color:var(--teal) !important;
+  box-shadow:0 0 0 3px rgba(76,152,232,.14) !important;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):disabled,
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"])[readonly],
+select:disabled,
+textarea:disabled,
+textarea[readonly]{
+  color:#fff !important;
+  background:#10203A !important;
+  opacity:.82;
+}
+input::placeholder,
+textarea::placeholder{
+  color:#9AA7BA !important;
+  opacity:1 !important;
+}
