@@ -28,6 +28,7 @@
         <div class="nav-submenu">
           <a class="navlink nav-child" data-view="regions"><span>المناطق</span></a>
           <a class="navlink nav-child" data-view="projects"><span>المشاريع</span></a>
+          <a class="navlink nav-child" data-view="projectupgrade"><span>ترقية المشروع</span></a>
           <a class="navlink nav-child" data-view="departments"><span>الأقسام والوظائف</span></a>
         </div>
       </div>
@@ -243,7 +244,29 @@
         </div>
         <div class="project-summary-note">متوسط الفرد محسوب على إجمالي عدد الأفراد في المشروع.</div>
       </div>
-      <div class="card section-card full-page-card"><div class="filters" style="margin:0 0 16px"><div class="search-box" style="max-width:420px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="search" id="projectSearch" placeholder="بحث باسم المشروع"></div><span class="pill pill-gray" id="projectCount">0 مشروع</span></div><h3>قائمة المشاريع</h3><div class="table-wrap"><table class="payroll-table projects-table"><colgroup><col class="col-project"><col class="col-region"><col class="col-guards"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-action"></colgroup><thead><tr><th>المشروع</th><th>المنطقة</th><th>الحراس</th><th>إيرادات الحراس</th><th>تكاليف الحراس</th><th>إجمالي الإيرادات</th><th>إجمالي التكاليف</th><th>الإجراء</th></tr></thead><tbody id="projectsTableBody"></tbody></table></div></div>
+      <div class="card section-card full-page-card"><div class="filters" style="margin:0 0 16px"><div class="search-box" style="max-width:420px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="search" id="projectSearch" placeholder="بحث باسم المشروع أو المنطقة"></div><span class="pill pill-gray" id="projectCount">0 مشروع</span></div><h3>قائمة المشاريع</h3><div class="table-wrap"><table class="payroll-table projects-table"><colgroup><col class="col-project"><col class="col-region"><col class="col-money"><col class="col-money"><col class="col-action"></colgroup><thead><tr><th>اسم المشروع</th><th>المنطقة</th><th>جميع الإيرادات</th><th>جميع التكاليف</th><th>الإجراءات</th></tr></thead><tbody id="projectsTableBody"></tbody></table></div></div>
+    </section>
+
+    <!-- ===== PROJECT UPGRADE ===== -->
+    <section id="view-projectupgrade" style="display:none">
+      <div class="topbar"><div class="pagetitle"><h1>ترقية المشروع</h1><p>اختيار المشروع المطلوب ترقيته ومراجعة بياناته المالية الحالية</p></div><div class="topbar-actions"><button class="btn" type="button" data-view="projects">العودة إلى المشاريع</button></div></div>
+      <div class="card section-card project-upgrade-card">
+        <div class="project-upgrade-head"><div><h3>المشروع المراد ترقيته</h3><p class="empty-note">يمكن الوصول إلى هذه الشاشة مباشرة من زر ▲ الموجود بجوار كل مشروع.</p></div></div>
+        <div class="field-grid project-upgrade-grid">
+          <div class="field full"><label>اختيار المشروع</label><select id="upgradeProjectSelect"><option value="">اختر المشروع</option></select></div>
+          <div class="field"><label>اسم المشروع</label><input id="upgradeProjectName" readonly></div>
+          <div class="field"><label>المنطقة</label><input id="upgradeProjectRegion" readonly></div>
+          <div class="field"><label>جميع الإيرادات</label><input id="upgradeProjectRevenue" readonly></div>
+          <div class="field"><label>جميع التكاليف</label><input id="upgradeProjectCost" readonly></div>
+          <div class="field"><label>صافي الفرق</label><input id="upgradeProjectProfit" readonly></div>
+        </div>
+      </div>
+      <div class="card section-card project-upgrade-empty" id="projectUpgradeEmpty">
+        <div class="upgrade-icon">▲</div><h3>اختر مشروعًا للبدء</h3><p>اختر المشروع من القائمة أعلاه أو اضغط ▲ من قائمة المشاريع لفتح بياناته هنا.</p>
+      </div>
+      <div class="card section-card project-upgrade-selected" id="projectUpgradeSelected" style="display:none">
+        <div class="upgrade-selected-icon">▲</div><div><h3 id="upgradeSelectedTitle">—</h3><p id="upgradeSelectedMeta">—</p></div>
+      </div>
     </section>
 
     <!-- ===== EMPLOYEES ===== -->

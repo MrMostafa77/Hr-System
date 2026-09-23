@@ -1398,3 +1398,29 @@ textarea::placeholder{
   color:#9AA7BA !important;
   opacity:1 !important;
 }
+
+/* ===== Project list actions / upgrade ===== */
+.project-icon-actions{justify-content:center!important;align-items:center!important;gap:6px!important;flex-wrap:nowrap!important}
+.icon-action-btn{width:34px!important;height:34px!important;min-width:34px!important;padding:0!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;border-radius:9px!important}
+.icon-action-btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.icon-action-danger:hover{color:var(--red)!important;border-color:var(--red)!important;background:var(--red-soft)!important}
+.icon-action-upgrade{color:var(--gold)!important;font-size:17px!important;font-weight:900!important}
+.icon-action-upgrade:hover{border-color:var(--gold)!important;background:var(--gold-soft)!important;transform:translateY(-1px)}
+.upgrade-arrow{line-height:1;display:inline-block;transform:translateY(-1px)}
+.project-upgrade-card{margin-bottom:16px}
+.project-upgrade-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.project-upgrade-grid input[readonly]{background:var(--border-soft);font-weight:700}
+.project-upgrade-empty,.project-upgrade-selected{min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px}
+.project-upgrade-selected{flex-direction:row;justify-content:flex-start;text-align:right;min-height:auto;padding:20px}
+.upgrade-icon,.upgrade-selected-icon{font-size:38px;line-height:1;color:var(--gold);font-weight:900}
+.upgrade-selected-icon{font-size:28px}
+.project-upgrade-empty h3,.project-upgrade-selected h3{margin:0;color:var(--navy-2)}
+.project-upgrade-empty p,.project-upgrade-selected p{margin:0;color:var(--ink-soft)}
+@media(max-width:700px){.project-upgrade-grid{grid-template-columns:1fr}.project-upgrade-selected{align-items:flex-start}}
+
+/* Final project table proportions after simplifying the project list */
+#view-projects .projects-table col.col-project{width:27%!important;}
+#view-projects .projects-table col.col-region{width:18%!important;}
+#view-projects .projects-table col.col-money{width:21%!important;}
+#view-projects .projects-table col.col-action{width:13%!important;}
+#view-projects .projects-table th:last-child,#view-projects .projects-table td:last-child{width:13%!important;min-width:125px!important;}

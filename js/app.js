@@ -232,8 +232,18 @@
     set('projectSummaryProfitPerson',profit/divisor); set('projectSummaryProfitTotal',profit);
   }
 
-  function projectTotal(p){return Number(p.costTotal)||0;}
-  function projectRevenueTotal(p){return Number(p.revenueTotal)||0;}
+  function projectItemsTotal(items){
+    if(!items || typeof items!=='object') return 0;
+    return Object.values(items).reduce((sum,rows)=>sum+(Array.isArray(rows)?rows.reduce((a,row)=>a+(Number(row?.quantity)||0)*(Number(row?.unit)||0),0):0),0);
+  }
+  function projectTotal(p){
+    const stored=Number(p?.costTotal)||0;
+    return stored || projectItemsTotal(p?.costItems);
+  }
+  function projectRevenueTotal(p){
+    const stored=Number(p?.revenueTotal)||0;
+    return stored || projectItemsTotal(p?.revenueItems);
+  }
   function toggleProjectConfig(){ updateProjectTotals(); }
   function resetProjectForm(){
     document.getElementById('projectForm').reset(); document.getElementById('projectId').value='';
@@ -259,12 +269,22 @@
     }
     updateProjectTotals();
   }
+  function projectActionIcon(type, id){
+    const icons={
+      edit:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.12 2.12 0 0 0-3-3L5 17v3Z"/><path d="m14.5 7.5 2 2"/></svg>',
+      delete:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3"/></svg>',
+      upgrade:'<span class="upgrade-arrow" aria-hidden="true">▲</span>'
+    };
+    const labels={edit:'تعديل المشروع',delete:'حذف المشروع',upgrade:'ترقية المشروع'};
+    const attr=type==='edit'?`data-project-edit="${escapeAttr(id)}"`:type==='delete'?`data-project-del="${escapeAttr(id)}"`:`data-project-upgrade="${escapeAttr(id)}"`;
+    return `<button type="button" class="btn btn-sm icon-action-btn ${type==='delete'?'icon-action-danger':''} ${type==='upgrade'?'icon-action-upgrade':''}" ${attr} title="${labels[type]}" aria-label="${labels[type]}">${icons[type]}</button>`;
+  }
   function renderProjects(){
     const q=(document.getElementById('projectSearch')?.value||'').trim().toLowerCase();
     const list=projects.filter(p=>!q||[p.name,p.region].some(v=>String(v||'').toLowerCase().includes(q)));
     document.getElementById('projectCount').textContent=`${list.length} مشروع`;
     const body=document.getElementById('projectsTableBody');
-    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b></td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
+    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b></td><td>${escapeHtml(p.region||'—')}</td><td class="mono"><b>${money(projectRevenueTotal(p))}</b></td><td class="mono"><b>${money(projectTotal(p))}</b></td><td><div class="row-actions project-icon-actions">${projectActionIcon('edit',p.id)}${projectActionIcon('delete',p.id)}${projectActionIcon('upgrade',p.id)}</div></td></tr>`).join('')||'<tr><td colspan="5" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
     body.querySelectorAll('[data-project-edit]').forEach(b=>b.onclick=()=>{
       const p=projects.find(x=>x.id===b.dataset.projectEdit);if(!p)return;
       document.getElementById('projectId').value=p.id;document.getElementById('projectName').value=p.name||'';document.getElementById('projectRegion').value=p.region||'';
@@ -275,7 +295,39 @@
       renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();window.scrollTo({top:0,behavior:'smooth'});
     });
     body.querySelectorAll('[data-project-del]').forEach(b=>b.onclick=()=>{if(confirm('حذف المشروع؟')){projects=projects.filter(x=>x.id!==b.dataset.projectDel);saveProjects();renderProjects();refreshEmployeeProjectSelect();}});
+    body.querySelectorAll('[data-project-upgrade]').forEach(b=>b.onclick=()=>openProjectUpgrade(b.dataset.projectUpgrade));
   }
+  function renderProjectUpgrade(selectedId=''){
+    const select=document.getElementById('upgradeProjectSelect'); if(!select)return;
+    const current=selectedId||select.value||'';
+    select.innerHTML='<option value="">اختر المشروع</option>'+projects.map(p=>`<option value="${escapeAttr(p.id)}">${escapeHtml(p.name||'—')} — ${escapeHtml(p.region||'—')}</option>`).join('');
+    select.value=projects.some(p=>p.id===current)?current:'';
+    updateProjectUpgrade(select.value);
+  }
+  function updateProjectUpgrade(id){
+    const p=projects.find(x=>x.id===id);
+    const empty=document.getElementById('projectUpgradeEmpty'), selected=document.getElementById('projectUpgradeSelected');
+    if(!p){
+      ['upgradeProjectName','upgradeProjectRegion','upgradeProjectRevenue','upgradeProjectCost','upgradeProjectProfit'].forEach(k=>{const e=document.getElementById(k);if(e)e.value='';});
+      if(empty)empty.style.display=''; if(selected)selected.style.display='none'; return;
+    }
+    const revenue=projectRevenueTotal(p), cost=projectTotal(p), profit=revenue-cost;
+    document.getElementById('upgradeProjectName').value=p.name||'';
+    document.getElementById('upgradeProjectRegion').value=p.region||'';
+    document.getElementById('upgradeProjectRevenue').value=money(revenue);
+    document.getElementById('upgradeProjectCost').value=money(cost);
+    document.getElementById('upgradeProjectProfit').value=money(profit);
+    document.getElementById('upgradeSelectedTitle').textContent=`ترقية: ${p.name||'—'}`;
+    document.getElementById('upgradeSelectedMeta').textContent=`${p.region||'—'} • الإيرادات ${money(revenue)} • التكاليف ${money(cost)}`;
+    if(empty)empty.style.display='none'; if(selected)selected.style.display='flex';
+  }
+  function openProjectUpgrade(id){
+    renderProjectUpgrade(id);
+    expandParentGroup('projectupgrade');
+    switchView('projectupgrade');
+    const select=document.getElementById('upgradeProjectSelect'); if(select)select.value=id, updateProjectUpgrade(id);
+  }
+
   function refreshRegionSelects(){
     const opts='<option value="">اختر المنطقة</option>'+regions.map(r=>`<option value="${escapeAttr(r.name||r)}">${escapeHtml(r.name||r)}</option>`).join('');
     const e=document.getElementById('projectRegion');if(e){const cur=e.value;e.innerHTML=opts;e.value=cur;}
@@ -334,14 +386,15 @@
     saveProjects();refreshEmployeeProjectSelect();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
   document.getElementById('projectSearch').addEventListener('input',renderProjects);
+  document.getElementById('upgradeProjectSelect')?.addEventListener('change',ev=>updateProjectUpgrade(ev.target.value));
   document.querySelectorAll('[data-project-revenue-toggle],[data-project-cost-toggle]').forEach(cb=>cb.addEventListener('change',()=>{const rv=getDetailData('revenue'),cv=getDetailData('cost');renderDynamicDetails('revenue',rv);renderDynamicDetails('cost',cv);updateProjectTotals();}));
 
 
   /* ===== Universal Excel / PDF / Word exports ===== */
-  const exportableViews=['dashboard','regions','projects','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','projectaccounts','reports'];
+  const exportableViews=['dashboard','regions','projects','projectupgrade','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','projectaccounts','reports'];
   function currentViewElement(){ return currentView ? document.getElementById('view-'+currentView) : null; }
   function exportFileBase(){
-    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
+    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',projectupgrade:'ترقية المشروع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
     return titles[currentView]||'تصدير';
   }
   function exportCurrentExcel(){
@@ -408,7 +461,7 @@
     const isLandscape=['projects','allcontracts','coverage'].includes(view);
     st.textContent=`@media print { @page { size: A4 ${isLandscape?'landscape':'portrait'} !important; margin: ${isLandscape?'8mm':'10mm'} !important; } }`;
     document.head.appendChild(st);
-    ['dashboard','regions','projects','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','projectaccounts','reports'].forEach(v=>{
+    ['dashboard','regions','projects','projectupgrade','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','projectaccounts','reports'].forEach(v=>{
       document.getElementById('view-'+v).style.display = (v===view)?'':'none';
     });
     document.querySelectorAll('.navlink[data-view]').forEach(a=>{
@@ -420,6 +473,7 @@
     if(view==='dashboard') renderDashboard();
     if(view==='regions'){renderRegions();refreshRegionSelects();}
     if(view==='projects'){renderProjects();refreshRegionSelects();}
+    if(view==='projectupgrade'){renderProjectUpgrade();}
     if(view==='employees') renderEmployeeTable();
     if(view==='departments') renderDepartments();
     if(view==='add'){
