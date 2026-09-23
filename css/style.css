@@ -1343,3 +1343,6 @@ body::after{
 .bank-account-type-box{min-height:44px}
 @media(max-width:900px){.personal-identity-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){.personal-identity-row{grid-template-columns:1fr}}
+
+/* Department action buttons */
+.dept-row-actions{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}

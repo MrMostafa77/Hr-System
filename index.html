@@ -299,17 +299,23 @@
     <section id="view-departments" style="display:none">
       <div class="topbar">
         <div class="pagetitle"><h1>الأقسام والوظائف</h1><p>إدارة الأقسام وإضافة الوظائف وربطها بالموظفين</p></div>
-        <div class="topbar-actions"><button class="btn btn-primary" id="addDepartmentBtn">+ إضافة قسم جديد</button><span class="pill pill-gray" id="deptSummaryCount">0 قسم</span></div>
+        <div class="topbar-actions">
+          <button class="btn" id="addJobBtn">+ إضافة وظيفة</button>
+          <button class="btn btn-primary" id="addDepartmentBtn">+ إضافة قسم جديد</button>
+          <span class="pill pill-gray" id="deptSummaryCount">0 قسم</span>
+        </div>
       </div>
       <div class="card section-card dept-editor-card" id="departmentEditor" style="display:none;margin-bottom:16px">
         <h3 id="departmentEditorTitle">إضافة قسم جديد</h3>
         <form id="departmentForm">
           <input type="hidden" id="departmentId"><input type="hidden" id="departmentOldJob">
+          <input type="hidden" id="departmentEditorMode" value="department">
           <div class="field-grid">
-            <div class="field"><label>اسم القسم <span class="req">*</span></label><input id="departmentName" required placeholder="مثال: الموارد البشرية"></div>
-            <div class="field"><label>الوظيفة الجديدة</label><input id="departmentJob" placeholder="مثال: مسؤول موارد بشرية"></div>
+            <div class="field" id="departmentNameField"><label>اسم القسم <span class="req">*</span></label><input id="departmentName" placeholder="مثال: الموارد البشرية"></div>
+            <div class="field" id="jobDepartmentField" style="display:none"><label>اختيار القسم <span class="req">*</span></label><select id="jobDepartmentSelect"></select></div>
+            <div class="field" id="departmentJobField"><label>الوظيفة الجديدة</label><input id="departmentJob" placeholder="مثال: مسؤول موارد بشرية"></div>
           </div>
-          <div class="action-row"><button class="btn btn-primary" type="submit">حفظ</button><button class="btn" type="button" id="cancelDepartmentBtn">إلغاء</button></div>
+          <div class="action-row"><button class="btn btn-primary" type="submit" id="departmentFormSubmit">حفظ</button><button class="btn" type="button" id="cancelDepartmentBtn">إلغاء</button></div>
         </form>
       </div>
       <div class="filters">

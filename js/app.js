@@ -613,40 +613,155 @@
       const matchedJobs=jobs.filter(([job])=>matchesDept || job.toLowerCase().includes(q));
       if(!matchedJobs.length && !matchesDept)return;
       const list=matchedJobs.length?matchedJobs:[['—',0]];
-      list.forEach(([job,count],idx)=>rows.push(`<tr>${idx===0?`<td rowspan="${list.length}"><strong>${escapeHtml(dept)}</strong></td>`:''}<td>${escapeHtml(job)}</td><td>${count}</td><td><div class="row-actions">${job!=='—'?`<button class="btn btn-sm" data-job-edit="${escapeAttr(dept)}" data-job="${escapeAttr(job)}">تعديل</button><button class="btn btn-sm btn-danger" data-job-del="${escapeAttr(dept)}" data-job="${escapeAttr(job)}">حذف</button>`:''}</div></td></tr>`));
+      list.forEach(([job,count],idx)=>rows.push(`<tr>${idx===0?`<td rowspan="${list.length}"><strong>${escapeHtml(dept)}</strong><div class="row-actions dept-row-actions"><button class="btn btn-sm" data-dept-edit="${escapeAttr(dept)}">تعديل القسم</button><button class="btn btn-sm btn-danger" data-dept-del="${escapeAttr(dept)}">حذف القسم</button></div></td>`:''}<td>${escapeHtml(job)}</td><td>${count}</td><td><div class="row-actions">${job!=='—'?`<button class="btn btn-sm" data-job-edit="${escapeAttr(dept)}" data-job="${escapeAttr(job)}">تعديل</button><button class="btn btn-sm btn-danger" data-job-del="${escapeAttr(dept)}" data-job="${escapeAttr(job)}">حذف</button>`:''}</div></td></tr>`));
     });
     const body=document.getElementById('departmentsTableBody'); if(body)body.innerHTML=rows.join('');
     const badge=document.getElementById('deptSummaryCount'); if(badge)badge.textContent=`${departments.length} قسم`;
     const empty=document.getElementById('departmentsEmptyNote'); if(empty)empty.style.display=rows.length?'none':'';
-    body?.querySelectorAll('[data-job-del]').forEach(b=>b.onclick=()=>{const d=departments.find(x=>x.name===b.dataset.jobDel); if(!d)return; if(confirm('حذف الوظيفة؟')){d.jobs=(d.jobs||[]).filter(j=>j!==b.dataset.job); saveDepartments(); renderDepartments(); refreshDepartmentJobSelects();}});
-    body?.querySelectorAll('[data-job-edit]').forEach(b=>b.onclick=()=>{document.getElementById('departmentEditor').style.display='';document.getElementById('departmentEditorTitle').textContent='تعديل وظيفة';document.getElementById('departmentId').value=departments.find(x=>x.name===b.dataset.jobEdit)?.id||'';document.getElementById('departmentOldJob').value=b.dataset.job||'';document.getElementById('departmentName').value=b.dataset.jobEdit;document.getElementById('departmentJob').value=b.dataset.job||'';});
-    body?.querySelectorAll('[data-dept-del]').forEach(b=>b.onclick=()=>{const i=departments.findIndex(x=>x.id===b.dataset.deptDel);if(i<0)return;if(confirm('حذف القسم؟')){departments.splice(i,1);saveDepartments();renderDepartments();refreshDepartmentJobSelects();}});
+    body?.querySelectorAll('[data-job-del]').forEach(b=>b.onclick=()=>{
+      const d=departments.find(x=>normalizeDepartmentName(x.name)===normalizeDepartmentName(b.dataset.jobDel)); if(!d)return;
+      if(confirm(`حذف الوظيفة "${b.dataset.job}" من قسم "${d.name}"؟`)){
+        d.jobs=(d.jobs||[]).filter(j=>normalizeJobName(j)!==normalizeJobName(b.dataset.job));
+        saveDepartments(); renderDepartments(); refreshDepartmentJobSelects();
+      }
+    });
+    body?.querySelectorAll('[data-job-edit]').forEach(b=>b.onclick=()=>{
+      const d=departments.find(x=>normalizeDepartmentName(x.name)===normalizeDepartmentName(b.dataset.jobEdit)); if(!d)return;
+      const form=document.getElementById('departmentForm');
+      form.reset();
+      form.dataset.editMode='job';
+      document.getElementById('departmentEditorMode').value='job';
+      document.getElementById('departmentEditor').style.display='';
+      document.getElementById('departmentEditorTitle').textContent='تعديل وظيفة';
+      document.getElementById('departmentId').value=d.id||'';
+      document.getElementById('departmentOldJob').value=b.dataset.job||'';
+      document.getElementById('departmentName').value=d.name||'';
+      document.getElementById('departmentJob').value=b.dataset.job||'';
+      document.getElementById('departmentNameField').style.display='';
+      document.getElementById('jobDepartmentField').style.display='none';
+      document.getElementById('departmentJobField').style.display='';
+    });
+    body?.querySelectorAll('[data-dept-edit]').forEach(b=>b.onclick=()=>{
+      const d=departments.find(x=>normalizeDepartmentName(x.name)===normalizeDepartmentName(b.dataset.deptEdit)); if(!d)return;
+      const form=document.getElementById('departmentForm');
+      form.reset();
+      form.dataset.editMode='department';
+      document.getElementById('departmentEditorMode').value='department';
+      document.getElementById('departmentEditor').style.display='';
+      document.getElementById('departmentEditorTitle').textContent='تعديل القسم';
+      document.getElementById('departmentId').value=d.id||'';
+      document.getElementById('departmentOldJob').value='';
+      document.getElementById('departmentName').value=d.name||'';
+      document.getElementById('departmentJob').value='';
+      document.getElementById('departmentNameField').style.display='';
+      document.getElementById('jobDepartmentField').style.display='none';
+      document.getElementById('departmentJobField').style.display='';
+    });
+    body?.querySelectorAll('[data-dept-del]').forEach(b=>b.onclick=()=>{
+      const i=departments.findIndex(x=>normalizeDepartmentName(x.name)===normalizeDepartmentName(b.dataset.deptDel)); if(i<0)return;
+      const d=departments[i];
+      if(confirm(`حذف القسم "${d.name}" وجميع وظائفه؟`)){
+        departments.splice(i,1);
+        saveDepartments(); renderDepartments(); refreshDepartmentJobSelects();
+      }
+    });
   }
+
+  function prepareDepartmentEditor(mode='department', deptName='', jobName=''){
+    const form=document.getElementById('departmentForm');
+    const editor=document.getElementById('departmentEditor');
+    if(!form||!editor)return;
+    form.reset();
+    form.dataset.editMode=mode;
+    document.getElementById('departmentEditorMode').value=mode;
+    document.getElementById('departmentId').value='';
+    document.getElementById('departmentOldJob').value=jobName||'';
+    const nameField=document.getElementById('departmentNameField');
+    const deptField=document.getElementById('jobDepartmentField');
+    const jobField=document.getElementById('departmentJobField');
+    const deptSelect=document.getElementById('jobDepartmentSelect');
+    if(mode==='job'){
+      document.getElementById('departmentEditorTitle').textContent='إضافة وظيفة جديدة';
+      nameField.style.display='none';
+      deptField.style.display='';
+      jobField.style.display='';
+      const depts=uniqueDepts();
+      deptSelect.innerHTML='<option value="">اختر القسم</option>'+depts.map(d=>`<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('');
+      deptSelect.value=deptName||'';
+      document.getElementById('departmentJob').value=jobName||'';
+    }else{
+      document.getElementById('departmentEditorTitle').textContent='إضافة قسم جديد';
+      nameField.style.display='';
+      deptField.style.display='none';
+      jobField.style.display='';
+      document.getElementById('departmentName').value=deptName||'';
+      document.getElementById('departmentJob').value=jobName||'';
+    }
+    editor.style.display='';
+  }
+
   document.getElementById('deptSearch')?.addEventListener('input',renderDepartments);
-  document.getElementById('addDepartmentBtn')?.addEventListener('click',()=>{document.getElementById('departmentForm').reset();document.getElementById('departmentId').value='';document.getElementById('departmentOldJob').value='';document.getElementById('departmentEditorTitle').textContent='إضافة قسم جديد';document.getElementById('departmentEditor').style.display='';});
+  document.getElementById('addDepartmentBtn')?.addEventListener('click',()=>prepareDepartmentEditor('department'));
+  document.getElementById('addJobBtn')?.addEventListener('click',()=>{
+    if(!uniqueDepts().length){showToast('أضف قسمًا أولًا ثم أضف الوظيفة');return;}
+    prepareDepartmentEditor('job');
+  });
   document.getElementById('addDepartmentFromEmployeeBtn')?.addEventListener('click',()=>{
     document.getElementById('departmentForm')?.setAttribute('data-return-to','add');
     switchView('departments');
     setTimeout(()=>document.getElementById('addDepartmentBtn')?.click(),50);
   });
-  document.getElementById('cancelDepartmentBtn')?.addEventListener('click',()=>document.getElementById('departmentEditor').style.display='none');
+  document.getElementById('cancelDepartmentBtn')?.addEventListener('click',()=>{
+    const form=document.getElementById('departmentForm');
+    form?.removeAttribute('data-edit-mode');
+    document.getElementById('departmentEditor').style.display='none';
+  });
   document.getElementById('departmentForm')?.addEventListener('submit',ev=>{
-    ev.preventDefault(); const id=document.getElementById('departmentId').value, oldJob=document.getElementById('departmentOldJob').value.trim(), name=document.getElementById('departmentName').value.trim(), job=document.getElementById('departmentJob').value.trim(); if(!name){showToast('اكتب اسم القسم');return;}
-    let d=departments.find(x=>x.id===id)||departments.find(x=>x.name===name);
-    if(!d){d={id:'d'+Date.now(),name,jobs:[]};departments.push(d);} else {d.name=name;d.jobs=d.jobs||[];}
-    if(oldJob){d.jobs=d.jobs.filter(j=>j!==oldJob);}
-    if(job && !d.jobs.includes(job))d.jobs.push(job);
+    ev.preventDefault();
+    const form=document.getElementById('departmentForm');
+    const mode=form.dataset.editMode || document.getElementById('departmentEditorMode').value || 'department';
+    const id=document.getElementById('departmentId').value;
+    const oldJob=document.getElementById('departmentOldJob').value.trim();
+    const name=document.getElementById('departmentName').value.trim();
+    const job=document.getElementById('departmentJob').value.trim();
+    const selectedDept=document.getElementById('jobDepartmentSelect')?.value.trim()||'';
+
+    if(mode==='job'){
+      if(!selectedDept){showToast('اختر القسم أولًا');return;}
+      if(!job){showToast('اكتب اسم الوظيفة');return;}
+      const d=departments.find(x=>normalizeDepartmentName(x.name)===normalizeDepartmentName(selectedDept));
+      if(!d){showToast('القسم المحدد غير موجود');return;}
+      d.jobs=d.jobs||[];
+      const normalizedOld=normalizeJobName(oldJob);
+      if(normalizedOld)d.jobs=d.jobs.filter(j=>normalizeJobName(j)!==normalizedOld);
+      if(d.jobs.some(j=>normalizeJobName(j)===normalizeJobName(job))){showToast('هذه الوظيفة موجودة بالفعل في القسم');return;}
+      d.jobs.push(job);
+      saveDepartments(); renderDepartments(); refreshDepartmentJobSelects();
+      form.reset(); form.removeAttribute('data-edit-mode'); document.getElementById('departmentEditor').style.display='none';
+      showToast(oldJob?'تم تعديل الوظيفة':'تمت إضافة الوظيفة');
+      return;
+    }
+
+    if(!name){showToast('اكتب اسم القسم');return;}
+    let d=departments.find(x=>x.id===id)||departments.find(x=>normalizeDepartmentName(x.name)===normalizeDepartmentName(name));
+    const oldName=d?.name||'';
+    if(!d){d={id:'d'+Date.now(),name,jobs:[]};departments.push(d);}
+    else{
+      if(departments.some(x=>x!==d && normalizeDepartmentName(x.name)===normalizeDepartmentName(name))){showToast('اسم القسم موجود بالفعل');return;}
+      d.name=name; d.jobs=d.jobs||[];
+    }
+    if(job && !d.jobs.some(j=>normalizeJobName(j)===normalizeJobName(job)))d.jobs.push(job);
     saveDepartments(); renderDepartments(); refreshDepartmentJobSelects();
-    const returnToAdd=document.getElementById('departmentForm').getAttribute('data-return-to');
-    document.getElementById('departmentForm').removeAttribute('data-return-to');
-    document.getElementById('departmentForm').reset(); document.getElementById('departmentEditor').style.display='none';
+    const returnToAdd=form.getAttribute('data-return-to');
+    form.removeAttribute('data-return-to'); form.removeAttribute('data-edit-mode');
+    form.reset(); document.getElementById('departmentEditor').style.display='none';
     if(returnToAdd==='add'){
       switchView('add');
       refreshDepartmentJobSelects(name,'');
       document.getElementById('f_dept').value=name;
       refreshDepartmentJobSelects(name,'');
     }
-    showToast('تم حفظ القسم والوظيفة');
+    showToast(oldName?'تم تعديل القسم':'تم حفظ القسم والوظيفة');
   });
 
   function normalizeDepartmentName(v){ return String(v||'').replace(/\s+/g,' ').trim(); }
