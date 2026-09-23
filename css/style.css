@@ -1424,3 +1424,7 @@ textarea::placeholder{
 #view-projects .projects-table col.col-money{width:21%!important;}
 #view-projects .projects-table col.col-action{width:13%!important;}
 #view-projects .projects-table th:last-child,#view-projects .projects-table td:last-child{width:13%!important;min-width:125px!important;}
+
+/* ===== Employee upgrade action ===== */
+#view-employees .icon-action-upgrade{width:34px!important;height:34px!important;min-width:34px!important;padding:0!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;border-radius:9px!important;font-size:17px!important;font-weight:900!important;line-height:1!important;color:var(--gold)!important}
+#view-employees .icon-action-upgrade:hover{border-color:var(--gold)!important;background:var(--gold-soft)!important;transform:translateY(-1px)}

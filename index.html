@@ -39,6 +39,7 @@
           <a class="navlink nav-child" data-view="add"><span>إضافة موظف</span></a>
           <a class="navlink nav-child" data-view="contracts"><span>عقود الموظفين</span></a>
           <a class="navlink nav-child" data-view="allcontracts"><span>كل العقود</span></a>
+          <a class="navlink nav-child" data-view="employeeupgrade"><span>ترقية الموظفين</span></a>
         </div>
       </div>
 
@@ -537,6 +538,39 @@
           <div id="contractSavedNote" class="empty-note" style="margin-top:10px"></div>
         </div>
         <div class="contract-preview"><div class="contract-sheet" id="contractSheet"></div></div>
+      </div>
+    </section>
+
+    <!-- ===== EMPLOYEE UPGRADE ===== -->
+    <section id="view-employeeupgrade" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle"><h1>ترقية الموظفين</h1><p>اختيار الموظف وتسجيل بيانات الترقية بنفس تنسيق ترقية المشروع</p></div>
+        <div class="topbar-actions"><button class="btn" type="button" data-view="employees">العودة إلى الموظفين</button></div>
+      </div>
+      <div class="card project-upgrade-card">
+        <h3>بيانات الترقية</h3>
+        <div class="field-grid project-upgrade-grid">
+          <div class="field full"><label>اختيار الموظف</label><select id="upgradeEmployeeSelect"><option value="">اختر الموظف</option></select></div>
+          <div class="field"><label>اسم الموظف</label><input id="upgradeEmployeeName" readonly></div>
+          <div class="field"><label>الرقم الوظيفي</label><input id="upgradeEmployeeCode" readonly></div>
+          <div class="field"><label>المنطقة</label><input id="upgradeEmployeeRegion" readonly></div>
+          <div class="field"><label>المشروع</label><input id="upgradeEmployeeProject" readonly></div>
+          <div class="field"><label>القسم الحالي</label><input id="upgradeEmployeeDept" readonly></div>
+          <div class="field"><label>المسمى الوظيفي الحالي</label><input id="upgradeEmployeeCurrentJob" readonly></div>
+          <div class="field"><label>الراتب الأساسي الحالي</label><input id="upgradeEmployeeCurrentSalary" readonly></div>
+          <div class="field"><label>المسمى الوظيفي الجديد</label><input id="upgradeEmployeeNewJob" placeholder="المسمى بعد الترقية"></div>
+          <div class="field"><label>الراتب الأساسي الجديد</label><input id="upgradeEmployeeNewSalary" type="number" min="0" step="0.01" placeholder="0"></div>
+          <div class="field"><label>تاريخ سريان الترقية</label><input id="upgradeEmployeeEffectiveDate" type="date"></div>
+          <div class="field"><label>ملاحظات الترقية</label><input id="upgradeEmployeeNotes" placeholder="ملاحظات أو قرار الترقية"></div>
+          <div class="field full action-row"><button class="btn btn-primary" type="button" id="saveEmployeeUpgradeBtn">حفظ الترقية</button><button class="btn btn-secondary" type="button" id="clearEmployeeUpgradeBtn">تفريغ</button></div>
+        </div>
+      </div>
+      <div class="card project-upgrade-card" id="employeeUpgradeEmpty">
+        <div class="project-upgrade-empty"><div class="upgrade-icon">▲</div><h3>اختر موظفًا للبدء</h3><p>اختر الموظف من القائمة أعلاه أو استخدم ▲ من قائمة الموظفين لفتح بيانات الترقية هنا.</p></div>
+      </div>
+      <div class="card project-upgrade-card" id="employeeUpgradeHistoryCard" style="display:none">
+        <h3>سجل ترقيات الموظف</h3>
+        <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>من المسمى</th><th>إلى المسمى</th><th>الراتب السابق</th><th>الراتب الجديد</th><th>ملاحظات</th></tr></thead><tbody id="employeeUpgradeHistoryBody"></tbody></table></div>
       </div>
     </section>
 
