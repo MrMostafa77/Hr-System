@@ -614,7 +614,7 @@
 
 
   /* ===== Universal Excel / PDF / Word exports ===== */
-  const exportableViews=['dashboard','regions','projects','allprojects','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','projectaccounts','reports'];
+  const exportableViews=['dashboard','regions','projects','allprojects','employees','departments','add','projectpromotions','employeepromotions','attendance','actions','coverage','documents','contracts','allcontracts','commencements','projectaccounts','reports'];
   function currentViewElement(){ return currentView ? document.getElementById('view-'+currentView) : null; }
   function exportFileBase(){
     const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
@@ -729,7 +729,7 @@
   window.switchView = switchView;
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
-  const PJ_TITLES={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
+  const PJ_TITLES={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
   const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn']};
   const pjTabs={open:[],dirty:new Set()};
@@ -1921,7 +1921,7 @@
   document.getElementById('printReportBtn').addEventListener('click', ()=>window.print());
 
   /* ===== export / import ===== */
-  document.getElementById('exportBtn').addEventListener('click', ()=>{
+  document.getElementById('exportBtn')?.addEventListener('click', ()=>{
     const headers = ['الرقم الوظيفي','الاسم الكامل','رقم الهوية','القسم','المسمى الوظيفي','حالة العقد','الراتب الأساسي','بدل السكن','بدل المواصلات','بدلات أخرى','الخصومات','صافي الراتب','رقم الآيبان','البنك','الهاتف','البريد الإلكتروني'];
     const rows = employees.map(e=>[e.empcode,e.fullname,e.idnum,e.dept,e.jobtitle,employeeContractStatus(e),e.basicsalary,e.housing,e.transport,e.otherallow,(Number(e.otherded)||0),netSalary(e),e.iban,e.bankname,e.phone,e.email]);
     let csv = '\uFEFF' + headers.join(',') + '\n' + rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -1933,8 +1933,8 @@
     URL.revokeObjectURL(url);
     showToast('تم تصدير الملف بصيغة CSV');
   });
-  document.getElementById('importBtnNav').addEventListener('click', ()=>document.getElementById('importFile').click());
-  document.getElementById('importFile').addEventListener('change', (ev)=>{
+  document.getElementById('importBtnNav')?.addEventListener('click', ()=>document.getElementById('importFile')?.click());
+  document.getElementById('importFile')?.addEventListener('change', (ev)=>{
     const file = ev.target.files[0];
     if(!file) return;
     const reader = new FileReader();
