@@ -1748,3 +1748,30 @@ html[data-theme="light"] .drawer{box-shadow:-12px 0 40px rgba(23,105,194,.22);}
 /* --- شاشة الدخول --- */
 html[data-theme="light"] .firebase-login-card{border-radius:22px;box-shadow:inset 0 4px 0 #1769C2,0 24px 60px rgba(23,105,194,.25);}
 html[data-theme="light"] .firebase-login-mark{background:var(--grad-blue);box-shadow:0 8px 20px rgba(23,105,194,.35);}
+
+/* ===== التأمينات الاجتماعية — تبويب المشاريع ===== */
+.project-si{margin-top:16px;border:1px solid var(--border);border-radius:14px;padding:14px;background:linear-gradient(180deg,var(--surface),var(--gold-soft))}
+.project-si[hidden]{display:none}
+.project-si-title{font-weight:800;color:var(--ink);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.project-si-title small{font-weight:500;color:var(--ink-soft);font-size:11.5px}
+.project-si-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.project-si-box{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:13px;display:flex;flex-direction:column;gap:9px;min-width:0}
+.project-si-box.si-guard{border-top:3px solid var(--teal)}
+.project-si-box.si-company{border-top:3px solid #7C8FD6}
+.si-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.si-head h4{margin:0;color:var(--ink);font-size:14.5px}
+.si-rate{font-weight:800;padding:3px 12px;border-radius:20px;background:var(--teal-soft);color:var(--teal);direction:ltr;font-family:'IBM Plex Mono','JF Flat Regular',monospace}
+.si-row{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:8px;align-items:center;padding:9px 10px;border-radius:10px;background:var(--border-soft)}
+.si-role{display:flex;flex-direction:column;gap:2px;min-width:0}
+.si-role b{font-size:13px;color:var(--ink)}
+.si-role small,.si-amt span{font-size:11px;color:var(--ink-soft)}
+.si-amt{display:flex;flex-direction:column;gap:2px}
+.si-amt b{font-size:13.5px;color:var(--ink);white-space:nowrap}
+.si-empty{font-size:12px;color:var(--ink-soft);padding:8px 2px}
+.si-total{display:flex;justify-content:space-between;align-items:center;gap:8px;padding-top:9px;border-top:1px dashed var(--border);font-size:12.5px;color:var(--ink-soft)}
+.si-total b{font-size:16px;color:var(--ink);white-space:nowrap}
+@media(max-width:1000px){.project-si-grid{grid-template-columns:1fr}}
+@media(max-width:520px){.si-row{grid-template-columns:1fr 1fr}.si-role{grid-column:1/-1}}
+html[data-theme="light"] .project-si{background:linear-gradient(180deg,#FFFFFF,#F0F6FF);box-shadow:var(--shadow-sm)}
+html[data-theme="light"] .project-si-box{box-shadow:0 1px 2px rgba(11,77,176,.05),0 6px 16px rgba(23,105,194,.07)}
+html[data-theme="light"] .si-row{background:#EEF5FF}

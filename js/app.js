@@ -156,6 +156,34 @@
     guards:'حارس أمن', guardsFemale:'حارسات أمن', supervisors:'مشرفين', managers:'مدير أمن', patrols:'دوريات أمنية', devices:'أجهزة اتصالات', uniforms:'بدل أمن', extras:'ملحقات مشروع'
   };
   function money(v){return `${fmt(Number(v)||0)} ريال`;}
+
+  /* ===== التأمينات الاجتماعية (في تكاليف المشروع) ===== */
+  const SI_GUARD_RATE=10.75, SI_COMPANY_RATE=12.75;   // نسبة حصة الحارس / حصة الشركة (%)
+  const siRoles=['guards','guardsFemale','supervisors','managers'];
+  function socialInsuranceCalc(){
+    const data=getDetailData('cost'); const rows=[];
+    siRoles.forEach(key=>(data[key]||[]).forEach(r=>rows.push({key,name:projectKinds[key],salary:Number(r.unit)||0,qty:Number(r.quantity)||0})));
+    const sum=rate=>rows.reduce((a,r)=>a+r.salary*rate/100*r.qty,0);
+    return {rows,guardTotal:sum(SI_GUARD_RATE),companyTotal:sum(SI_COMPANY_RATE)};
+  }
+  function renderSocialInsurance(){
+    const box=document.getElementById('projectSocialInsurance'); if(!box)return;
+    const on=!!document.getElementById('projectSiToggle')?.checked;
+    box.hidden=!on;
+    if(!on){box.innerHTML='';return;}
+    const calc=socialInsuranceCalc();
+    const build=(cls,title,rate,total)=>`<div class="project-si-box ${cls}">
+        <div class="si-head"><h4>${title}</h4><span class="si-rate">${rate}%</span></div>
+        ${calc.rows.length?calc.rows.map(r=>`<div class="si-row">
+          <div class="si-role"><b>${r.name}</b><small>الراتب: ${money(r.salary)} × ${fmt(r.qty)}</small></div>
+          <div class="si-amt"><span>للفرد</span><b>${money(r.salary*rate/100)}</b></div>
+          <div class="si-amt"><span>للعدد</span><b>${money(r.salary*rate/100*r.qty)}</b></div>
+        </div>`).join(''):'<div class="si-empty">أضف حارس أمن وراتبه في التكاليف لحساب المبلغ.</div>'}
+        <div class="si-total"><span>إجمالي ${title}</span><b>${money(total)}</b></div>
+      </div>`;
+    box.innerHTML=`<div class="project-si-title">التأمينات الاجتماعية <small>محسوبة على راتب الفرد في المشروع</small></div>
+      <div class="project-si-grid">${build('si-guard','حصة الحارس',SI_GUARD_RATE,calc.guardTotal)}${build('si-company','حصة الشركة',SI_COMPANY_RATE,calc.companyTotal)}</div>`;
+  }
   function detailCard(mode,key,title,data={}){
     const isType=key==='devices'||key==='uniforms';
     const qty=Number(data.quantity||data.count||0)||0, unit=Number(data.unit||data.price||data.salary||0)||0;
@@ -230,6 +258,7 @@
     set('projectSummaryRevenuePerson',totalRevenue/divisor); set('projectSummaryRevenueTotal',totalRevenue);
     set('projectSummaryCostPerson',totalCost/divisor); set('projectSummaryCostTotal',totalCost);
     set('projectSummaryProfitPerson',profit/divisor); set('projectSummaryProfitTotal',profit);
+    renderSocialInsurance();
   }
 
   function projectTotal(p){return Number(p.costTotal)||0;}
@@ -253,6 +282,7 @@
       renderDynamicDetails('revenue',{});
     }else if(section==='cost'){
       document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards');
+      const siT=document.getElementById('projectSiToggle'); if(siT) siT.checked=false;
       renderDynamicDetails('cost',{});
     }else if(section==='notes'){
       document.getElementById('projectNotes').value='';
@@ -272,6 +302,7 @@
       const rev=p.revenueItems||{}, cost=p.costItems||{};
       document.querySelectorAll('[data-project-revenue-toggle]').forEach(c=>c.checked=c.dataset.projectRevenueToggle==='guards' || Array.isArray(rev[c.dataset.projectRevenueToggle]));
       document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards' || Array.isArray(cost[c.dataset.projectCostToggle]));
+      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled;
       renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();window.scrollTo({top:0,behavior:'smooth'});
     });
     body.querySelectorAll('[data-project-del]').forEach(b=>b.onclick=()=>{if(confirm('حذف المشروع؟')){projects=projects.filter(x=>x.id!==b.dataset.projectDel);saveProjects();renderProjects();refreshEmployeeProjectSelect();}});
@@ -320,7 +351,7 @@
       revenueItems, costItems, guardBasic:guardSalary, guardHousing:0, guardTransport:0, guardOther:0,
       supervisorBasic:unitFrom(costItems,'supervisors'), supervisorHousing:0, supervisorTransport:0, supervisorOther:0,
       managerBasic:unitFrom(costItems,'managers'), managerHousing:0, managerTransport:0, managerOther:0,
-      projectCostGuards:costGuards, includeBreaks:false, socialInsurance:false, socialInsuranceRate:0, patrolBilling:'', notes:document.getElementById('projectNotes').value.trim()
+      projectCostGuards:costGuards, includeBreaks:false, socialInsurance:false, socialInsuranceRate:0, siEnabled:!!document.getElementById('projectSiToggle')?.checked, siGuardRate:SI_GUARD_RATE, siCompanyRate:SI_COMPANY_RATE, siGuardTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().guardTotal:0, siCompanyTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0, patrolBilling:'', notes:document.getElementById('projectNotes').value.trim()
     };
     const allCostCards=[...document.querySelectorAll('#projectCostDetails .project-detail-card')];
     data.costTotal=allCostCards.reduce((a,c)=>a+(Number(c.querySelector('.pd-qty')?.value)||0)*(Number(c.querySelector('.pd-unit')?.value)||0),0);
@@ -334,6 +365,8 @@
     saveProjects();refreshEmployeeProjectSelect();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
   document.getElementById('projectSearch').addEventListener('input',renderProjects);
+  document.getElementById('projectSiToggle')?.addEventListener('change',renderSocialInsurance);
+  renderDynamicDetails('revenue',{});renderDynamicDetails('cost',{});updateProjectTotals();  // عرض بطاقة الحارس فور فتح التبويب
   document.querySelectorAll('[data-project-revenue-toggle],[data-project-cost-toggle]').forEach(cb=>cb.addEventListener('change',()=>{const rv=getDetailData('revenue'),cv=getDetailData('cost');renderDynamicDetails('revenue',rv);renderDynamicDetails('cost',cv);updateProjectTotals();}));
 
 
