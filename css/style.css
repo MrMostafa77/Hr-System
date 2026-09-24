@@ -1869,3 +1869,48 @@ html[data-theme="light"] .pay-auto-hint{background:linear-gradient(90deg,#EAF3FF
 #view-commencements .commencement-data-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
 @media(max-width:900px){#view-commencements .commencement-data-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:600px){#view-commencements .commencement-data-grid{grid-template-columns:1fr}}
+
+/* ===== كل المشاريع: عرض كامل بدون شريط تمرير أفقي ===== */
+#view-allprojects .all-projects-table-wrap{overflow-x:hidden!important;width:100%!important;max-width:100%!important;}
+#view-allprojects .all-projects-table{direction:rtl!important;table-layout:fixed!important;width:100%!important;min-width:0!important;max-width:100%!important;border-collapse:collapse!important;}
+#view-allprojects .all-projects-table col.ap-project{width:18%!important}
+#view-allprojects .all-projects-table col.ap-region{width:11%!important}
+#view-allprojects .all-projects-table col.ap-capacity{width:10%!important}
+#view-allprojects .all-projects-table col.ap-employees{width:10%!important}
+#view-allprojects .all-projects-table col.ap-revenue{width:13%!important}
+#view-allprojects .all-projects-table col.ap-cost{width:13%!important}
+#view-allprojects .all-projects-table col.ap-profit{width:13%!important}
+#view-allprojects .all-projects-table col.ap-action{width:12%!important}
+#view-allprojects .all-projects-table th,
+#view-allprojects .all-projects-table td{box-sizing:border-box!important;text-align:center!important;vertical-align:middle!important;padding:10px 6px!important;white-space:normal!important;overflow:hidden!important;word-break:break-word!important;}
+#view-allprojects .all-projects-table th{font-weight:800!important;line-height:1.25!important;}
+#view-allprojects .all-projects-table td{line-height:1.4!important;}
+#view-allprojects .all-projects-table .project-name-cell{text-align:right!important;padding-right:12px!important;}
+#view-allprojects .all-projects-table .money-cell{white-space:nowrap!important;font-size:12px!important;}
+#view-allprojects .all-projects-table .row-actions{display:flex!important;justify-content:center!important;align-items:center!important;gap:4px!important;flex-wrap:wrap!important;}
+#view-allprojects .all-projects-table .row-actions .btn{padding:6px 7px!important;font-size:11px!important;white-space:nowrap!important;}
+#view-allprojects .all-project-row{cursor:pointer!important;transition:background .15s ease!important;}
+#view-allprojects .all-project-row:hover{background:rgba(76,152,232,.10)!important;}
+.table-alert-dot{display:inline-flex;align-items:center;justify-content:center;margin-right:4px;font-size:12px;}
+.project-alert-panel{margin-top:24px;padding:16px;border:1px solid rgba(220,80,80,.35);border-radius:14px;background:rgba(120,25,35,.08);}
+.project-alert-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;}
+.project-alert-head h3{margin:0;font-size:17px;}
+.project-alert-table-wrap{overflow-x:hidden!important;}
+.project-alert-table{width:100%!important;table-layout:fixed!important;min-width:0!important;}
+.project-alert-table th,.project-alert-table td{width:auto!important;text-align:center!important;vertical-align:middle!important;white-space:normal!important;word-break:break-word!important;}
+.project-alert-table th:nth-child(1),.project-alert-table td:nth-child(1){width:25%!important;text-align:right!important;}
+.project-alert-table th:nth-child(2),.project-alert-table td:nth-child(2){width:18%!important;}
+.project-alert-table th:nth-child(3),.project-alert-table td:nth-child(3){width:20%!important;}
+.project-alert-table th:nth-child(4),.project-alert-table td:nth-child(4){width:37%!important;}
+.project-employee-alert{display:inline-block;margin:2px 3px;padding:4px 7px;border-radius:7px;background:rgba(220,80,80,.14);color:#ffb7b7;font-size:11px;font-weight:700;}
+.project-alert-ok{padding:12px;border-radius:10px;background:rgba(55,180,110,.10);color:#b9f1cc;text-align:center;font-weight:700;}
+.pill-danger{background:rgba(220,80,80,.16)!important;color:#ffb7b7!important;border-color:rgba(220,80,80,.3)!important;}
+/* عرض تفاصيل المشروع بشكل مريح على كامل الشاشة */
+.pj-modal{align-items:stretch!important;padding:10px!important;}
+.pj-modal-box{width:min(1400px,100%)!important;max-width:100%!important;height:calc(100vh - 20px)!important;max-height:none!important;border-radius:14px!important;}
+.pj-modal-body{overflow-y:auto!important;overflow-x:hidden!important;padding:12px 22px 24px!important;}
+@media(max-width:900px){
+  #view-allprojects .all-projects-table th,#view-allprojects .all-projects-table td{font-size:10px!important;padding:8px 3px!important;}
+  #view-allprojects .all-projects-table .row-actions .btn{font-size:9px!important;padding:5px 4px!important;}
+  #view-allprojects .all-projects-table .money-cell{font-size:10px!important;}
+}

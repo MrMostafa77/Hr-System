@@ -371,7 +371,19 @@
     }));
     const counts=projectEmployeeCounts(p.name,null), caps=Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]));
     const capRows=Object.keys(roleCapacityLabels).filter(k=>caps[k]>0).map(k=>{const over=(counts[k]||0)-caps[k];return `<tr class="${over>0?'pj-over-row':''}"><td>${roleCapacityLabels[k]}</td><td class="mono">${fmt(caps[k])}</td><td class="mono">${fmt(counts[k]||0)}</td><td class="mono">${over>0?'زيادة '+fmt(over):fmt(caps[k]-(counts[k]||0))}</td></tr>`;});
-    const alerts=projectOverList(p.name,caps).map(o=>`<div class="pj-over">⚠ تنبيه: عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('');
+    const projectEmployees=employees.filter(e=>sameProjectName(e.project,p.name));
+    const today=new Date(); today.setHours(0,0,0,0);
+    const alertRows=[];
+    projectEmployees.forEach(e=>{
+      const problems=[];
+      if(e.iddate_expiry){const d=new Date(e.iddate_expiry+'T00:00:00'); if(!Number.isNaN(d.getTime()) && d<=today) problems.push('الإقامة منتهية');}
+      const ci=employeeContractInfo(e.id); if(!ci.contract) problems.push('لا يوجد عقد');
+      const hasComm=commencements.some(c=>c.empId===e.id && sameProjectName(c.project,p.name) && c.startDate);
+      if(!hasComm) problems.push('لا توجد مباشرة عمل');
+      if(problems.length) alertRows.push(`<tr><td><b>${escapeHtml(e.fullname||'—')}</b></td><td>${escapeHtml(e.empcode||'—')}</td><td>${escapeHtml(e.jobtitle||'—')}</td><td>${problems.map(x=>`<span class="project-employee-alert">⚠ ${x}</span>`).join(' ')}</td></tr>`);
+    });
+    const alerts=[...projectOverList(p.name,caps).map(o=>`<div class="pj-over">⚠ تنبيه: عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`), ...((alertRows.length?[]:[]))].join('');
+    const employeeAlerts=`<div class="project-alert-panel"><div class="project-alert-head"><h3>شاشة التنبيهات</h3><span class="pill ${alertRows.length?'pill-danger':'pill-gray'}">${alertRows.length?`${alertRows.length} موظف يحتاج مراجعة`:'لا توجد تنبيهات'}</span></div>${alertRows.length?`<div class="table-wrap project-alert-table-wrap"><table class="payroll-table project-alert-table"><thead><tr><th>الموظف</th><th>الرقم الوظيفي</th><th>الوظيفة</th><th>التنبيهات</th></tr></thead><tbody>${alertRows.join('')}</tbody></table></div>`:`<div class="project-alert-ok">✓ لا توجد تنبيهات على موظفي المشروع بخصوص الإقامة أو العقد أو المباشرة.</div>`}</div>`;
     const tr=sumRows(rev), tc=sumRows(cost);
     const el=document.createElement('div'); el.id='pjViewModal'; el.className='pj-modal';
     el.innerHTML=`<div class="pj-modal-box" role="dialog" aria-modal="true"><div class="pj-modal-head"><h3>${escapeHtml(p.name||'')}</h3><div><button class="btn btn-sm" data-pv-edit>تعديل</button> <button class="btn btn-sm" data-pv-close>إغلاق ✕</button></div></div>
@@ -388,6 +400,7 @@
         </div>
         <div class="pj-bd-title">سعة المشروع</div>${alerts}
         <div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>البند</th><th>السعة</th><th>المضاف فعليًا</th><th>المتبقي</th></tr></thead><tbody>${capRows.join('')||'<tr><td colspan="4" class="empty-note">لا توجد سعة محددة.</td></tr>'}</tbody></table></div>
+        ${employeeAlerts}
       </div></div>`;
     document.body.appendChild(el);
     el.addEventListener('click',e=>{ if(e.target===el||e.target.closest('[data-pv-close]')) closeProjectView(); if(e.target.closest('[data-pv-edit]')){closeProjectView();document.querySelector(`[data-project-edit="${p.id}"]`)?.click();} });
@@ -513,6 +526,12 @@
     const idx=projects.findIndex(x=>x.id===data.id);if(idx>=0)projects[idx]=data;else projects.push(data);
     saveProjects();refreshEmployeeProjectSelect();refreshDepartmentJobSelects();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
+  function projectEmployeeTotal(projectName){
+    return employees.filter(e=>sameProjectName(e.project,projectName)).length;
+  }
+  function projectCapacityTotal(p){
+    return Object.keys(roleCapacityLabels).reduce((sum,k)=>sum+projectRoleCapacity(p,k),0);
+  }
   function renderAllProjectsPage(){
     const q=(document.getElementById('allProjectsSearch')?.value||'').trim().toLowerCase();
     const list=projects.filter(p=>!q||[p.name,p.region].some(v=>String(v||'').toLowerCase().includes(q)));
@@ -520,10 +539,23 @@
     const count=document.getElementById('allProjectsCount');
     if(!body)return;
     if(count) count.textContent=`${list.length} مشروع`;
-    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b></td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueTotal)||0)}</td><td class="mono">${money(Number(p.costTotal)||0)}</td><td><div class="row-actions"><button class="btn btn-sm" data-all-project-view="${p.id}">عرض</button><button class="btn btn-sm" data-all-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-all-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="6" class="empty-note">لا توجد مشاريع مضافة.</td></tr>';
-    body.querySelectorAll('[data-all-project-view]').forEach(b=>b.onclick=()=>{document.querySelector(`[data-project-view="${b.dataset.allProjectView}"]`)?.click();});
-    body.querySelectorAll('[data-all-project-edit]').forEach(b=>b.onclick=()=>{document.querySelector(`[data-project-edit="${b.dataset.allProjectEdit}"]`)?.click();});
-    body.querySelectorAll('[data-all-project-del]').forEach(b=>b.onclick=()=>{document.querySelector(`[data-project-del="${b.dataset.allProjectDel}"]`)?.click();setTimeout(renderAllProjectsPage,50);});
+    body.innerHTML=list.map(p=>{
+      const cap=projectCapacityTotal(p), emp=projectEmployeeTotal(p.name), over=emp>cap && cap>0;
+      return `<tr class="all-project-row" data-all-project-row="${p.id}" title="دبل كليك لعرض المشروع">
+        <td class="project-name-cell"><b>${escapeHtml(p.name||'—')}</b></td>
+        <td>${escapeHtml(p.region||'—')}</td>
+        <td class="mono">${fmt(cap)}</td>
+        <td class="mono">${fmt(emp)}${over?`<span class="table-alert-dot" title="عدد الموظفين أكبر من سعة المشروع">⚠</span>`:''}</td>
+        <td class="mono money-cell">${money(Number(p.revenueTotal)||0)}</td>
+        <td class="mono money-cell">${money(Number(p.costTotal)||0)}</td>
+        <td class="mono money-cell">${money((Number(p.revenueTotal)||0)-(Number(p.costTotal)||0))}</td>
+        <td><div class="row-actions"><button class="btn btn-sm" data-all-project-view="${p.id}">عرض</button><button class="btn btn-sm" data-all-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-all-project-del="${p.id}">حذف</button></div></td>
+      </tr>`;
+    }).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مضافة.</td></tr>';
+    body.querySelectorAll('[data-all-project-view]').forEach(b=>b.onclick=()=>{const p=projects.find(x=>x.id===b.dataset.allProjectView);if(p)showProjectView(p);});
+    body.querySelectorAll('[data-all-project-row]').forEach(row=>row.ondblclick=()=>{const p=projects.find(x=>x.id===row.dataset.allProjectRow);if(p)showProjectView(p);});
+    body.querySelectorAll('[data-all-project-edit]').forEach(b=>b.onclick=()=>{const p=projects.find(x=>x.id===b.dataset.allProjectEdit);if(p){switchView('projects');setTimeout(()=>{document.querySelector(`[data-project-edit="${p.id}"]`)?.click();},0);}});
+    body.querySelectorAll('[data-all-project-del]').forEach(b=>b.onclick=()=>{if(confirm('حذف المشروع؟')){projects=projects.filter(x=>x.id!==b.dataset.allProjectDel);saveProjects();renderProjects();refreshEmployeeProjectSelect();renderAllProjectsPage();}});
   }
   document.getElementById('allProjectsBtn')?.addEventListener('click',()=>{switchView('allprojects');});
   document.getElementById('backToProjectsBtn')?.addEventListener('click',()=>{switchView('projects');});
