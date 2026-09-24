@@ -420,7 +420,7 @@
 }
 
 /* Compact project tender costing layout */
-.project-account-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+.project-account-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:14px;align-items:start}
 .project-account-grid .section-card{padding:12px 14px}
 .project-account-grid .field-grid{gap:8px}
 .project-account-grid .field label{font-size:12px;margin-bottom:4px}
@@ -488,9 +488,9 @@
 
 /* Tender costing detailed summary */
 .tender-table{width:100%;margin:14px 0;border:1px solid rgba(255,255,255,.10);border-radius:10px;overflow:hidden;background:#0b1b36}
-.tender-row{display:grid;grid-template-columns:minmax(250px,1.5fr) repeat(3,minmax(190px,1fr));gap:0;border-top:1px solid rgba(255,255,255,.08);min-width:900px}
+.tender-row{display:grid;grid-template-columns:minmax(170px,1.5fr) minmax(56px,.45fr) repeat(5,minmax(118px,1fr));gap:0;border-top:1px solid rgba(255,255,255,.08);min-width:900px}
 .tender-row:first-child{border-top:0}
-.tender-row>span,.tender-row>b{padding:13px 14px;text-align:center;display:flex;align-items:center;justify-content:center;min-height:48px}
+.tender-row>span,.tender-row>b{padding:11px 8px;font-size:13px;line-height:1.4;text-align:center;display:flex;align-items:center;justify-content:center;min-height:48px}
 .tender-row>span:first-child{text-align:right;justify-content:flex-start;color:#dbe7f8}
 .tender-head{background:#123d73;font-weight:700}
 .tender-row.highlight{background:rgba(18,61,115,.55)}

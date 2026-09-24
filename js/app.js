@@ -2071,9 +2071,11 @@
     return el;
   }
   function paRoleNum(role,key,def=0){ const el=document.getElementById(`pa_${role}_${key}`); return el ? (Number(el.value)||0) : def; }
-  function renderProjectRolePanels(){
+  function renderProjectRolePanels(resetValues){
     const active=paRoleDefs.filter(r=>paRoleCount(r.key)>0);
     const ids=['pa_salary_roles','pa_gosi_roles','pa_leave_roles','pa_rest_roles','pa_medical_roles','pa_eos_roles'];
+    const keptValues={};
+    if(!resetValues) ids.forEach(cid=>document.querySelectorAll('#'+cid+' input').forEach(i=>{ if(i.id && !i.readOnly) keptValues[i.id]=i.value; }));
     ids.forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML='';});
     const roleSummary=document.getElementById('pa_role_summary');
     if(roleSummary){
@@ -2081,17 +2083,16 @@
     }
     const salary=document.getElementById('pa_salary_roles');
     active.forEach(r=>{
-      const basic=paRoleNum(r.key,'basic',r.key==='guards'?3000:0), hp=paRoleNum(r.key,'housing_pct',0), tp=paRoleNum(r.key,'transport_pct',0), op=paRoleNum(r.key,'other_pct',0);
+      const basic=paRoleNum(r.key,'basic',r.key==='guards'?3000:0), hp=paRoleNum(r.key,'housing_pct',0), tp=paRoleNum(r.key,'transport_pct',0), op=paRoleNum(r.key,'other',0);
       const box=document.createElement('div'); box.className='pa-role-block'; box.innerHTML=`
         <div class="pa-role-title"><b>${r.label}</b><span>${paRoleCount(r.key)} فرد</span></div>
         <div class="field-grid">
           <div class="field"><label>الراتب الأساسي / شهر</label><input type="number" id="pa_${r.key}_basic" min="0" step="0.01" value="${basic}"></div>
           <div class="field"><label>بدل السكن %</label><input type="number" id="pa_${r.key}_housing_pct" min="0" step="0.01" value="${hp}"></div>
           <div class="field"><label>بدل المواصلات %</label><input type="number" id="pa_${r.key}_transport_pct" min="0" step="0.01" value="${tp}"></div>
-          <div class="field"><label>البدلات الأخرى %</label><input type="number" id="pa_${r.key}_other_pct" min="0" step="0.01" value="${op}"></div>
+          <div class="field"><label>البدلات الأخرى (مبلغ ريال / شهر)</label><input type="number" id="pa_${r.key}_other" min="0" step="0.01" placeholder="0" value="${op}"></div>
           <div class="field"><label>بدل السكن المحسوب / شهر</label><input id="pa_${r.key}_housing" readonly></div>
           <div class="field"><label>بدل المواصلات المحسوب / شهر</label><input id="pa_${r.key}_transport" readonly></div>
-          <div class="field"><label>البدلات الأخرى المحسوبة / شهر</label><input id="pa_${r.key}_other" readonly></div>
           <div class="field"><label>الأجر الأخير / شهر</label><input id="pa_${r.key}_finalwage" readonly></div>
         </div>
         <div class="pa-results three-results"><div><span>الفرد / شهر</span><b id="pa_${r.key}_salary_emp_month">0 ريال</b></div><div><span>جميع ${r.label} / شهر</span><b id="pa_${r.key}_salary_all_month">0 ريال</b></div><div><span>جميع ${r.label} / مدة المشروع</span><b id="pa_${r.key}_salary_total">0 ريال</b></div></div>`;
@@ -2110,6 +2111,7 @@
       });
     };
     renderRoleMetric('pa_gosi_roles','gosi'); renderRoleMetric('pa_leave_roles','leave'); renderRoleMetric('pa_rest_roles','rest'); renderRoleMetric('pa_medical_roles','medical'); renderRoleMetric('pa_eos_roles','eos');
+    Object.keys(keptValues).forEach(id=>{const el=document.getElementById(id); if(el && !el.readOnly) el.value=keptValues[id];});
     document.getElementById('pa_uniforms_view')?.setAttribute('value',String(paVal('pa_uniforms')));
     document.getElementById('pa_devices_view')?.setAttribute('value',String(paVal('pa_devices')));
     document.getElementById('pa_cones_view')?.setAttribute('value',String(paVal('pa_cones')));
@@ -2119,9 +2121,9 @@
     calculateProjectAccount();
   }
   function roleData(key){
-    const count=paRoleCount(key), basic=paRoleNum(key,'basic',0), housingPct=paRoleNum(key,'housing_pct',0), transportPct=paRoleNum(key,'transport_pct',0), otherPct=paRoleNum(key,'other_pct',0);
-    const housing=basic*housingPct/100, transport=basic*transportPct/100, other=basic*otherPct/100, wage=basic+housing+transport+other;
-    return {count,basic,housingPct,transportPct,otherPct,housing,transport,other,wage};
+    const count=paRoleCount(key), basic=paRoleNum(key,'basic',0), housingPct=paRoleNum(key,'housing_pct',0), transportPct=paRoleNum(key,'transport_pct',0);
+    const housing=basic*housingPct/100, transport=basic*transportPct/100, other=Math.max(0,paRoleNum(key,'other',0)), wage=basic+housing+transport+other;
+    return {count,basic,housingPct,transportPct,housing,transport,other,wage};
   }
   function calculateProjectAccount(){
     const months=Math.max(0,paVal('pa_months')), days=Math.max(0,paVal('pa_days') || months*30), active=paRoleDefs.filter(r=>paRoleCount(r.key)>0);
@@ -2131,7 +2133,7 @@
     const salaryTotal=roles.reduce((sum,x)=>sum+x.data.wage*x.data.count*months,0), salaryAllMonth=roles.reduce((sum,x)=>sum+x.data.wage*x.data.count,0);
     const gosiEnabled=!!document.getElementById('pa_gosi_enabled')?.checked, empGosiPct=paVal('pa_gosi_employee_pct'), companyGosiPct=paVal('pa_gosi_company_pct');
     let gosiTotal=0, employeeGosiTotal=0;
-    roles.forEach(x=>{const base=x.data.basic+x.data.housing, emp=gosiEnabled?base*empGosiPct/100:0, comp=gosiEnabled?base*companyGosiPct/100:0, total=comp*x.data.count*months;gosiTotal+=total;employeeGosiTotal+=emp*x.data.count*months;const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=Number(v||0);};const text=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=paMoney(v);};set(`pa_${x.def.key}_housing`,x.data.housing);set(`pa_${x.def.key}_transport`,x.data.transport);set(`pa_${x.def.key}_other`,x.data.other);set(`pa_${x.def.key}_finalwage`,x.data.wage);text(`pa_${x.def.key}_salary_emp_month`,x.data.wage);text(`pa_${x.def.key}_salary_all_month`,x.data.wage*x.data.count);text(`pa_${x.def.key}_salary_total`,x.data.wage*x.data.count*months);text(`pa_${x.def.key}_gosi_base_view`,base);text(`pa_${x.def.key}_gosi_emp_view`,emp);text(`pa_${x.def.key}_gosi_company_view`,comp);text(`pa_${x.def.key}_gosi_total_view`,total);});
+    roles.forEach(x=>{const base=x.data.basic+x.data.housing, emp=gosiEnabled?base*empGosiPct/100:0, comp=gosiEnabled?base*companyGosiPct/100:0, total=comp*x.data.count*months;gosiTotal+=total;employeeGosiTotal+=emp*x.data.count*months;const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=Number(v||0);};const text=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=paMoney(v);};set(`pa_${x.def.key}_housing`,x.data.housing);set(`pa_${x.def.key}_transport`,x.data.transport);set(`pa_${x.def.key}_finalwage`,x.data.wage);text(`pa_${x.def.key}_salary_emp_month`,x.data.wage);text(`pa_${x.def.key}_salary_all_month`,x.data.wage*x.data.count);text(`pa_${x.def.key}_salary_total`,x.data.wage*x.data.count*months);text(`pa_${x.def.key}_gosi_base_view`,base);text(`pa_${x.def.key}_gosi_emp_view`,emp);text(`pa_${x.def.key}_gosi_company_view`,comp);text(`pa_${x.def.key}_gosi_total_view`,total);});
     const leaveEnabled=!!document.getElementById('pa_leave_enabled')?.checked, leaveDays=paVal('pa_leave_days')||21, eligibleAnnual=months>=12, accruedLeave=eligibleAnnual?(months/12)*leaveDays:0;
     let leaveTotal=0;
     roles.forEach(x=>{const emp=leaveEnabled&&eligibleAnnual?x.data.wage/30*accruedLeave:0,total=emp*x.data.count;leaveTotal+=total;const text=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=paMoney(v);};text(`pa_${x.def.key}_leave_wage_view`,x.data.wage);text(`pa_${x.def.key}_leave_emp_view`,emp);text(`pa_${x.def.key}_leave_total_view`,total);});
@@ -2153,8 +2155,14 @@
     set('pa_days',days);set('pa_months',months);set('pa_headcount',totalHead);set('pa_salary_total',salaryTotal);set('pa_gosi_total',gosiTotal);set('pa_leave_accrued',accruedLeave);set('pa_leave_total',leaveTotal);set('pa_rest',restTotal/safeMonths);set('pa_rest_total',restTotal);set('pa_medical',totalHead?medicalTotal/safeMonths/totalHead:0);set('pa_medical_total',medicalTotal);set('pa_security_total',securityTotal);set('pa_comms_total',commsTotal);set('pa_eos_years',years);set('pa_eos_total',eosTotal);set('pa_patrols_view',patrolsCount);set('pa_patrols_total',patrolTotal);set('pa_cones_total',conesTotal);set('pa_uniforms_view',paVal('pa_uniforms'));set('pa_devices_view',paVal('pa_devices'));set('pa_cones_view',conesCount);
     text('pa_salary_all_month',salaryAllMonth);text('pa_salary_total_view',salaryTotal);text('pa_total_personnel',totalHead);text('pa_gosi_all_month',gosiTotal/safeMonths);text('pa_gosi_total_view',gosiTotal);text('pa_gosi_employee_total_view',employeeGosiTotal);text('pa_leave_all_month',leaveTotal/safeMonths);text('pa_leave_total_view',leaveTotal);text('pa_rest_all_month',restTotal/safeMonths);text('pa_rest_total_view',restTotal);text('pa_rest_personnel',totalHead);text('pa_medical_all_month',medicalTotal/safeMonths);text('pa_medical_total_view',medicalTotal);text('pa_medical_personnel',totalHead);text('pa_security_all_month',securityTotal/safeMonths);text('pa_security_total_view',securityTotal);text('pa_security_units_total_view',securityUnitsTotal);text('pa_comms_all_month',commsTotal/safeMonths);text('pa_comms_total_view',commsTotal);text('pa_comms_units_total_view',commsUnitsTotal);text('pa_eos_all_month',eosTotal/safeMonths);text('pa_eos_total_view',eosTotal);text('pa_patrols_all_month',patrolTotal/safeMonths);text('pa_patrols_total_view',patrolTotal);text('pa_patrols_count_view',patrolsCount);text('pa_cones_all_month',conesTotal/safeMonths);text('pa_cones_total_view',conesTotal);text('pa_cones_count_view',conesCount);
     document.getElementById('pa_cost_total').textContent=paMoney(cost);document.getElementById('pa_profit_total').textContent=paMoney(profit);document.getElementById('pa_offer_total').textContent=paMoney(offer);
-    const roleRows=roles.map(x=>`<div class="tender-row"><span>${x.def.label}</span><b>${x.data.count}</b><b>${paMoney(x.data.wage*x.data.count)}</b><b>${paMoney(x.data.wage*x.data.count*months)}</b></div>`).join('');
-    document.getElementById('pa_tender_table').innerHTML=`<div class="tender-row tender-head"><span>الفئة</span><span>العدد</span><span>التكلفة / شهر</span><span>التكلفة / مدة المشروع</span></div>${roleRows}<div class="tender-row"><span>التأمينات وحصة الشركة</span><b>—</b><b>${paMoney(gosiTotal/safeMonths)}</b><b>${paMoney(gosiTotal)}</b></div><div class="tender-row"><span>الإجازات</span><b>—</b><b>${paMoney(leaveTotal/safeMonths)}</b><b>${paMoney(leaveTotal)}</b></div><div class="tender-row"><span>بديل الراحات</span><b>—</b><b>${paMoney(restTotal/safeMonths)}</b><b>${paMoney(restTotal)}</b></div><div class="tender-row"><span>التأمين الطبي</span><b>—</b><b>${paMoney(medicalTotal/safeMonths)}</b><b>${paMoney(medicalTotal)}</b></div><div class="tender-row"><span>البدل</span><b>${securityUnitsTotal}</b><b>${paMoney(securityTotal/safeMonths)}</b><b>${paMoney(securityTotal)}</b></div><div class="tender-row"><span>أجهزة الاتصالات</span><b>${commsUnitsTotal}</b><b>${paMoney(commsTotal/safeMonths)}</b><b>${paMoney(commsTotal)}</b></div><div class="tender-row"><span>الدوريات والسيارات</span><b>${patrolsCount}</b><b>${paMoney(patrolTotal/safeMonths)}</b><b>${paMoney(patrolTotal)}</b></div><div class="tender-row"><span>الأقماع والملحقات</span><b>${conesCount}</b><b>${paMoney(conesTotal/safeMonths)}</b><b>${paMoney(conesTotal)}</b></div><div class="tender-row"><span>نهاية الخدمة</span><b>—</b><b>${paMoney(eosTotal/safeMonths)}</b><b>${paMoney(eosTotal)}</b></div><div class="tender-row total"><span>إجمالي التكلفة</span><b>—</b><b>${paMoney(cost/safeMonths)}</b><b>${paMoney(cost)}</b></div>`;
+    const guardsCount=paRoleCount('guards');
+    const itemsSum=cost+employeeGosiTotal;
+    const perGuard=v=>guardsCount?paMoney(v/guardsCount):'—';
+    const sharePct=v=>itemsSum>0?((v/itemsSum*100).toLocaleString('ar-SA',{maximumFractionDigits:2})+'%'):'—';
+    const trow=(label,countTxt,monthly,contract,cls)=>`<div class="tender-row${cls?' '+cls:''}"><span>${label}</span><b>${countTxt}</b><b>${paMoney(monthly)}</b><b>${paMoney(contract)}</b><b>${perGuard(monthly)}</b><b>${perGuard(contract)}</b><b>${sharePct(contract)}</b></div>`;
+    const roleRows=roles.map(x=>trow(x.def.label,x.data.count,x.data.wage*x.data.count,x.data.wage*x.data.count*months)).join('');
+    document.getElementById('pa_tender_table').innerHTML=`<div class="tender-row tender-head"><span>الفئة / البند</span><span>العدد</span><span>التكلفة / شهر</span><span>التكلفة / مدة المشروع</span><span>تكلفة الحارس الواحد / شهر</span><span>تكلفة الحارس الواحد / مدة العقد</span><span>نسبة البند من التكلفة</span></div>${roleRows}${trow('التأمينات وحصة الشركة','—',gosiTotal/safeMonths,gosiTotal)}${trow('الإجازات','—',leaveTotal/safeMonths,leaveTotal)}${trow('بديل الراحات','—',restTotal/safeMonths,restTotal)}${trow('التأمين الطبي','—',medicalTotal/safeMonths,medicalTotal)}${trow('البدل',securityUnitsTotal,securityTotal/safeMonths,securityTotal)}${trow('أجهزة الاتصالات',commsUnitsTotal,commsTotal/safeMonths,commsTotal)}${trow('الدوريات والسيارات',patrolsCount,patrolTotal/safeMonths,patrolTotal)}${trow('الأقماع والملحقات',conesCount,conesTotal/safeMonths,conesTotal)}${trow('نهاية الخدمة','—',eosTotal/safeMonths,eosTotal)}<div class="tender-row total"><span>إجمالي التكلفة</span><b>—</b><b>${paMoney(cost/safeMonths)}</b><b>${paMoney(cost)}</b><b>${perGuard(cost/safeMonths)}</b><b>${perGuard(cost)}</b><b>${itemsSum>0?(100).toLocaleString('ar-SA')+'%':'—'}</b></div>`;
+    text('pa_final_emp_month',totalHead?cost/safeMonths/totalHead:0);text('pa_final_all_month',cost/safeMonths);text('pa_final_contract',cost);
     document.getElementById('pa_breakdown').innerHTML=`<div>رواتب: <b>${paMoney(salaryTotal)}</b></div><div>تأمينات الشركة: <b>${paMoney(gosiTotal)}</b></div><div>إجازات: <b>${paMoney(leaveTotal)}</b></div><div>بديل الراحات: <b>${paMoney(restTotal)}</b></div><div>تأمين طبي: <b>${paMoney(medicalTotal)}</b></div><div>بدل وأمن: <b>${paMoney(securityTotal)}</b></div><div>اتصالات: <b>${paMoney(commsTotal)}</b></div><div>دوريات وسيارات: <b>${paMoney(patrolTotal)}</b></div><div>أقماع وملحقات: <b>${paMoney(conesTotal)}</b></div><div>نهاية الخدمة: <b>${paMoney(eosTotal)}</b></div>`;
     return {days,months,head:totalHead,roles,salaryTotal,gosiTotal,employeeGosiTotal,leaveTotal,restTotal,medicalTotal,securityTypes,securityUnitsTotal,securityTotal,commsTypes,commsUnitsTotal,commsTotal,patrolsCount,patrolPrice,patrolTotal,conesCount,conesPrice,conesTotal,years,eosTotal,cost,profit,offer,salaryAllMonth};
   }
@@ -2169,7 +2177,7 @@
     paCountIds.forEach(id=>{const e=document.getElementById(id);if(e)e.value=0;});
     ['pa_gosi_employee_pct','pa_gosi_company_pct','pa_cones_price','pa_patrol_price'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=0;});
     document.getElementById('pa_leave_days').value='21';['pa_gosi_enabled','pa_leave_enabled','pa_eos_enabled'].forEach(id=>{const e=document.getElementById(id);if(e)e.checked=false;});
-    renderProjectRolePanels();calculateProjectAccount();
+    renderProjectRolePanels(true);calculateProjectAccount();
   }
   function renderProjectAccount(){renderProjectRolePanels();}
   paCountIds.forEach(id=>document.getElementById(id)?.addEventListener('input',()=>{renderProjectRolePanels();}));
