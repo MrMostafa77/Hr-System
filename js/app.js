@@ -854,11 +854,71 @@
     try{ t = localStorage.getItem(THEME_KEY); }catch(e){}
     document.documentElement.setAttribute('data-theme', t==='light' ? 'light' : 'dark');
   }
-  document.getElementById('themeToggle').addEventListener('click', ()=>{
+  document.getElementById('themeToggle')?.addEventListener('click', ()=>{
     const cur = document.documentElement.getAttribute('data-theme') || 'dark';
     const next = cur==='dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+  });
+
+  /* ===== start a fresh data cycle ===== */
+  async function resetOperationalData(){
+    const ok = confirm('سيتم حذف بيانات التشغيل المدخلة فقط: الموظفين، المشاريع، العقود، الحضور والانصراف، الإجراءات، التغطيات، ومعلومات الحسابات المرتبطة بها.\n\nستبقى الأقسام والوظائف والمناطق وإعدادات النظام والمذكرات والمستندات كما هي.\n\nهل تريد المتابعة؟');
+    if(!ok) return;
+    const ok2 = confirm('تأكيد نهائي: هل تريد بالفعل بدء دورة بيانات جديدة؟ لا يمكن التراجع عن حذف البيانات التشغيلية.');
+    if(!ok2) return;
+    try{
+      cloudApplying = true;
+      clearTimeout(cloudSaveTimer);
+
+      // Remove uploaded employee files that belong to the employee records being cleared.
+      const oldEmployees = Array.isArray(employees) ? employees.slice() : [];
+      for(const emp of oldEmployees){
+        const files = emp?.files && typeof emp.files==='object' ? emp.files : {};
+        for(const entry of Object.values(files)){
+          if(entry?.path && window.FB?.deleteEmployeeFile){
+            try{ await window.FB.deleteEmployeeFile(entry.path); }catch(err){ console.warn('Could not delete employee file:',err); }
+          }
+        }
+      }
+
+      employees=[];
+      attendance={};
+      penalties=[];
+      coverage=[];
+      projects=[];
+      contracts=[];
+      commencements=[];
+      projectAccounts=[];
+
+      // Keep these system/setup data intact: settings, regions, departments/jobs.
+      persistLocal();
+      const freshState=currentState();
+      if(window.FB?.saveState) await window.FB.saveState(freshState);
+      applyState(freshState);
+      persistLocal();
+
+      renderRegions?.();
+      renderProjects?.();
+      renderDepartments?.();
+      renderEmployeeTable?.();
+      renderAttendanceAndPenalties?.();
+      renderEmployeeFiles?.();
+      switchView(currentView);
+      showToast('تم بدء دورة بيانات جديدة مع الاحتفاظ بإعدادات النظام.');
+    }catch(err){
+      console.error('Operational data reset failed:',err);
+      showToast('تعذر إكمال تصفير البيانات. تحقق من الاتصال ثم حاول مرة أخرى.');
+    }finally{
+      cloudApplying = false;
+    }
+  }
+  document.getElementById('resetDataBtn')?.addEventListener('click', resetOperationalData);
+  document.getElementById('floatingLogoutBtn')?.addEventListener('click', async ()=>{
+    if(!window.firebaseSignOut) return;
+    if(confirm('هل تريد تسجيل الخروج من البرنامج؟')){
+      try{ await window.firebaseSignOut(); }catch(err){ console.error('Logout failed:',err); showToast('تعذر تسجيل الخروج.'); }
+    }
   });
 
   /* ===== dashboard ===== */
