@@ -1833,3 +1833,5 @@ html[data-theme="light"] .pay-auto-hint{background:linear-gradient(90deg,#EAF3FF
   .project-detail-fields.pd-cols-4{grid-template-columns:repeat(4,minmax(0,1fr)) !important}
 }
 @media(max-width:700px){.pd-med-fields{grid-template-columns:1fr}.pd-med-fields .project-calc-box{margin-top:0}}
+
+.pj-bd-title{color:#B8860B !important}

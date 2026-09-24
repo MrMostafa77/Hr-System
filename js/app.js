@@ -317,10 +317,10 @@
     const agg=(d,key)=>({n:d[key].reduce((a,r)=>a+(Number(r.quantity)||0),0),ex:d[key].reduce((a,r)=>a+(Number(r.quantity)||0)*(Number(r.unit)||0),0)});
     Object.keys(projectKinds).forEach(key=>{
       if(Array.isArray(rv[key])){const a=agg(rv,key);rev.push({k:key,name:projectKinds[key],n:a.n,ex:a.ex,inc:a.ex*k});}
-      if(Array.isArray(cv[key])){const a=agg(cv,key);cost.push({k:key,name:projectKinds[key],n:a.n,ex:a.ex,inc:a.ex*k});}
+      if(Array.isArray(cv[key])){const a=agg(cv,key);cost.push({k:key,name:projectKinds[key],n:a.n,ex:a.ex,inc:a.ex});}
     });
     if(si) cost.push({k:'si',name:'التأمينات الاجتماعية (حصة الشركة)',n:0,ex:si,inc:si});
-    const med=medOn?medicalTotal(cv):0; if(med) cost.push({k:'med',name:'التأمين الطبي',n:0,ex:med,inc:med*k});
+    const med=medOn?medicalTotal(cv):0; if(med) cost.push({k:'med',name:'التأمين الطبي',n:0,ex:med,inc:med});
     return {rev,cost};
   }
   function projectBreakdown(){
@@ -333,18 +333,19 @@
     });
   }
   const sumRows=rows=>rows.reduce((a,r)=>({n:a.n+r.n,ex:a.ex+r.ex,inc:a.inc+r.inc}),{n:0,ex:0,inc:0});
-  function bdTable(title,rows,person){
-    const t=sumRows(rows), per=(ex,n)=>n?money(ex/n):'—', cnt=r=>(r.k==='si'||r.k==='med')?'—':fmt(r.n);
-    return `<div class="pj-bd-title">${title}</div><div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>الفئة</th><th>العدد</th>${person?'<th>للفرد</th>':''}<th>الإجمالي بدون ضريبة</th><th>الإجمالي بالضريبة</th></tr></thead><tbody>${
-      rows.map(r=>`<tr><td>${r.name}</td><td class="mono">${cnt(r)}</td>${person?`<td class="mono">${per(r.ex,r.n)}</td>`:''}<td class="mono">${money(r.ex)}</td><td class="mono">${money(r.inc)}</td></tr>`).join('')||`<tr><td colspan="${person?5:4}" class="empty-note">لا توجد بنود.</td></tr>`
-    }<tr class="pj-bd-total"><td>الإجمالي</td><td class="mono">${fmt(t.n)}</td>${person?`<td class="mono">${per(t.ex,t.n)}</td>`:''}<td class="mono">${money(t.ex)}</td><td class="mono">${money(t.inc)}</td></tr></tbody></table></div>`;
+  function bdTable(title,rows,person,vat=true){
+    const t=sumRows(rows), per=(ex,n)=>n?money(ex/n):'—', cnt=r=>(r.k==='si'||r.k==='med')?'—':fmt(r.n), cols=2+(person?1:0)+1+(vat?2:0);
+    const cells=r=>`<td class="mono">${money(r.ex)}</td>${vat?`<td class="mono">${money(r.inc-r.ex)}</td><td class="mono">${money(r.inc)}</td>`:''}`;
+    return `<div class="pj-bd-title">${title}</div><div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>الفئة</th><th>العدد</th>${person?'<th>للفرد</th>':''}<th>الإجمالي</th>${vat?'<th>الضريبة</th><th>الإجمالي بالضريبة</th>':''}</tr></thead><tbody>${
+      rows.map(r=>`<tr><td>${r.name}</td><td class="mono">${cnt(r)}</td>${person?`<td class="mono">${per(r.ex,r.n)}</td>`:''}${cells(r)}</tr>`).join('')||`<tr><td colspan="${cols}" class="empty-note">لا توجد بنود.</td></tr>`
+    }<tr class="pj-bd-total"><td>الإجمالي</td><td class="mono">${fmt(t.n)}</td>${person?`<td class="mono">${per(t.ex,t.n)}</td>`:''}${cells(t)}</tr></tbody></table></div>`;
   }
   function renderBreakdowns(){
     const {rev,cost}=projectBreakdown(), set=(id,h)=>{const e=document.getElementById(id);if(e)e.innerHTML=h;};
-    set('projectRevenueBreakdown',bdTable('إجمالي إيرادات المشروع الشهرية',rev,false));
-    set('projectCostBreakdown',bdTable('إجمالي تكاليف المشروع الشهرية (الرواتب)',cost,false));
+    set('projectRevenueBreakdown',bdTable('إجمالي إيرادات المشروع الشهرية',rev,false,true));
+    set('projectCostBreakdown',bdTable('إجمالي تكاليف المشروع الشهرية (الرواتب)',cost,false,false));
     const profit=profitRows(rev,cost);
-    set('projectSummaryDetail',bdTable('تفصيل الإيرادات بالفئات (شهريًا)',rev,true)+bdTable('تفصيل التكاليف بالفئات (شهريًا)',cost,true)+bdTable('هامش الربح بالفئات (شهريًا)',profit,true));
+    set('projectSummaryDetail',bdTable('تفصيل الإيرادات بالفئات (شهريًا)',rev,true,true)+bdTable('تفصيل التكاليف بالفئات (شهريًا)',cost,true,false)+bdTable('هامش الربح بالفئات (شهريًا)',profit,true,true));
   }
 
   /* ===== عرض المشروع (قراءة فقط) ===== */
@@ -366,12 +367,12 @@
       <div class="pj-modal-body">
         <div class="pj-bd-title">البيانات الأساسية</div>
         <div class="pv-grid">${kv('المنطقة',p.region)}${kv('السجل التجاري',p.cr)}${kv('الرقم الضريبي',p.vatNo)}${kv('العنوان',p.address)}${kv('أرقام التواصل',(p.phones||[]).join(' ، '))}${kv('إيميلات التواصل',(p.emails||[]).join(' ، '))}${kv('اسم ممثل الشركة',p.repName)}${kv('هوية ممثل الشركة',p.repId)}${kv('نسبة الضريبة',vat+'%')}${kv('التأمينات الاجتماعية',p.siEnabled?'مفعّلة':'غير مفعّلة')}${kv('التأمين الطبي',p.medEnabled?'مفعّل':'غير مفعّل')}${p.notes?kv('ملاحظات',p.notes):''}</div>
-        ${bdTable('الإيرادات الشهرية',rev,false)}
+        ${bdTable('الإيرادات الشهرية',rev,false,true)}
         ${sal.length?`<div class="pj-bd-title">رواتب المشروع</div><div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>الفئة</th><th>العدد</th><th>الأساسي</th><th>السكن</th><th>المواصلات</th><th>بدلات أخرى</th><th>إجمالي الراتب / فرد</th><th>الإجمالي للعدد</th></tr></thead><tbody>${sal.join('')}</tbody></table></div>`:''}
-        ${bdTable('التكاليف الشهرية',cost,false)}
+        ${bdTable('التكاليف الشهرية',cost,false,false)}
         <div class="project-summary-grid pj-view-sum">
           <div class="project-summary-box"><div class="project-summary-label">الإيرادات</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tr.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tr.inc)}</b></div></div>
-          <div class="project-summary-box"><div class="project-summary-label">التكاليف</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tc.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tc.inc)}</b></div></div>
+          <div class="project-summary-box"><div class="project-summary-label">التكاليف</div><div class="project-summary-row"><span>الإجمالي (بدون ضريبة)</span><b>${money(tc.ex)}</b></div></div>
           <div class="project-summary-box"><div class="project-summary-label">هامش الربح</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tr.ex-tc.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tr.inc-tc.inc)}</b></div></div>
         </div>
         <div class="pj-bd-title">سعة المشروع</div>${alerts}
