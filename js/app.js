@@ -185,6 +185,7 @@
     box.innerHTML=`<div class="project-si-title">التأمينات الاجتماعية <small>محسوبة على الأساسي + السكن</small></div>
       <div class="project-si-grid">${build('si-guard','حصة الحارس',SI_GUARD_RATE,calc.guardTotal)}${build('si-company','حصة الشركة',SI_COMPANY_RATE,calc.companyTotal)}</div>`;
   }
+  const ampBoxes=a=>`<div class="pd-amt-boxes"><div class="project-calc-box"><span>للفرد</span><b class="${a}">0 ريال</b></div><div class="project-calc-box"><span>للعدد</span><b class="${a}-n">0 ريال</b></div></div>`;
   function detailCard(mode,key,title,data={}){
     const isType=key==='devices'||key==='uniforms', sal=mode==='cost'&&siRoles.includes(key);
     const qty=Number(data.quantity||data.count||0)||0; let unit=Number(data.unit||data.price||data.salary||0)||0;
@@ -192,14 +193,14 @@
     const hP=data.hPct??25, tP=data.tPct??38.5, oth=Number(data.other)||0;
     let basic=data.basic; if(sal&&basic==null) basic=unit?Math.round(unit/(1+(hP+tP)/100)*100)/100:0;
     if(sal) unit=(Number(basic)||0)*(1+(Number(hP)+Number(tP))/100)+oth;
-    const numA=(c,l,v,a)=>`<div class="field"><label>${l}</label><input type="number" class="${c}" min="0" step="0.01" value="${v}"><small class="pd-amt ${a}"></small></div>`;
+    const numA=(c,l,v,a)=>`<div class="field"><label>${l}</label><input type="number" class="${c}" min="0" step="0.01" value="${v}">${ampBoxes(a)}</div>`;
     const num=(c,l,v,st='0.01')=>`<div class="field"><label>${l}</label><input type="number" class="${c}" min="0" step="${st}" value="${v}"></div>`;
     return `<div class="project-detail-card" data-project-detail="${mode}-${key}" data-key="${key}">
       <div class="project-detail-head"><h4>${title}</h4>${isType?`<button type="button" class="small-btn danger project-remove-detail">×</button>`:''}</div>
       ${isType?`<div class="field"><label>النوع</label><input class="pd-type" value="${escapeAttr(type)}" placeholder="اكتب النوع"></div>`:''}
       <div class="field-grid project-detail-fields">
         ${num('pd-qty','العدد',qty,'1')}
-        ${sal?num('pd-basic','الأساسي',basic)+numA('pd-hpct','سكن %',hP,'pd-hamt')+numA('pd-tpct','مواصلات %',tP,'pd-tamt')+num('pd-other','بدلات أخرى (ريال)',oth)
+        ${sal?num('pd-basic','الأساسي',basic)+numA('pd-hpct','سكن %',hP,'pd-hamt')+numA('pd-tpct','مواصلات %',tP,'pd-tamt')+`<div class="field"><label>بدلات أخرى (ريال)</label><input type="number" class="pd-other" min="0" step="0.01" value="${oth}">${ampBoxes('pd-oamt')}</div>`
           +`<div class="field"><label>إجمالي الراتب / فرد</label><input type="number" class="pd-unit" value="${unit.toFixed(2)}" readonly></div>`
           :num('pd-unit',mode==='revenue'?'الإيراد / القطعة':'الراتب / القطعة',unit)}
         <div class="project-calc-box"><span>الإجمالي للقطعة</span><b class="pd-unit-total">${money(unit)}</b></div>
@@ -211,8 +212,8 @@
   function refreshSalaryCard(card){
     if(!card.querySelector('.pd-basic'))return;
     const g=c=>Number(card.querySelector(c).value)||0, basic=g('.pd-basic'), h=basic*g('.pd-hpct')/100, t=basic*g('.pd-tpct')/100, q=g('.pd-qty');
-    card.querySelector('.pd-hamt').textContent='= '+money(h)+' / فرد';
-    card.querySelector('.pd-tamt').textContent='= '+money(t)+' / فرد';
+    const o=g('.pd-other'), put=(c,v)=>{card.querySelector('.'+c).textContent=money(v);card.querySelector('.'+c+'-n').textContent=money(v*q);};
+    put('pd-hamt',h);put('pd-tamt',t);put('pd-oamt',o);
     const box=card.querySelector('.pd-si'), on=!!document.getElementById('projectSiToggle')?.checked;
     box.hidden=!on; if(!on){box.innerHTML='';return;}
     const base=basic+h, part=(cls,title,rate)=>`<div class="project-si-box ${cls}"><div class="si-head"><h4>${title}</h4><span class="si-rate">${rate}%</span></div><div class="pd-si-row"><span>للفرد</span><b>${money(base*rate/100)}</b></div><div class="pd-si-row"><span>للعدد (${fmt(q)})</span><b>${money(base*rate/100*q)}</b></div></div>`;
@@ -307,16 +308,24 @@
 
   /* ===== جداول الإيرادات/التكاليف/الملخص + سعة المشروع ===== */
   const vatRate=()=>{const v=parseFloat(document.getElementById('projectVat')?.value);return isNaN(v)?15:v;};
-  function projectBreakdown(){
-    const rv=getDetailData('revenue'), cv=getDetailData('cost'), k=1+vatRate()/100, rev=[], cost=[];
-    const agg=(d,key)=>({n:d[key].reduce((a,r)=>a+r.quantity,0),ex:d[key].reduce((a,r)=>a+r.quantity*r.unit,0)});
+  function breakdownFrom(rv,cv,vat,si){
+    const k=1+vat/100, rev=[], cost=[];
+    const agg=(d,key)=>({n:d[key].reduce((a,r)=>a+(Number(r.quantity)||0),0),ex:d[key].reduce((a,r)=>a+(Number(r.quantity)||0)*(Number(r.unit)||0),0)});
     Object.keys(projectKinds).forEach(key=>{
-      if(rv[key]){const a=agg(rv,key);rev.push({k:key,name:projectKinds[key],n:a.n,ex:a.ex,inc:a.ex*k});}
-      if(cv[key]){const a=agg(cv,key);cost.push({k:key,name:projectKinds[key],n:a.n,ex:a.ex,inc:a.ex*k});}
+      if(Array.isArray(rv[key])){const a=agg(rv,key);rev.push({k:key,name:projectKinds[key],n:a.n,ex:a.ex,inc:a.ex*k});}
+      if(Array.isArray(cv[key])){const a=agg(cv,key);cost.push({k:key,name:projectKinds[key],n:a.n,ex:a.ex,inc:a.ex*k});}
     });
-    const si=document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0;
     if(si) cost.push({k:'si',name:'التأمينات الاجتماعية (حصة الشركة)',n:0,ex:si,inc:si});
     return {rev,cost};
+  }
+  function projectBreakdown(){
+    return breakdownFrom(getDetailData('revenue'),getDetailData('cost'),vatRate(),document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0);
+  }
+  function profitRows(rev,cost){
+    return [...new Set([...rev,...cost].map(r=>r.k))].map(key=>{
+      const a=rev.find(r=>r.k===key)||{n:0,ex:0,inc:0}, b=cost.find(r=>r.k===key)||{n:0,ex:0,inc:0};
+      return {k:key,name:a.name||b.name||projectKinds[key],n:a.n||b.n,ex:a.ex-b.ex,inc:a.inc-b.inc};
+    });
   }
   const sumRows=rows=>rows.reduce((a,r)=>({n:a.n+r.n,ex:a.ex+r.ex,inc:a.inc+r.inc}),{n:0,ex:0,inc:0});
   function bdTable(title,rows,person){
@@ -329,12 +338,44 @@
     const {rev,cost}=projectBreakdown(), set=(id,h)=>{const e=document.getElementById(id);if(e)e.innerHTML=h;};
     set('projectRevenueBreakdown',bdTable('إجمالي إيرادات المشروع الشهرية',rev,false));
     set('projectCostBreakdown',bdTable('إجمالي تكاليف المشروع الشهرية (الرواتب)',cost,false));
-    const profit=[...new Set([...rev,...cost].map(r=>r.k))].map(key=>{
-      const a=rev.find(r=>r.k===key)||{n:0,ex:0,inc:0}, b=cost.find(r=>r.k===key)||{n:0,ex:0,inc:0};
-      return {k:key,name:a.name||b.name||projectKinds[key],n:a.n||b.n,ex:a.ex-b.ex,inc:a.inc-b.inc};
-    });
+    const profit=profitRows(rev,cost);
     set('projectSummaryDetail',bdTable('تفصيل الإيرادات بالفئات (شهريًا)',rev,true)+bdTable('تفصيل التكاليف بالفئات (شهريًا)',cost,true)+bdTable('هامش الربح بالفئات (شهريًا)',profit,true));
   }
+
+  /* ===== عرض المشروع (قراءة فقط) ===== */
+  function closeProjectView(){document.getElementById('pjViewModal')?.remove();}
+  function showProjectView(p){
+    closeProjectView();
+    const vat=p.vatRate??15, {rev,cost}=breakdownFrom(p.revenueItems||{},p.costItems||{},vat,p.siEnabled?(Number(p.siCompanyTotal)||0):0);
+    const kv=(l,v)=>`<div class="pv-item"><span>${l}</span><b>${escapeHtml(String(v||'—'))}</b></div>`;
+    const sal=[]; siRoles.forEach(key=>(p.costItems?.[key]||[]).forEach(r=>{
+      const hP=r.hPct??25,tP=r.tPct??38.5,oth=Number(r.other)||0,u=Number(r.unit)||0,b=r.basic!=null?Number(r.basic)||0:Math.round(u/(1+(hP+tP)/100)*100)/100, q=Number(r.quantity)||0;
+      sal.push(`<tr><td>${projectKinds[key]}</td><td class="mono">${fmt(q)}</td><td class="mono">${money(b)}</td><td class="mono">${money(b*hP/100)} <small>(${hP}%)</small></td><td class="mono">${money(b*tP/100)} <small>(${tP}%)</small></td><td class="mono">${money(oth)}</td><td class="mono">${money(u)}</td><td class="mono">${money(u*q)}</td></tr>`);
+    }));
+    const counts=projectEmployeeCounts(p.name,null), caps=Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]));
+    const capRows=Object.keys(roleCapacityLabels).filter(k=>caps[k]>0).map(k=>{const over=(counts[k]||0)-caps[k];return `<tr class="${over>0?'pj-over-row':''}"><td>${roleCapacityLabels[k]}</td><td class="mono">${fmt(caps[k])}</td><td class="mono">${fmt(counts[k]||0)}</td><td class="mono">${over>0?'زيادة '+fmt(over):fmt(caps[k]-(counts[k]||0))}</td></tr>`;});
+    const alerts=projectOverList(p.name,caps).map(o=>`<div class="pj-over">⚠ تنبيه: عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('');
+    const tr=sumRows(rev), tc=sumRows(cost);
+    const el=document.createElement('div'); el.id='pjViewModal'; el.className='pj-modal';
+    el.innerHTML=`<div class="pj-modal-box" role="dialog" aria-modal="true"><div class="pj-modal-head"><h3>${escapeHtml(p.name||'')}</h3><div><button class="btn btn-sm" data-pv-edit>تعديل</button> <button class="btn btn-sm" data-pv-close>إغلاق ✕</button></div></div>
+      <div class="pj-modal-body">
+        <div class="pj-bd-title">البيانات الأساسية</div>
+        <div class="pv-grid">${kv('المنطقة',p.region)}${kv('السجل التجاري',p.cr)}${kv('الرقم الضريبي',p.vatNo)}${kv('العنوان',p.address)}${kv('أرقام التواصل',(p.phones||[]).join(' ، '))}${kv('إيميلات التواصل',(p.emails||[]).join(' ، '))}${kv('اسم ممثل الشركة',p.repName)}${kv('هوية ممثل الشركة',p.repId)}${kv('نسبة الضريبة',vat+'%')}${kv('التأمينات الاجتماعية',p.siEnabled?'مفعّلة':'غير مفعّلة')}${p.notes?kv('ملاحظات',p.notes):''}</div>
+        ${bdTable('الإيرادات الشهرية',rev,false)}
+        ${sal.length?`<div class="pj-bd-title">رواتب المشروع</div><div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>الفئة</th><th>العدد</th><th>الأساسي</th><th>السكن</th><th>المواصلات</th><th>بدلات أخرى</th><th>إجمالي الراتب / فرد</th><th>الإجمالي للعدد</th></tr></thead><tbody>${sal.join('')}</tbody></table></div>`:''}
+        ${bdTable('التكاليف الشهرية',cost,false)}
+        <div class="project-summary-grid pj-view-sum">
+          <div class="project-summary-box"><div class="project-summary-label">الإيرادات</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tr.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tr.inc)}</b></div></div>
+          <div class="project-summary-box"><div class="project-summary-label">التكاليف</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tc.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tc.inc)}</b></div></div>
+          <div class="project-summary-box"><div class="project-summary-label">هامش الربح</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tr.ex-tc.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tr.inc-tc.inc)}</b></div></div>
+        </div>
+        <div class="pj-bd-title">سعة المشروع</div>${alerts}
+        <div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>البند</th><th>السعة</th><th>المضاف فعليًا</th><th>المتبقي</th></tr></thead><tbody>${capRows.join('')||'<tr><td colspan="4" class="empty-note">لا توجد سعة محددة.</td></tr>'}</tbody></table></div>
+      </div></div>`;
+    document.body.appendChild(el);
+    el.addEventListener('click',e=>{ if(e.target===el||e.target.closest('[data-pv-close]')) closeProjectView(); if(e.target.closest('[data-pv-edit]')){closeProjectView();document.querySelector(`[data-project-edit="${p.id}"]`)?.click();} });
+  }
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeProjectView();});
   function projectOverList(name,caps){   // caps: {key:capacity}
     const counts=name?projectEmployeeCounts(name,null):{}, out=[];
     Object.keys(roleCapacityLabels).forEach(k=>{const cap=Number(caps[k])||0, over=(counts[k]||0)-cap; if(cap>0&&over>0) out.push({k,over,label:roleCapacityLabels[k]});});
@@ -384,7 +425,7 @@
     const list=projects.filter(p=>!q||[p.name,p.region].some(v=>String(v||'').toLowerCase().includes(q)));
     document.getElementById('projectCount').textContent=`${list.length} مشروع`;
     const body=document.getElementById('projectsTableBody');
-    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b>${projectOverList(p.name,Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]))).map(o=>`<div class="pj-over">⚠ عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('')}</td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
+    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b>${projectOverList(p.name,Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]))).map(o=>`<div class="pj-over">⚠ عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('')}</td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-view="${p.id}">عرض</button><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
     body.querySelectorAll('[data-project-edit]').forEach(b=>b.onclick=()=>{
       const p=projects.find(x=>x.id===b.dataset.projectEdit);if(!p)return;
       document.getElementById('projectId').value=p.id;document.getElementById('projectName').value=p.name||'';document.getElementById('projectRegion').value=p.region||'';
@@ -396,6 +437,7 @@
       const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled;
       renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();window.scrollTo({top:0,behavior:'smooth'});
     });
+    body.querySelectorAll('[data-project-view]').forEach(b=>b.onclick=()=>{const p=projects.find(x=>x.id===b.dataset.projectView); if(p)showProjectView(p);});
     body.querySelectorAll('[data-project-del]').forEach(b=>b.onclick=()=>{if(confirm('حذف المشروع؟')){projects=projects.filter(x=>x.id!==b.dataset.projectDel);saveProjects();renderProjects();refreshEmployeeProjectSelect();}});
   }
   function refreshRegionSelects(){
