@@ -392,12 +392,6 @@
         <div class="pv-grid">${kv('المنطقة',p.region)}${kv('السجل التجاري',p.cr)}${kv('الرقم الضريبي',p.vatNo)}${kv('العنوان',p.address)}${kv('أرقام التواصل',(p.phones||[]).join(' ، '))}${kv('إيميلات التواصل',(p.emails||[]).join(' ، '))}${kv('اسم ممثل الشركة',p.repName)}${kv('هوية ممثل الشركة',p.repId)}${kv('نسبة الضريبة',vat+'%')}${kv('التأمينات الاجتماعية',p.siEnabled?'مفعّلة':'غير مفعّلة')}${kv('التأمين الطبي',p.medEnabled?'مفعّل':'غير مفعّل')}</div>
         ${bdTable('الإيرادات الشهرية',rev,false,true)}
         ${sal.length?`<div class="pj-bd-title">رواتب المشروع</div><div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>الفئة</th><th>العدد</th><th>الأساسي</th><th>السكن</th><th>المواصلات</th><th>بدلات أخرى</th><th>إجمالي الراتب / فرد</th><th>الإجمالي للعدد</th></tr></thead><tbody>${sal.join('')}</tbody></table></div>`:''}
-        ${bdTable('التكاليف الشهرية (التكلفة الحقيقية)',cost,true,false,true)}
-        <div class="project-summary-grid pj-view-sum">
-          <div class="project-summary-box"><div class="project-summary-label">الإيرادات</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tr.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tr.inc)}</b></div></div>
-          <div class="project-summary-box"><div class="project-summary-label">التكاليف</div><div class="project-summary-row"><span>الإجمالي (بدون ضريبة)</span><b>${money(tc.ex)}</b></div></div>
-          <div class="project-summary-box"><div class="project-summary-label">هامش الربح</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tr.ex-tc.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tr.inc-tc.inc)}</b></div></div>
-        </div>
         <div class="pj-bd-title">سعة المشروع</div>${alerts}
         <div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>البند</th><th>السعة</th><th>المضاف فعليًا</th><th>المتبقي</th></tr></thead><tbody>${capRows.join('')||'<tr><td colspan="4" class="empty-note">لا توجد سعة محددة.</td></tr>'}</tbody></table></div>
         ${employeeAlerts}
