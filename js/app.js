@@ -1532,11 +1532,11 @@
         <div class="employee-file-actions">
           <input type="file" class="employee-file-input" data-file-key="${item.key}" accept=".pdf,.jpg,.jpeg,.png" hidden>
           <button type="button" class="btn btn-sm employee-upload-btn" data-file-key="${item.key}">تحميل من الجهاز</button>
-          <button type="button" class="btn btn-sm employee-download-btn" data-file-key="${item.key}" ${has?'':'disabled'}>تنزيل الملف PDF</button>
-          <button type="button" class="btn btn-sm btn-danger employee-remove-file-btn" data-file-key="${item.key}" ${has?'':'disabled'}>إزالة الملف</button>
+          <button type="button" class="btn btn-sm employee-download-btn" data-file-key="${item.key}">تنزيل الملف PDF</button>
+          <button type="button" class="btn btn-sm btn-danger employee-remove-file-btn" data-file-key="${item.key}">إزالة الملف</button>
         </div>
       </div>`;
-    }).join('') + `<div class="employee-file-row employee-files-all-row"><div class="employee-file-title"><span class="employee-file-dot ${EMPLOYEE_FILE_TYPES.some(x=>pendingEmployeeFiles[x.key]||saved[x.key])?'has-file':''}"></span><div><strong>تحميل الكل</strong><small>الملف الكامل للموظف مرة واحدة</small></div></div><div class="employee-file-actions"><input type="file" class="employee-file-all-input" id="employeeFileAllInput" accept=".zip" hidden><button type="button" class="btn btn-sm employee-file-all-upload-btn" id="employeeUploadAllBtn">تحميل من الجهاز</button><button type="button" class="btn btn-sm employee-file-all-download-btn" id="employeeDownloadAllBtn" ${EMPLOYEE_FILE_TYPES.some(x=>pendingEmployeeFiles[x.key]||saved[x.key])?'':'disabled'}>تنزيل الملف PDF</button><button type="button" class="btn btn-sm btn-danger employee-file-all-remove-btn" id="employeeRemoveAllBtn" ${EMPLOYEE_FILE_TYPES.some(x=>pendingEmployeeFiles[x.key]||saved[x.key])?'':'disabled'}>إزالة الملف</button></div></div>`;
+    }).join('') + `<div class="employee-file-row employee-files-all-row"><div class="employee-file-title"><span class="employee-file-dot ${(pendingEmployeeFiles.__all || EMPLOYEE_FILE_TYPES.some(x=>pendingEmployeeFiles[x.key]||saved[x.key]))?'has-file':''}"></span><div><strong>تحميل الكل</strong><small>الملف الكامل للموظف مرة واحدة</small></div></div><div class="employee-file-actions"><input type="file" class="employee-file-all-input" id="employeeFileAllInput" accept="*/*" hidden><button type="button" class="btn btn-sm employee-file-all-upload-btn" id="employeeUploadAllBtn">تحميل من الجهاز</button><button type="button" class="btn btn-sm employee-file-all-download-btn" id="employeeDownloadAllBtn">تنزيل الملف PDF</button><button type="button" class="btn btn-sm btn-danger employee-file-all-remove-btn" id="employeeRemoveAllBtn">إزالة الملف</button></div></div>`;
 
     list.querySelectorAll('.employee-upload-btn').forEach(btn=>btn.addEventListener('click',()=>list.querySelector(`.employee-file-input[data-file-key="${btn.dataset.fileKey}"]`)?.click()));
     list.querySelectorAll('.employee-file-input').forEach(input=>input.addEventListener('change',()=>{
@@ -1555,9 +1555,10 @@
     document.getElementById('employeeRemoveAllBtn')?.addEventListener('click',removeAllEmployeeFiles);
   }
   async function downloadEmployeeFile(key){
-    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e)return;
+    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e){showToast('اختر موظفاً أولاً.');return;}
     const pending=pendingEmployeeFiles[key];
-    const entry=pending || fileEntryFor(e,key); if(!entry)return;
+    const entry=pending || fileEntryFor(e,key);
+    if(!entry){showToast('لا يوجد ملف محفوظ لهذا المستند بعد.');return;}
     if(pending){
       await downloadBlobAsPdf(pending,pending.name);
       return;
@@ -1585,6 +1586,13 @@
   }
   async function downloadAllEmployeeFiles(){
     const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e)return;
+    if(pendingEmployeeFiles.__all){
+      const file=pendingEmployeeFiles.__all; const url=URL.createObjectURL(file); const a=document.createElement('a'); a.href=url; a.download=file.name || `ملف-الموظف-${id||'employee'}`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); return;
+    }
+    const savedAll=e.files?.__all;
+    if(savedAll?.url){
+      try{ const res=await fetch(savedAll.url); const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=savedAll.name || `ملف-الموظف-${id||'employee'}`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); return; }catch(err){ console.error(err); }
+    }
     const entries=EMPLOYEE_FILE_TYPES.map(x=>({key:x.key,entry:pendingEmployeeFiles[x.key]||fileEntryFor(e,x.key)})).filter(x=>x.entry);
     if(!entries.length){showToast('لا توجد ملفات لتحميلها.');return;}
     if(!window.JSZip){showToast('تعذر تجهيز الملف الكامل. أعد تحميل الصفحة وحاول مرة أخرى.');return;}
@@ -1601,9 +1609,16 @@
   }
   async function handleUploadAllEmployeeFiles(ev){
     const file=ev.target.files?.[0]; ev.target.value=''; if(!file)return;
-    if(!/\.zip$/i.test(file.name)){showToast('يرجى اختيار ملف ZIP يحتوي على ملفات الموظف.');return;}
     if(file.size>100*1024*1024){showToast('حجم الملف الكامل يجب ألا يتجاوز 100 ميجابايت.');return;}
-    if(!window.JSZip){showToast('تعذر قراءة الملف الكامل. أعد تحميل الصفحة وحاول مرة أخرى.');return;}
+    // يقبل سطر تحميل الكل أي صيغة ملف. ملفات ZIP يتم فكها وتوزيعها على مستندات الموظف،
+    // وأي صيغة أخرى تُحفظ كملف كامل مستقل كما هي بدون تغيير الامتداد أو المحتوى.
+    if(!/\.zip$/i.test(file.name)){
+      pendingEmployeeFiles.__all = file;
+      renderEmployeeFiles();
+      showToast('تم اختيار الملف الكامل وسيتم حفظه كما هو.');
+      return;
+    }
+    if(!window.JSZip){showToast('تعذر قراءة ملف ZIP. أعد تحميل الصفحة وحاول مرة أخرى.');return;}
     try{
       const zip=await window.JSZip.loadAsync(file);
       const byBase=new Map(EMPLOYEE_FILE_TYPES.map(x=>[x.key.toLowerCase(),x]));
@@ -1627,9 +1642,16 @@
   async function removeAllEmployeeFiles(){
     const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e)return;
     const keys=EMPLOYEE_FILE_TYPES.filter(x=>pendingEmployeeFiles[x.key]||fileEntryFor(e,x.key)).map(x=>x.key);
-    if(!keys.length)return;
+    const hasAll=!!(pendingEmployeeFiles.__all || e.files?.__all);
+    if(!keys.length && !hasAll)return;
     if(!confirm('هل تريد إزالة جميع ملفات الموظف نهائياً؟'))return;
     try{
+      if(pendingEmployeeFiles.__all){ delete pendingEmployeeFiles.__all; }
+      else if(e.files?.__all){
+        const entry=e.files.__all;
+        if(entry.path && window.FB?.deleteEmployeeFile) await window.FB.deleteEmployeeFile(entry.path);
+        if(e.files) delete e.files.__all;
+      }
       for(const key of keys){
         if(pendingEmployeeFiles[key]){delete pendingEmployeeFiles[key];continue;}
         const entry=fileEntryFor(e,key);
@@ -1640,9 +1662,9 @@
     }catch(err){console.error(err);showToast('تعذر إزالة ملف أو أكثر.');}
   }
   async function removeEmployeeFile(key){
-    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e)return;
+    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e){showToast('اختر موظفاً أولاً.');return;}
     if(pendingEmployeeFiles[key]){ delete pendingEmployeeFiles[key]; renderEmployeeFiles(); showToast('تم إلغاء الملف المختار.'); return; }
-    const entry=fileEntryFor(e,key); if(!entry)return;
+    const entry=fileEntryFor(e,key); if(!entry){showToast('لا يوجد ملف محفوظ لهذا المستند بعد.');return;}
     if(!confirm('هل تريد إزالة هذا الملف نهائياً؟')) return;
     try{
       if(entry.path && window.FB?.deleteEmployeeFile) await window.FB.deleteEmployeeFile(entry.path);
