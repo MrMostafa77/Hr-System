@@ -1646,13 +1646,42 @@
     if(!project) return null;
     const counts=projectEmployeeCounts(data.project, employeeId);
     const limit=projectRoleCapacity(project,k);
-    // إذا لم يتم تعريف سعة الوظيفة في المشروع، لا نمنع الإضافة. أما إذا كانت السعة معرفة، فنطبقها على نفس الوظيفة فقط.
+    // إذا لم يتم تعريف سعة الوظيفة في المشروع، لا نطلب تأكيداً.
     if(limit<=0) return null;
-    if(counts[k]>=limit) return `تنبيه: سعة ${roleCapacityLabels[k]} في مشروع «${project.name}» هي ${limit} فقط، والموجود حالياً ${counts[k]}.`;
+    if(counts[k]>=limit) return {project:project.name, role:roleCapacityLabels[k], limit, current:counts[k]};
     return null;
   }
 
-  document.getElementById('empForm').addEventListener('submit', (ev)=>{
+  function validateEmployeeSocialInsurance(data){
+    if(!data.project) return null;
+    const project=projects.find(p=>sameProjectName(p.name,data.project));
+    if(!project || !project.siEnabled) return null;
+    const gross=Number(data.lastwage)||0;
+    if(gross < SI_MIN_SALARY) return {project:project.name,gross,min:SI_MIN_SALARY};
+    return null;
+  }
+
+  function confirmProjectEmployeeWarnings(warnings){
+    if(!warnings.length) return Promise.resolve(true);
+    const overlay=document.getElementById('projectEmployeeWarningOverlay');
+    const text=document.getElementById('projectEmployeeWarningText');
+    const yes=document.getElementById('projectEmployeeWarningYes');
+    const no=document.getElementById('projectEmployeeWarningNo');
+    if(!overlay||!text||!yes||!no) return Promise.resolve(confirm(warnings.map(w=>w.text).join('\n\n')+'\n\nهل تريد المتابعة؟'));
+    text.innerHTML=warnings.map(w=>`<div class="project-warning-item"><span class="warn-title">${escapeHtml(w.title)}</span>${w.html}</div>`).join('');
+    overlay.classList.add('open');
+    return new Promise(resolve=>{
+      const close=(answer)=>{
+        overlay.classList.remove('open');
+        yes.onclick=no.onclick=null;
+        resolve(answer);
+      };
+      yes.onclick=()=>close(true);
+      no.onclick=()=>close(false);
+    });
+  }
+
+  document.getElementById('empForm').addEventListener('submit', async (ev)=>{
     ev.preventDefault();
     clearValidation(); composeFullName();
     const id = document.getElementById('f_id').value || ('e'+Date.now());
@@ -1693,8 +1722,25 @@
     if(Object.keys(errors).length){ showFormError(errors,Object.keys(errors)[0]); return; }
     data.idnum=normalizeDigits(data.idnum); data.iban=data.iban.replace(/\s+/g,'').toUpperCase();
     if(id && employees.find(x=>x.id===id)?.empcode) data.empcode=employees.find(x=>x.id===id).empcode; else data.empcode=nextEmployeeCode(data.region,'');
-    const capacityError=validateEmployeeCapacity(data,id);
-    if(capacityError){ showToast(capacityError); }
+    const capacityWarning=validateEmployeeCapacity(data,id);
+    const siWarning=validateEmployeeSocialInsurance(data);
+    const warnings=[];
+    if(capacityWarning){
+      warnings.push({
+        title:'تجاوز سعة المشروع',
+        html:`العدد المضاف سوف يكون أكبر من سعة المشروع <b>(${fmt(capacityWarning.limit)})</b> لفئة <b>${escapeHtml(capacityWarning.role)}</b> في مشروع <b>${escapeHtml(capacityWarning.project)}</b>. هل تريد المتابعة؟`
+      });
+    }
+    if(siWarning){
+      warnings.push({
+        title:'مخالفة قوانين التأمينات الاجتماعية',
+        html:`الموظف المضاف الآن راتبه الإجمالي <b>${money(siWarning.gross)}</b> مخالف لقوانين التأمينات الاجتماعية لأن راتبه الإجمالي أقل من <b>(${money(siWarning.min)})</b>. هل تريد المتابعة؟`
+      });
+    }
+    if(warnings.length){
+      const proceed=await confirmProjectEmployeeWarnings(warnings);
+      if(!proceed){ showToast('لم يتم حفظ الموظف.'); return; }
+    }
     const idx = employees.findIndex(x=>x.id===id);
     if(idx>=0) employees[idx] = data; else employees.push(data);
     saveEmployees();

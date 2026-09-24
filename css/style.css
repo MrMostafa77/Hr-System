@@ -1922,3 +1922,31 @@ html[data-theme="light"] .pay-auto-hint{background:linear-gradient(90deg,#EAF3FF
 .pj-si-warning-row b{color:#ff9f43;white-space:nowrap}
 #projectSiComplianceAlert{margin-top:10px}
 #projectSiComplianceAlert[hidden]{display:none!important}
+
+/* تنبيه الموظف عند تجاوز سعة المشروع أو مخالفة حد التأمينات */
+.project-warning-box{
+  width:min(560px,calc(100vw - 32px));
+  margin:16vh auto;
+  padding:26px 28px;
+  text-align:center;
+  background:linear-gradient(180deg,var(--navy),#16243a);
+  border:1px solid rgba(210,165,60,.55);
+  border-radius:18px;
+  box-shadow:0 22px 60px rgba(0,0,0,.42);
+}
+.project-warning-icon{
+  width:48px;height:48px;margin:0 auto 10px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(210,165,60,.14);border:1px solid rgba(210,165,60,.55);
+  color:#D2A53C;font-size:25px;font-weight:800;
+}
+.project-warning-box h3{margin:0 0 14px;color:#D2A53C;font-size:18px}
+.project-warning-text{color:var(--ink);font-size:14px;line-height:1.9;text-align:right}
+.project-warning-item{
+  margin:8px 0;padding:12px 14px;border-radius:12px;
+  background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.08)
+}
+.project-warning-item b{color:#fff}
+.project-warning-item .warn-title{display:block;color:#D2A53C;font-weight:800;margin-bottom:3px}
+.project-warning-actions{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
+.project-warning-actions .btn{min-width:150px}
