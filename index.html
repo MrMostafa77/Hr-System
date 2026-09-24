@@ -199,7 +199,16 @@
         <input type="hidden" id="projectBasic"><input type="hidden" id="projectHousing"><input type="hidden" id="projectTransport"><input type="hidden" id="projectOther">
         <div class="card section-card project-panel-card"><div class="project-section-head"><h3>1 — البيانات الأساسية للمشروع</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="basic">↻ إعادة ضبط القسم</button></div><div class="field-grid project-basic-grid">
           <div class="field"><label>اسم المشروع <span class="req">*</span></label><input id="projectName" required></div>
-          <div class="field"><label>اختيار المنطقة <span class="req">*</span></label><select id="projectRegion" required></select></div>
+          <div class="field"><label>المنطقة <span class="req">*</span></label><select id="projectRegion" required></select></div>
+          <div class="field"><label>السجل التجاري</label><input id="projectCR" inputmode="numeric"></div>
+          <div class="field"><label>الرقم الضريبي</label><input id="projectVatNo" inputmode="numeric"></div>
+          <div class="field full"><label>العنوان</label><input id="projectAddress"></div>
+          <div class="field"><label>أرقام التواصل</label><div id="projectPhones" class="multi-list"></div><button type="button" class="small-btn add-type" id="addProjectPhone">+ إضافة رقم</button></div>
+          <div class="field"><label>إيميلات التواصل</label><div id="projectEmails" class="multi-list"></div><button type="button" class="small-btn add-type" id="addProjectEmail">+ إضافة إيميل</button></div>
+          <div class="field"><label>هوية ممثل الشركة</label><input id="projectRepId" inputmode="numeric"></div>
+          <div class="field"><label>اسم ممثل الشركة</label><input id="projectRepName"></div>
+          <div class="field"><label>نسبة ضريبة القيمة المضافة %</label><input type="number" id="projectVat" value="15" min="0" step="0.01"></div>
+          <div class="field"><label class="project-check project-check-si"><input type="checkbox" id="projectSiToggle" data-project-si-toggle><span>التأمينات الاجتماعية (تُفعَّل تلقائيًا في التكاليف)</span></label></div>
         </div></div>
 
 
@@ -216,6 +225,7 @@
             <label class="project-check"><input type="checkbox" data-project-revenue-toggle="extras"><span>ملحقات مشروع</span></label>
           </div>
           <div id="projectRevenueDetails" class="project-dynamic-grid"></div>
+          <div id="projectRevenueBreakdown" class="pj-bd-wrap"></div>
         </div>
 
         <div class="card section-card project-panel-card"><div class="project-section-head"><h3>3 — التكاليف</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="cost">↻ إعادة ضبط القسم</button></div>
@@ -229,10 +239,10 @@
             <label class="project-check"><input type="checkbox" data-project-cost-toggle="devices"><span>أجهزة اتصالات</span></label>
             <label class="project-check"><input type="checkbox" data-project-cost-toggle="uniforms"><span>بدل أمن</span></label>
             <label class="project-check"><input type="checkbox" data-project-cost-toggle="extras"><span>ملحقات مشروع</span></label>
-            <label class="project-check project-check-si"><input type="checkbox" id="projectSiToggle" data-project-si-toggle><span>التأمينات الاجتماعية</span></label>
           </div>
           <div id="projectCostDetails" class="project-dynamic-grid"></div>
           <div id="projectSocialInsurance" class="project-si" hidden></div>
+          <div id="projectCostBreakdown" class="pj-bd-wrap"></div>
         </div>
 
         <div class="card section-card project-panel-card"><div class="project-section-head"><h3>4 — الملاحظات والحفظ</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="notes">↻ إعادة ضبط القسم</button></div><div class="field"><label>ملاحظات</label><input id="projectNotes"></div><div class="project-form-actions"><button class="btn btn-primary" type="submit">حفظ المشروع</button><button class="btn" type="button" id="newProjectEntryBtn">+ إدخالات جديدة</button><button class="btn" type="button" id="cancelProjectBtn">إلغاء</button></div></div>
@@ -245,7 +255,9 @@
           <div class="project-summary-box profit-summary"><div class="project-summary-label">هامش ربح المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryProfitPerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryProfitTotal">0 ريال</b></div></div>
         </div>
         <div class="project-summary-note">متوسط الفرد محسوب على إجمالي عدد الأفراد في المشروع.</div>
+        <div id="projectSummaryDetail" class="pj-bd-wrap"></div>
       </div>
+      <div class="card section-card project-panel-card" id="projectCapacityCard"><div class="project-section-head"><h3>سعة المشروع</h3></div><div id="projectCapacity" class="pj-bd-wrap"></div></div>
       <div class="card section-card full-page-card"><div class="filters" style="margin:0 0 16px"><div class="search-box" style="max-width:420px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="search" id="projectSearch" placeholder="بحث باسم المشروع"></div><span class="pill pill-gray" id="projectCount">0 مشروع</span></div><h3>قائمة المشاريع</h3><div class="table-wrap"><table class="payroll-table projects-table"><colgroup><col class="col-project"><col class="col-region"><col class="col-guards"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-action"></colgroup><thead><tr><th>المشروع</th><th>المنطقة</th><th>الحراس</th><th>إيرادات الحراس</th><th>تكاليف الحراس</th><th>إجمالي الإيرادات</th><th>إجمالي التكاليف</th><th>الإجراء</th></tr></thead><tbody id="projectsTableBody"></tbody></table></div></div>
     </section>
 
@@ -401,6 +413,7 @@
         </div>
 
         <div class="tabpanel" data-panel="pay">
+          <div class="pay-auto-hint" id="payAutoHint" hidden></div>
           <div class="field-grid">
             <div class="field"><label>الراتب الأساسي (ريال)</label><input type="number" id="f_basicsalary" min="0" step="0.01"></div>
             <div class="field"><label>بدل السكن</label><div class="allowance-input"><input type="number" id="f_housing_pct" class="allowance-pct" min="0" step="0.01" placeholder="%"><input type="number" id="f_housing" min="0" step="0.01" readonly></div></div>

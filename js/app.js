@@ -104,7 +104,7 @@
     const state=localState();
     applyState({...state, employees: state.employees || []});
   }
-  function saveEmployees(){ persistCloud(); }
+  function saveEmployees(){ persistCloud(); try{renderProjectCapacity(); renderProjects();}catch(e){} }
   function loadAux(){
     const state=localState();
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
@@ -155,6 +155,7 @@
   const projectKinds={
     guards:'حارس أمن', guardsFemale:'حارسات أمن', supervisors:'مشرفين', managers:'مدير أمن', patrols:'دوريات أمنية', devices:'أجهزة اتصالات', uniforms:'بدل أمن', extras:'ملحقات مشروع'
   };
+  const roleCapacityLabels={guards:'حراس الأمن',guardsFemale:'حارسات الأمن',supervisors:'المشرفين',managers:'مدراء المشاريع',patrols:'الدوريات'};
   function money(v){return `${fmt(Number(v)||0)} ريال`;}
 
   /* ===== التأمينات الاجتماعية (في تكاليف المشروع) ===== */
@@ -162,7 +163,7 @@
   const siRoles=['guards','guardsFemale','supervisors','managers'];
   function socialInsuranceCalc(){
     const data=getDetailData('cost'); const rows=[];
-    siRoles.forEach(key=>(data[key]||[]).forEach(r=>rows.push({key,name:projectKinds[key],salary:Number(r.unit)||0,qty:Number(r.quantity)||0})));
+    siRoles.forEach(key=>(data[key]||[]).forEach(r=>rows.push({key,name:projectKinds[key],salary:(r.basic!=null?(Number(r.basic)||0)*(1+(Number(r.hPct)||0)/100):Number(r.unit)||0),qty:Number(r.quantity)||0})));
     const sum=rate=>rows.reduce((a,r)=>a+r.salary*rate/100*r.qty,0);
     return {rows,guardTotal:sum(SI_GUARD_RATE),companyTotal:sum(SI_COMPANY_RATE)};
   }
@@ -175,25 +176,31 @@
     const build=(cls,title,rate,total)=>`<div class="project-si-box ${cls}">
         <div class="si-head"><h4>${title}</h4><span class="si-rate">${rate}%</span></div>
         ${calc.rows.length?calc.rows.map(r=>`<div class="si-row">
-          <div class="si-role"><b>${r.name}</b><small>الراتب: ${money(r.salary)} × ${fmt(r.qty)}</small></div>
+          <div class="si-role"><b>${r.name}</b><small>الأساسي + السكن: ${money(r.salary)} × ${fmt(r.qty)}</small></div>
           <div class="si-amt"><span>للفرد</span><b>${money(r.salary*rate/100)}</b></div>
           <div class="si-amt"><span>للعدد</span><b>${money(r.salary*rate/100*r.qty)}</b></div>
         </div>`).join(''):'<div class="si-empty">أضف حارس أمن وراتبه في التكاليف لحساب المبلغ.</div>'}
         <div class="si-total"><span>إجمالي ${title}</span><b>${money(total)}</b></div>
       </div>`;
-    box.innerHTML=`<div class="project-si-title">التأمينات الاجتماعية <small>محسوبة على راتب الفرد في المشروع</small></div>
+    box.innerHTML=`<div class="project-si-title">التأمينات الاجتماعية <small>محسوبة على الأساسي + السكن</small></div>
       <div class="project-si-grid">${build('si-guard','حصة الحارس',SI_GUARD_RATE,calc.guardTotal)}${build('si-company','حصة الشركة',SI_COMPANY_RATE,calc.companyTotal)}</div>`;
   }
   function detailCard(mode,key,title,data={}){
-    const isType=key==='devices'||key==='uniforms';
-    const qty=Number(data.quantity||data.count||0)||0, unit=Number(data.unit||data.price||data.salary||0)||0;
+    const isType=key==='devices'||key==='uniforms', sal=mode==='cost'&&siRoles.includes(key);
+    const qty=Number(data.quantity||data.count||0)||0; let unit=Number(data.unit||data.price||data.salary||0)||0;
     const type=data.type||'';
+    const hP=data.hPct??25, tP=data.tPct??38.5, oth=Number(data.other)||0;
+    let basic=data.basic; if(sal&&basic==null) basic=unit?Math.round(unit/(1+(hP+tP)/100)*100)/100:0;
+    if(sal) unit=(Number(basic)||0)*(1+(Number(hP)+Number(tP))/100)+oth;
+    const num=(c,l,v,st='0.01')=>`<div class="field"><label>${l}</label><input type="number" class="${c}" min="0" step="${st}" value="${v}"></div>`;
     return `<div class="project-detail-card" data-project-detail="${mode}-${key}" data-key="${key}">
       <div class="project-detail-head"><h4>${title}</h4>${isType?`<button type="button" class="small-btn danger project-remove-detail">×</button>`:''}</div>
       ${isType?`<div class="field"><label>النوع</label><input class="pd-type" value="${escapeAttr(type)}" placeholder="اكتب النوع"></div>`:''}
       <div class="field-grid project-detail-fields">
-        <div class="field"><label>العدد</label><input type="number" class="pd-qty" min="0" step="1" value="${qty}"></div>
-        <div class="field"><label>${mode==='revenue'?'الإيراد / القطعة':'الراتب / القطعة'}</label><input type="number" class="pd-unit" min="0" step="0.01" value="${unit}"></div>
+        ${num('pd-qty','العدد',qty,'1')}
+        ${sal?num('pd-basic','الأساسي',basic)+num('pd-hpct','سكن %',hP)+num('pd-tpct','مواصلات %',tP)+num('pd-other','بدلات أخرى (ريال)',oth)
+          +`<div class="field"><label>إجمالي الراتب / فرد</label><input type="number" class="pd-unit" value="${unit.toFixed(2)}" readonly></div>`
+          :num('pd-unit',mode==='revenue'?'الإيراد / القطعة':'الراتب / القطعة',unit)}
         <div class="project-calc-box"><span>الإجمالي للقطعة</span><b class="pd-unit-total">${money(unit)}</b></div>
         <div class="project-calc-box"><span>الإجمالي للعدد</span><b class="pd-total">${money(qty*unit)}</b></div>
       </div>
@@ -203,7 +210,7 @@
     const out={};
     document.querySelectorAll(`#project${mode==='revenue'?'Revenue':'Cost'}Details .project-detail-card`).forEach(card=>{
       const key=card.dataset.key; if(!out[key])out[key]=[];
-      out[key].push({type:card.querySelector('.pd-type')?.value||'',quantity:Number(card.querySelector('.pd-qty')?.value)||0,unit:Number(card.querySelector('.pd-unit')?.value)||0});
+      out[key].push({type:card.querySelector('.pd-type')?.value||'',quantity:Number(card.querySelector('.pd-qty')?.value)||0,unit:Number(card.querySelector('.pd-unit')?.value)||0,...(card.querySelector('.pd-basic')?{basic:Number(card.querySelector('.pd-basic').value)||0,hPct:Number(card.querySelector('.pd-hpct').value)||0,tPct:Number(card.querySelector('.pd-tpct').value)||0,other:Number(card.querySelector('.pd-other').value)||0}:{})});
     });
     return out;
   }
@@ -225,7 +232,7 @@
   }
   function bindProjectDetailInputs(){
     document.querySelectorAll('#projectRevenueDetails .project-detail-card,#projectCostDetails .project-detail-card').forEach(card=>{
-      const recalc=()=>{const q=Number(card.querySelector('.pd-qty')?.value)||0,u=Number(card.querySelector('.pd-unit')?.value)||0;card.querySelector('.pd-unit-total').textContent=money(u);card.querySelector('.pd-total').textContent=money(q*u);updateProjectTotals();};
+      const recalc=()=>{const bE=card.querySelector('.pd-basic'); if(bE){const g=c=>Number(card.querySelector(c).value)||0; card.querySelector('.pd-unit').value=(g('.pd-basic')*(1+(g('.pd-hpct')+g('.pd-tpct'))/100)+g('.pd-other')).toFixed(2);} const q=Number(card.querySelector('.pd-qty')?.value)||0,u=Number(card.querySelector('.pd-unit')?.value)||0;card.querySelector('.pd-unit-total').textContent=money(u);card.querySelector('.pd-total').textContent=money(q*u);updateProjectTotals();};
       card.querySelectorAll('input').forEach(i=>i.addEventListener('input',recalc));
       card.querySelector('.project-remove-detail')?.addEventListener('click',()=>{card.remove();updateProjectTotals();});
     });
@@ -246,7 +253,8 @@
       box.dataset.total=total;
       if(mode==='revenue') detailRevenue=total; else detailCost=total;
     });
-    const totalRevenue=detailRevenue, totalCost=detailCost, profit=totalRevenue-totalCost;
+    const siCo=document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0;
+    const totalRevenue=detailRevenue, totalCost=detailCost+siCo, profit=totalRevenue-totalCost;
     const revData=getDetailData('revenue'), costData=getDetailData('cost');
     const humanKeys=['guards','guardsFemale','supervisors','managers','patrols'];
     const people=humanKeys.reduce((sum,key)=>{
@@ -258,7 +266,64 @@
     set('projectSummaryRevenuePerson',totalRevenue/divisor); set('projectSummaryRevenueTotal',totalRevenue);
     set('projectSummaryCostPerson',totalCost/divisor); set('projectSummaryCostTotal',totalCost);
     set('projectSummaryProfitPerson',profit/divisor); set('projectSummaryProfitTotal',profit);
-    renderSocialInsurance();
+    renderSocialInsurance(); renderBreakdowns(); renderProjectCapacity();
+  }
+
+
+  /* ===== بيانات التواصل المتعددة ===== */
+  const pjRow=(kind,val='')=>`<div class="multi-row">${kind==='phone'?'<span class="pj-pfx" dir="ltr">+966</span>':''}<input class="pj-${kind}" dir="ltr" ${kind==='phone'?'inputmode="numeric" maxlength="9" placeholder="5XXXXXXXX"':'type="email" placeholder="name@example.com"'} value="${escapeAttr(val)}"><button type="button" class="small-btn danger pj-rm">×</button></div>`;
+  function setMulti(kind,arr){const box=document.getElementById(kind==='phone'?'projectPhones':'projectEmails'); if(!box)return; const l=(arr&&arr.length)?arr:['']; box.innerHTML=l.map(v=>pjRow(kind,kind==='phone'?String(v).replace(/^\+966/,''):v)).join('');}
+  function getMulti(kind){return [...document.querySelectorAll('.pj-'+kind)].map(i=>{let v=i.value.trim(); if(kind==='phone'){v=normalizeDigits(v).replace(/^0+/,'').slice(0,9); return v?'+966'+v:'';} return v;}).filter(Boolean);}
+  document.getElementById('addProjectPhone')?.addEventListener('click',()=>document.getElementById('projectPhones').insertAdjacentHTML('beforeend',pjRow('phone')));
+  document.getElementById('addProjectEmail')?.addEventListener('click',()=>document.getElementById('projectEmails').insertAdjacentHTML('beforeend',pjRow('email')));
+  document.getElementById('view-projects')?.addEventListener('click',e=>{const b=e.target.closest('.pj-rm'); if(!b)return; const row=b.closest('.multi-row'); if(row.parentElement.children.length>1) row.remove(); else row.querySelector('input').value='';});
+  document.getElementById('view-projects')?.addEventListener('input',e=>{if(e.target.matches('.pj-phone'))e.target.value=normalizeDigits(e.target.value).slice(0,9);});
+  setMulti('phone',[]);setMulti('email',[]);
+
+  /* ===== جداول الإيرادات/التكاليف/الملخص + سعة المشروع ===== */
+  const vatRate=()=>{const v=parseFloat(document.getElementById('projectVat')?.value);return isNaN(v)?15:v;};
+  function projectBreakdown(){
+    const rv=getDetailData('revenue'), cv=getDetailData('cost'), k=1+vatRate()/100, rev=[], cost=[];
+    const agg=(d,key)=>({n:d[key].reduce((a,r)=>a+r.quantity,0),ex:d[key].reduce((a,r)=>a+r.quantity*r.unit,0)});
+    Object.keys(projectKinds).forEach(key=>{
+      if(rv[key]){const a=agg(rv,key);rev.push({k:key,name:projectKinds[key],n:a.n,ex:a.ex,inc:a.ex*k});}
+      if(cv[key]){const a=agg(cv,key);cost.push({k:key,name:projectKinds[key],n:a.n,ex:a.ex,inc:a.ex*k});}
+    });
+    const si=document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0;
+    if(si) cost.push({k:'si',name:'التأمينات الاجتماعية (حصة الشركة)',n:0,ex:si,inc:si});
+    return {rev,cost};
+  }
+  const sumRows=rows=>rows.reduce((a,r)=>({n:a.n+r.n,ex:a.ex+r.ex,inc:a.inc+r.inc}),{n:0,ex:0,inc:0});
+  function bdTable(title,rows,person){
+    const t=sumRows(rows), per=(ex,n)=>n?money(ex/n):'—', cnt=r=>r.k==='si'?'—':fmt(r.n);
+    return `<div class="pj-bd-title">${title}</div><div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>الفئة</th><th>العدد</th>${person?'<th>للفرد</th>':''}<th>الإجمالي بدون ضريبة</th><th>الإجمالي بالضريبة</th></tr></thead><tbody>${
+      rows.map(r=>`<tr><td>${r.name}</td><td class="mono">${cnt(r)}</td>${person?`<td class="mono">${per(r.ex,r.n)}</td>`:''}<td class="mono">${money(r.ex)}</td><td class="mono">${money(r.inc)}</td></tr>`).join('')||`<tr><td colspan="${person?5:4}" class="empty-note">لا توجد بنود.</td></tr>`
+    }<tr class="pj-bd-total"><td>الإجمالي</td><td class="mono">${fmt(t.n)}</td>${person?`<td class="mono">${per(t.ex,t.n)}</td>`:''}<td class="mono">${money(t.ex)}</td><td class="mono">${money(t.inc)}</td></tr></tbody></table></div>`;
+  }
+  function renderBreakdowns(){
+    const {rev,cost}=projectBreakdown(), set=(id,h)=>{const e=document.getElementById(id);if(e)e.innerHTML=h;};
+    set('projectRevenueBreakdown',bdTable('إجمالي إيرادات المشروع الشهرية',rev,false));
+    set('projectCostBreakdown',bdTable('إجمالي تكاليف المشروع الشهرية (الرواتب)',cost,false));
+    const profit=[...new Set([...rev,...cost].map(r=>r.k))].map(key=>{
+      const a=rev.find(r=>r.k===key)||{n:0,ex:0,inc:0}, b=cost.find(r=>r.k===key)||{n:0,ex:0,inc:0};
+      return {k:key,name:a.name||b.name||projectKinds[key],n:a.n||b.n,ex:a.ex-b.ex,inc:a.inc-b.inc};
+    });
+    set('projectSummaryDetail',bdTable('تفصيل الإيرادات بالفئات (شهريًا)',rev,true)+bdTable('تفصيل التكاليف بالفئات (شهريًا)',cost,true)+bdTable('هامش الربح بالفئات (شهريًا)',profit,true));
+  }
+  function projectOverList(name,caps){   // caps: {key:capacity}
+    const counts=name?projectEmployeeCounts(name,null):{}, out=[];
+    Object.keys(roleCapacityLabels).forEach(k=>{const cap=Number(caps[k])||0, over=(counts[k]||0)-cap; if(cap>0&&over>0) out.push({k,over,label:roleCapacityLabels[k]});});
+    return out;
+  }
+  function renderProjectCapacity(){
+    const box=document.getElementById('projectCapacity'); if(!box)return;
+    const name=document.getElementById('projectName')?.value.trim()||'', cv=getDetailData('cost');
+    const counts=name?projectEmployeeCounts(name,null):{}, caps={}, rows=[];
+    Object.keys(projectKinds).forEach(k=>{ if(!cv[k])return; const cap=cv[k].reduce((a,r)=>a+r.quantity,0); caps[k]=cap;
+      const human=roleCapacityLabels[k]!==undefined, used=human?(counts[k]||0):null, over=human?used-cap:0;
+      rows.push(`<tr class="${over>0?'pj-over-row':''}"><td>${projectKinds[k]}</td><td class="mono">${fmt(cap)}</td><td class="mono">${human?fmt(used):'—'}</td><td class="mono">${human?fmt(Math.max(cap-used,0)):'—'}</td></tr>`); });
+    const alerts=projectOverList(name,caps).map(o=>`<div class="pj-over">⚠ تنبيه: عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('');
+    box.innerHTML=alerts+`<div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>البند</th><th>السعة (حسب التكاليف)</th><th>المضاف فعليًا</th><th>المتبقي</th></tr></thead><tbody>${rows.join('')||'<tr><td colspan="4" class="empty-note">أضف بنودًا في التكاليف.</td></tr>'}</tbody></table></div>`;
   }
 
   function projectTotal(p){return Number(p.costTotal)||0;}
@@ -269,12 +334,13 @@
     document.querySelectorAll('[data-project-revenue-toggle],[data-project-cost-toggle]').forEach(c=>c.checked=(c.dataset.projectRevenueToggle==='guards'||c.dataset.projectCostToggle==='guards'));
     renderDynamicDetails('revenue',{});renderDynamicDetails('cost',{});
     document.getElementById('projectNotes').value='';refreshRegionSelects();
-    document.getElementById('projectRegion').value='';
+    document.getElementById('projectRegion').value='';setMulti('phone',[]);setMulti('email',[]);
     updateProjectTotals();toggleProjectConfig();
   }
   function resetProjectSection(section){
     if(section==='basic'){
-      document.getElementById('projectName').value='';
+      ['projectName','projectCR','projectVatNo','projectAddress','projectRepId','projectRepName'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('projectVat').value='15'; const siB=document.getElementById('projectSiToggle'); if(siB) siB.checked=false; setMulti('phone',[]);setMulti('email',[]);
       refreshRegionSelects();
       document.getElementById('projectRegion').value='';
     }else if(section==='revenue'){
@@ -282,7 +348,6 @@
       renderDynamicDetails('revenue',{});
     }else if(section==='cost'){
       document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards');
-      const siT=document.getElementById('projectSiToggle'); if(siT) siT.checked=false;
       renderDynamicDetails('cost',{});
     }else if(section==='notes'){
       document.getElementById('projectNotes').value='';
@@ -294,11 +359,12 @@
     const list=projects.filter(p=>!q||[p.name,p.region].some(v=>String(v||'').toLowerCase().includes(q)));
     document.getElementById('projectCount').textContent=`${list.length} مشروع`;
     const body=document.getElementById('projectsTableBody');
-    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b></td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
+    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b>${projectOverList(p.name,Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]))).map(o=>`<div class="pj-over">⚠ عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('')}</td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
     body.querySelectorAll('[data-project-edit]').forEach(b=>b.onclick=()=>{
       const p=projects.find(x=>x.id===b.dataset.projectEdit);if(!p)return;
       document.getElementById('projectId').value=p.id;document.getElementById('projectName').value=p.name||'';document.getElementById('projectRegion').value=p.region||'';
       document.getElementById('projectNotes').value=p.notes||'';
+      const sv=(id,v)=>document.getElementById(id).value=v??''; sv('projectCR',p.cr);sv('projectVatNo',p.vatNo);sv('projectAddress',p.address);sv('projectRepId',p.repId);sv('projectRepName',p.repName);sv('projectVat',p.vatRate??15);setMulti('phone',p.phones);setMulti('email',p.emails);
       const rev=p.revenueItems||{}, cost=p.costItems||{};
       document.querySelectorAll('[data-project-revenue-toggle]').forEach(c=>c.checked=c.dataset.projectRevenueToggle==='guards' || Array.isArray(rev[c.dataset.projectRevenueToggle]));
       document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards' || Array.isArray(cost[c.dataset.projectCostToggle]));
@@ -346,6 +412,7 @@
     const guardRevenue=unitFrom(revenueItems,'guards');
     const data={
       id:document.getElementById('projectId').value||'p'+Date.now(), name:document.getElementById('projectName').value.trim(), region:document.getElementById('projectRegion').value,
+      cr:document.getElementById('projectCR').value.trim(), vatNo:document.getElementById('projectVatNo').value.trim(), address:document.getElementById('projectAddress').value.trim(), phones:getMulti('phone'), emails:getMulti('email'), repId:document.getElementById('projectRepId').value.trim(), repName:document.getElementById('projectRepName').value.trim(), vatRate:vatRate(),
       guards, guardsFemale, supervisors:supervisorQty, managers:managerQty, patrols:patrolQty, devices:deviceQty, uniforms:uniformQty, cones:extraQty,
       revenueGuard:guardRevenue, costGuard:guardSalary, revenueTotal:guards*guardRevenue, costTotal:costGuards*guardSalary,
       revenueItems, costItems, guardBasic:guardSalary, guardHousing:0, guardTransport:0, guardOther:0,
@@ -357,15 +424,17 @@
     data.costTotal=allCostCards.reduce((a,c)=>a+(Number(c.querySelector('.pd-qty')?.value)||0)*(Number(c.querySelector('.pd-unit')?.value)||0),0);
     const allRevenueCards=[...document.querySelectorAll('#projectRevenueDetails .project-detail-card')];
     data.revenueTotal=allRevenueCards.reduce((a,c)=>a+(Number(c.querySelector('.pd-qty')?.value)||0)*(Number(c.querySelector('.pd-unit')?.value)||0),0);
+    data.costTotal+=data.siEnabled?data.siCompanyTotal:0;
     if(!data.name||!data.region){showToast('يرجى إدخال اسم المشروع واختيار المنطقة');return;}
     const existing=projects.find(x=>x.id===data.id);
     const capacityError=validateProjectCapacities(existing?existing.name:data.name,null,data);
-    if(capacityError){showToast(capacityError);return;}
+    if(capacityError){showToast(capacityError);}
     const idx=projects.findIndex(x=>x.id===data.id);if(idx>=0)projects[idx]=data;else projects.push(data);
     saveProjects();refreshEmployeeProjectSelect();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
   document.getElementById('projectSearch').addEventListener('input',renderProjects);
-  document.getElementById('projectSiToggle')?.addEventListener('change',renderSocialInsurance);
+  document.getElementById('projectSiToggle')?.addEventListener('change',updateProjectTotals);
+  ['projectVat','projectName'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateProjectTotals));
   renderDynamicDetails('revenue',{});renderDynamicDetails('cost',{});updateProjectTotals();  // عرض بطاقة الحارس فور فتح التبويب
   document.querySelectorAll('[data-project-revenue-toggle],[data-project-cost-toggle]').forEach(cb=>cb.addEventListener('change',()=>{const rv=getDetailData('revenue'),cv=getDetailData('cost');renderDynamicDetails('revenue',rv);renderDynamicDetails('cost',cv);updateProjectTotals();}));
 
@@ -1122,6 +1191,58 @@
   }
   document.getElementById('f_project').addEventListener('change', ()=>{ const p=projects.find(x=>x.name===document.getElementById('f_project').value); if(p && document.getElementById('f_region')) { document.getElementById('f_region').value=p.region||''; refreshEmployeeProjectSelect(p.region||''); document.getElementById('f_project').value=p.name||''; updateEmployeeCode(true); } });
   document.getElementById('f_region')?.addEventListener('change',()=>{ refreshEmployeeProjectSelect(document.getElementById('f_region').value); updateEmployeeCode(true); });
+
+  /* ===== تعبئة الراتب تلقائياً من راتب المشروع حسب فئة الوظيفة ===== */
+  const AUTO_HOUSING_PCT=25, AUTO_TRANSPORT_PCT=38.5, AUTO_OTHER_PCT=0;   // نسب التوزيع على الراتب الأساسي
+  function projectRoleSalary(project,key){
+    if(!project||!key) return 0;
+    const rows=Array.isArray(project.costItems?.[key])?project.costItems[key]:[];
+    const row=rows.find(x=>Number(x?.unit)>0)||rows[0];
+    const legacy={guards:project.costGuard??project.guardBasic, supervisors:project.supervisorBasic, managers:project.managerBasic}[key];
+    return Number(row?.unit)||Number(legacy)||0;
+  }
+  // يحسب الأساسي بحيث (أساسي + سكن + مواصلات + أخرى) = راتب المشروع بالضبط بعد تقريب الهللات
+  function solveBasicForTotal(total,hp,tp,op){
+    const target=Math.round(total*100), c0=Math.round(total/(1+(hp+tp+op)/100)*100);
+    let best=null;
+    for(let d=-5;d<=5;d++){
+      const b=(c0+d)/100;
+      const sum=Math.round((b+allowanceAmount(b,hp)+allowanceAmount(b,tp)+allowanceAmount(b,op))*100);
+      const diff=Math.abs(sum-target);
+      if(!best||diff<best.diff||(diff===best.diff&&Math.abs(d)<Math.abs(best.d))) best={b,diff,d};
+    }
+    return best.b;
+  }
+  function applyProjectSalaryToEmployee(){
+    const pName=document.getElementById('f_project')?.value||'';
+    const job=document.getElementById('f_jobtitle')?.value||'';
+    if(!pName||!job) return;
+    const key=roleCapacityKey(job); if(!key) return;
+    const project=projects.find(x=>String(x.name||'')===String(pName)); if(!project) return;
+    const hint=document.getElementById('payAutoHint');
+    const total=projectRoleSalary(project,key);
+    if(!(total>0)){ if(hint) hint.hidden=true; showToast(`لا يوجد راتب محدد لفئة «${job}» في مشروع ${pName}`); return; }
+    const editing=!!document.getElementById('f_id')?.value;
+    const currentTotal=Number(document.getElementById('f_lastwage')?.value)||0;
+    if(editing && currentTotal>0 && Math.abs(currentTotal-total)>=0.01 && !confirm(`تحديث راتب الموظف إلى راتب فئة «${job}» في المشروع (${money(total)}) بدل الراتب الحالي (${money(currentTotal)})؟`)) return;
+    document.getElementById('f_housing_pct').value=AUTO_HOUSING_PCT;
+    document.getElementById('f_transport_pct').value=AUTO_TRANSPORT_PCT;
+    document.getElementById('f_otherallow_pct').value=AUTO_OTHER_PCT;
+    const b0=solveBasicForTotal(total,AUTO_HOUSING_PCT,AUTO_TRANSPORT_PCT,AUTO_OTHER_PCT);
+    const hAmt=allowanceAmount(b0,AUTO_HOUSING_PCT), tAmt=allowanceAmount(b0,AUTO_TRANSPORT_PCT), oAmt=allowanceAmount(b0,AUTO_OTHER_PCT);
+    const residual=Math.round(total*100)-Math.round((b0+hAmt+tAmt+oAmt)*100);      // فرق هللات نادر بسبب التقريب يُضاف على الأساسي
+    document.getElementById('f_basicsalary').value=(b0+residual/100).toFixed(2);
+    syncAllAllowances();
+    document.getElementById('f_housing').value=hAmt.toFixed(2);
+    document.getElementById('f_transport').value=tAmt.toFixed(2);
+    document.getElementById('f_otherallow').value=oAmt.toFixed(2);
+    updateLastWage();
+    if(hint){ hint.textContent=`تم توزيع الراتب تلقائياً من مشروع «${pName}» لفئة «${job}» — إجمالي الراتب ${money(total)}.`; hint.hidden=false; }
+    showToast('تم تعبئة الرواتب والماليات من راتب المشروع');
+  }
+  document.getElementById('f_project')?.addEventListener('change',applyProjectSalaryToEmployee);
+  document.getElementById('f_jobtitle')?.addEventListener('change',applyProjectSalaryToEmployee);
+  ['f_basicsalary','f_housing_pct','f_transport_pct','f_otherallow_pct'].forEach(id=>document.getElementById(id)?.addEventListener('input',()=>{ const h=document.getElementById('payAutoHint'); if(h) h.hidden=true; }));
   ['firstname','fathername','grandname','familyname'].forEach(id=>document.getElementById('f_'+id)?.addEventListener('input',composeFullName));
   document.getElementById('f_idnum')?.addEventListener('input',e=>{e.target.value=normalizeDigits(e.target.value).slice(0,10);});
   document.getElementById('f_phone9')?.addEventListener('input',e=>{e.target.value=normalizeDigits(e.target.value).slice(0,9);});
@@ -1166,7 +1287,7 @@
     formFields.forEach(f=>{ const el = document.getElementById('f_'+f); if(el) el.value = ''; });
     const statusEl=document.getElementById('f_contractstatus_display'); if(statusEl) statusEl.value='بدون عقد';
     const housingPct=document.getElementById('f_housing_pct'), transportPct=document.getElementById('f_transport_pct'), otherPct=document.getElementById('f_otherallow_pct');
-    if(housingPct) housingPct.value='25'; if(transportPct) transportPct.value='38'; if(otherPct) otherPct.value='0';
+    if(housingPct) housingPct.value='25'; if(transportPct) transportPct.value='38.5'; if(otherPct) otherPct.value='0'; const payHint=document.getElementById('payAutoHint'); if(payHint) payHint.hidden=true;
     const delMemo=document.getElementById('f_delegate_memo'); if(delMemo){delMemo.value=''; delete delMemo.dataset.value;} const delName=document.getElementById('f_delegate_name'); if(delName) delName.value=''; const delMemoName=document.getElementById('delegateMemoName'); if(delMemoName) delMemoName.textContent=''; syncBankAccountType(); const photoEl=document.getElementById('f_idphoto'); if(photoEl){ photoEl.value=''; delete photoEl.dataset.value; } const photoName=document.getElementById('idPhotoName'); if(photoName) photoName.textContent=''; const personalRadio=document.querySelector('input[name=bankAccountType][value="حساب شخصي"]'); if(personalRadio) personalRadio.checked=true;
     document.getElementById('formTitle').textContent = 'إضافة موظف جديد';
     syncStartDateAction();
@@ -1177,6 +1298,7 @@
     const e = employees.find(x=>x.id===id);
     if(!e) return;
     document.getElementById('f_id').value = e.id;
+    { const ph=document.getElementById('payAutoHint'); if(ph) ph.hidden=true; }
     formFields.forEach(f=>{ const el = document.getElementById('f_'+f); if(el) el.value = e[f]!=null ? e[f] : ''; });
     const oldNames=String(e.fullname||'').trim().split(/\s+/);
     ['firstname','fathername','grandname','familyname'].forEach((k,i)=>{const el=document.getElementById('f_'+k); if(el && !el.value) el.value=oldNames[i]||'';});
@@ -1251,7 +1373,6 @@
     if(/دوري|دوريات|patrol/.test(t)) return 'patrols';
     return null;
   }
-  const roleCapacityLabels={guards:'حراس الأمن',guardsFemale:'حارسات الأمن',supervisors:'المشرفين',managers:'مدراء المشاريع',patrols:'الدوريات'};
   function sameProjectName(a,b){
     return normalizeCapacityText(a)===normalizeCapacityText(b);
   }
@@ -1270,7 +1391,7 @@
     const counts=projectEmployeeCounts(projectName, excludeId);
     for(const k of Object.keys(roleCapacityLabels)){
       const limit=Number(caps[k])||0;
-      if(counts[k]>limit) return `لا يمكن حفظ المشروع: عدد ${roleCapacityLabels[k]} الحالي (${counts[k]}) أكبر من الحد المحدد (${limit}).`;
+      if(counts[k]>limit) return `تنبيه: عدد ${roleCapacityLabels[k]} الحالي (${counts[k]}) أكبر من الحد المحدد (${limit}).`;
     }
     return null;
   }
@@ -1309,7 +1430,7 @@
     const limit=projectRoleCapacity(project,k);
     // إذا لم يتم تعريف سعة الوظيفة في المشروع، لا نمنع الإضافة. أما إذا كانت السعة معرفة، فنطبقها على نفس الوظيفة فقط.
     if(limit<=0) return null;
-    if(counts[k]>=limit) return `لا يمكن إضافة الموظف: سعة ${roleCapacityLabels[k]} في مشروع «${project.name}» هي ${limit} فقط، والموجود حالياً ${counts[k]}.`;
+    if(counts[k]>=limit) return `تنبيه: سعة ${roleCapacityLabels[k]} في مشروع «${project.name}» هي ${limit} فقط، والموجود حالياً ${counts[k]}.`;
     return null;
   }
 
@@ -1355,7 +1476,7 @@
     data.idnum=normalizeDigits(data.idnum); data.iban=data.iban.replace(/\s+/g,'').toUpperCase();
     if(id && employees.find(x=>x.id===id)?.empcode) data.empcode=employees.find(x=>x.id===id).empcode; else data.empcode=nextEmployeeCode(data.region,'');
     const capacityError=validateEmployeeCapacity(data,id);
-    if(capacityError){ showToast(capacityError); return; }
+    if(capacityError){ showToast(capacityError); }
     const idx = employees.findIndex(x=>x.id===id);
     if(idx>=0) employees[idx] = data; else employees.push(data);
     saveEmployees();

@@ -1775,3 +1775,20 @@ html[data-theme="light"] .firebase-login-mark{background:var(--grad-blue);box-sh
 html[data-theme="light"] .project-si{background:linear-gradient(180deg,#FFFFFF,#F0F6FF);box-shadow:var(--shadow-sm)}
 html[data-theme="light"] .project-si-box{box-shadow:0 1px 2px rgba(11,77,176,.05),0 6px 16px rgba(23,105,194,.07)}
 html[data-theme="light"] .si-row{background:#EEF5FF}
+
+/* ===== تنبيه: الراتب محسوب تلقائياً من المشروع ===== */
+.pay-auto-hint{margin:0 0 14px;padding:11px 14px;border-radius:12px;border:1px solid var(--border);background:var(--teal-soft);color:var(--ink);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.pay-auto-hint[hidden]{display:none}
+.pay-auto-hint::before{content:"✓";display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--teal);color:#fff;font-size:12px;flex:0 0 20px}
+html[data-theme="light"] .pay-auto-hint{background:linear-gradient(90deg,#EAF3FF,#F5F9FF);border-color:#B7D0F3;color:#0B4DB0}
+
+/* ===== المشاريع: تواصل متعدد / جداول / سعة ===== */
+.multi-list{display:flex;flex-direction:column;gap:8px}
+.multi-row{display:flex;gap:6px;align-items:center}.multi-row input{flex:1;min-width:0}
+.pj-pfx{padding:9px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);font-weight:700;direction:ltr}
+.pj-bd-wrap{margin-top:16px}.pj-bd-title{font-weight:800;color:var(--navy-2);margin:14px 0 8px}
+.pj-bd th,.pj-bd td{text-align:center}.pj-bd td:first-child,.pj-bd th:first-child{text-align:right}
+.pj-bd-total td{font-weight:800;background:var(--gold-soft)}
+.pj-over{color:#e5484d;background:rgba(229,72,77,.10);border:1px solid rgba(229,72,77,.45);border-radius:10px;padding:8px 12px;margin:6px 0;font-weight:800}
+.pj-over-row td{color:#e5484d;font-weight:800}
+.project-detail-fields{grid-template-columns:repeat(4,minmax(0,1fr))}
