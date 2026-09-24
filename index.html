@@ -194,8 +194,19 @@
     </section>
 
     <!-- ===== PROJECTS ===== -->
+    <section id="view-allprojects" style="display:none">
+      <div class="topbar"><div class="pagetitle"><h1>كل المشاريع</h1><p>عرض جميع المشاريع المضافة بالتفصيل</p></div><div class="topbar-actions"><button class="btn" type="button" id="backToProjectsBtn">← المشاريع</button></div></div>
+      <div class="card section-card full-page-card">
+        <div class="filters" style="margin:0 0 16px">
+          <div class="search-box" style="max-width:520px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="search" id="allProjectsSearch" placeholder="بحث باسم المشروع أو المنطقة"></div>
+          <span class="pill pill-gray" id="allProjectsCount">0 مشروع</span>
+        </div>
+        <div class="table-wrap"><table class="payroll-table projects-table"><thead><tr><th>المشروع</th><th>المنطقة</th><th>الحراس</th><th>إجمالي الإيرادات</th><th>إجمالي التكاليف</th><th>الإجراء</th></tr></thead><tbody id="allProjectsTableBody"></tbody></table></div>
+      </div>
+    </section>
+
     <section id="view-projects" style="display:none">
-      <div class="topbar"><div class="pagetitle"><h1>المشاريع</h1><p>البيانات الأساسية والإيرادات والتكاليف الخاصة بكل مشروع</p></div><div class="topbar-actions"><button class="btn btn-primary" id="addProjectBtn">+ إضافة مشروع</button></div></div>
+      <div class="topbar"><div class="pagetitle"><h1>المشاريع</h1><p>البيانات الأساسية والإيرادات والتكاليف الخاصة بكل مشروع</p></div><div class="topbar-actions"><button class="btn" type="button" id="allProjectsBtn">كل المشاريع</button><button class="btn btn-primary" id="addProjectBtn">+ إضافة مشروع</button></div></div>
       <form id="projectForm">
         <input type="hidden" id="projectId">
         <input type="hidden" id="projectBasic"><input type="hidden" id="projectHousing"><input type="hidden" id="projectTransport"><input type="hidden" id="projectOther">
