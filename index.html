@@ -207,8 +207,11 @@
           <div class="field"><label>إيميلات التواصل</label><div id="projectEmails" class="multi-list"></div><button type="button" class="small-btn add-type" id="addProjectEmail">+ إضافة إيميل</button></div>
           <div class="field"><label>هوية ممثل الشركة</label><input id="projectRepId" inputmode="numeric"></div>
           <div class="field"><label>اسم ممثل الشركة</label><input id="projectRepName"></div>
-          <div class="field"><label>نسبة ضريبة القيمة المضافة %</label><input type="number" id="projectVat" value="15" min="0" step="0.01"></div>
-          <div class="field"><label class="project-check project-check-si"><input type="checkbox" id="projectSiToggle" data-project-si-toggle><span>التأمينات الاجتماعية (تُفعَّل تلقائيًا في التكاليف)</span></label></div>
+          <div class="pj-flags-wrap"><div class="pj-flags">
+            <div class="field pj-vat"><label>ضريبة القيمة المضافة %</label><input type="number" id="projectVat" value="15" min="0" step="0.01"></div>
+            <label class="project-check project-check-si"><input type="checkbox" id="projectSiToggle" data-project-si-toggle><span>التأمينات الاجتماعية</span></label>
+            <label class="project-check project-check-si"><input type="checkbox" id="projectMedToggle"><span>التأمين الطبي</span></label>
+          </div></div>
         </div></div>
 
 
