@@ -1835,3 +1835,13 @@ html[data-theme="light"] .pay-auto-hint{background:linear-gradient(90deg,#EAF3FF
 @media(max-width:700px){.pd-med-fields{grid-template-columns:1fr}.pd-med-fields .project-calc-box{margin-top:0}}
 
 .pj-bd-title{color:#B8860B !important}
+
+/* ===== تابات التبويبات ===== */
+.pj-tabs{position:sticky;top:0;z-index:60;display:flex;gap:4px;align-items:flex-end;overflow-x:auto;padding:6px 4px 0;margin:0 0 14px;background:var(--bg);border-bottom:1px solid var(--border);scrollbar-width:thin}
+.pj-tab{display:flex;align-items:center;gap:4px;padding:6px 8px 6px 10px;border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;background:var(--surface);color:var(--ink-soft);cursor:pointer;white-space:nowrap;font-weight:700;font-size:13px;flex:0 0 auto}
+.pj-tab:hover{color:var(--ink)}
+.pj-tab.active{background:var(--gold-soft);color:var(--ink);border-color:#B8860B;box-shadow:0 2px 0 var(--gold-soft)}
+.pj-tab-btn{border:0;background:transparent;color:inherit;cursor:pointer;padding:3px 6px;border-radius:6px;font-size:12px;line-height:1}
+.pj-tab-btn:hover{background:rgba(184,134,11,.22)}.pj-tab-x:hover{background:rgba(229,72,77,.25);color:#e5484d}
+.pj-dot{color:#e5a30b;font-style:normal;font-size:11px}
+@media print{.pj-tabs{display:none !important}}
