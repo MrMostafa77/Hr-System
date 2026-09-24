@@ -166,6 +166,31 @@
   /* ===== التأمينات الاجتماعية (في تكاليف المشروع) ===== */
   const SI_GUARD_RATE=10.75, SI_COMPANY_RATE=12.75;   // نسبة حصة الحارس / حصة الشركة (%)
   const siRoles=['guards','guardsFemale','supervisors','managers'];
+  const SI_MIN_SALARY=4000;
+  function socialInsuranceComplianceIssues(costItems, enabled=true){
+    if(!enabled) return [];
+    const issues=[];
+    siRoles.forEach(key=>{
+      (costItems?.[key]||[]).forEach((r,i)=>{
+        const qty=Number(r.quantity)||0;
+        const unit=Number(r.unit)||0;
+        if(qty>0 && unit>0 && unit<SI_MIN_SALARY) issues.push({key,index:i,name:projectKinds[key],qty,unit});
+      });
+    });
+    return issues;
+  }
+  function socialInsuranceComplianceHtml(costItems, enabled=true){
+    const issues=socialInsuranceComplianceIssues(costItems,enabled);
+    if(!issues.length) return '';
+    const names=[...new Set(issues.map(x=>x.name))].join('، ');
+    return `<div class="pj-si-warning"><b>⚠ مخالفة محتملة للتأمينات الاجتماعية</b><div>يوجد ${escapeHtml(names)} بتكلفة للفرد أقل من ${money(SI_MIN_SALARY)}. الحد الأدنى للراتب المضاف عند تفعيل التأمينات الاجتماعية هو ${money(SI_MIN_SALARY)}.</div>${issues.map(x=>`<div class="pj-si-warning-row"><span>${escapeHtml(x.name)}${x.qty>1?` × ${fmt(x.qty)}`:''}</span><b>${money(x.unit)} للفرد</b></div>`).join('')}</div>`;
+  }
+  function renderSocialInsuranceCompliance(){
+    const box=document.getElementById('projectSiComplianceAlert'); if(!box)return;
+    const on=!!document.getElementById('projectSiToggle')?.checked;
+    box.innerHTML=socialInsuranceComplianceHtml(getDetailData('cost'),on);
+    box.hidden=!box.innerHTML;
+  }
   function socialInsuranceCalc(){
     const data=getDetailData('cost'); const rows=[];
     siRoles.forEach(key=>(data[key]||[]).forEach(r=>rows.push({key,name:projectKinds[key],salary:Number(r.unit)||0,qty:Number(r.quantity)||0})));
@@ -291,6 +316,7 @@
     document.querySelectorAll('#projectRevenueDetails .project-detail-card').forEach(card=>{const q=Number(card.querySelector('.pd-qty')?.value)||0,u=Number(card.querySelector('.pd-unit')?.value)||0,b=q*u,v=b*vatRate()/100; if(card.querySelector('.pd-before'))card.querySelector('.pd-before').textContent=money(b); if(card.querySelector('.pd-vat'))card.querySelector('.pd-vat').textContent=money(v); if(card.querySelector('.pd-after'))card.querySelector('.pd-after').textContent=money(b+v);});
     document.querySelectorAll('#projectCostDetails .project-detail-card').forEach(refreshSalaryCard);
     renderBreakdowns(); renderProjectCapacity();
+     renderSocialInsuranceCompliance();
   }
 
 
@@ -390,6 +416,7 @@
       <div class="pj-modal-body">
         <div class="pj-bd-title">البيانات الأساسية</div>
         <div class="pv-grid">${kv('المنطقة',p.region)}${kv('السجل التجاري',p.cr)}${kv('الرقم الضريبي',p.vatNo)}${kv('العنوان',p.address)}${kv('أرقام التواصل',(p.phones||[]).join(' ، '))}${kv('إيميلات التواصل',(p.emails||[]).join(' ، '))}${kv('اسم ممثل الشركة',p.repName)}${kv('هوية ممثل الشركة',p.repId)}${kv('نسبة الضريبة',vat+'%')}${kv('التأمينات الاجتماعية',p.siEnabled?'مفعّلة':'غير مفعّلة')}${kv('التأمين الطبي',p.medEnabled?'مفعّل':'غير مفعّل')}</div>
+        ${socialInsuranceComplianceHtml(p.costItems||{},!!p.siEnabled)}
         ${bdTable('الإيرادات الشهرية',rev,false,true)}
         ${sal.length?`<div class="pj-bd-title">رواتب المشروع</div><div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>الفئة</th><th>العدد</th><th>الأساسي</th><th>السكن</th><th>المواصلات</th><th>بدلات أخرى</th><th>إجمالي الراتب / فرد</th><th>الإجمالي للعدد</th></tr></thead><tbody>${sal.join('')}</tbody></table></div>`:''}
         <div class="pj-bd-title">سعة المشروع</div>${alerts}
@@ -447,7 +474,7 @@
     const list=projects.filter(p=>!q||[p.name,p.region].some(v=>String(v||'').toLowerCase().includes(q)));
     document.getElementById('projectCount').textContent=`${list.length} مشروع`;
     const body=document.getElementById('projectsTableBody');
-    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b>${projectOverList(p.name,Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]))).map(o=>`<div class="pj-over">⚠ عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('')}</td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-view="${p.id}">عرض</button><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
+    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b>${projectOverList(p.name,Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]))).map(o=>`<div class="pj-over">⚠ عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('')}${socialInsuranceComplianceHtml(p.costItems||{},!!p.siEnabled)}</td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-view="${p.id}">عرض</button><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
     body.querySelectorAll('[data-project-edit]').forEach(b=>b.onclick=()=>{
       const p=projects.find(x=>x.id===b.dataset.projectEdit);if(!p)return;
       document.getElementById('projectId').value=p.id;document.getElementById('projectName').value=p.name||'';document.getElementById('projectRegion').value=p.region||'';
@@ -536,7 +563,7 @@
     body.innerHTML=list.map(p=>{
       const cap=projectCapacityTotal(p), emp=projectEmployeeTotal(p.name), over=emp>cap && cap>0;
       return `<tr class="all-project-row" data-all-project-row="${p.id}" title="دبل كليك لعرض المشروع">
-        <td class="project-name-cell"><b>${escapeHtml(p.name||'—')}</b></td>
+        <td class="project-name-cell"><b>${escapeHtml(p.name||'—')}</b>${socialInsuranceComplianceHtml(p.costItems||{},!!p.siEnabled)}</td>
         <td>${escapeHtml(p.region||'—')}</td>
         <td class="mono">${fmt(cap)}</td>
         <td class="mono">${fmt(emp)}${over?`<span class="table-alert-dot" title="عدد الموظفين أكبر من سعة المشروع">⚠</span>`:''}</td>
@@ -555,7 +582,11 @@
   document.getElementById('backToProjectsBtn')?.addEventListener('click',()=>{switchView('projects');});
   document.getElementById('allProjectsSearch')?.addEventListener('input',renderAllProjectsPage);
   document.getElementById('projectSearch').addEventListener('input',renderProjects);
-  ['projectSiToggle','projectMedToggle'].forEach(id=>document.getElementById(id)?.addEventListener('change',updateProjectTotals));
+  document.getElementById('projectSiToggle')?.addEventListener('change',()=>{
+    updateProjectTotals();
+    if(document.getElementById('projectSiToggle').checked && socialInsuranceComplianceIssues(getDetailData('cost'),true).length) showToast('⚠ يوجد راتب أقل من 4000 ريال ومخالف لحد التأمينات المحدد.');
+  });
+  document.getElementById('projectMedToggle')?.addEventListener('change',updateProjectTotals);
   ['projectVat','projectName'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateProjectTotals));
   document.querySelectorAll('[data-project-tab]').forEach(btn=>btn.addEventListener('click',()=>{
     const tab=btn.dataset.projectTab;

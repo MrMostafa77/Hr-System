@@ -1914,3 +1914,11 @@ html[data-theme="light"] .pay-auto-hint{background:linear-gradient(90deg,#EAF3FF
   #view-allprojects .all-projects-table .row-actions .btn{font-size:9px!important;padding:5px 4px!important;}
   #view-allprojects .all-projects-table .money-cell{font-size:10px!important;}
 }
+
+/* تنبيه الحد الأدنى للتأمينات الاجتماعية */
+.pj-si-warning{margin:8px 0;padding:9px 12px;border:1px solid rgba(245,158,11,.55);border-radius:10px;background:rgba(245,158,11,.10);color:#ffd38a;font-size:12px;line-height:1.65;font-weight:700;text-align:right}
+.pj-si-warning>b{display:block;color:#ffb84d;margin-bottom:2px}
+.pj-si-warning-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:3px 0;border-top:1px solid rgba(245,158,11,.18);font-weight:600}
+.pj-si-warning-row b{color:#ff9f43;white-space:nowrap}
+#projectSiComplianceAlert{margin-top:10px}
+#projectSiComplianceAlert[hidden]{display:none!important}
