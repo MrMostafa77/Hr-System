@@ -1399,32 +1399,146 @@ textarea::placeholder{
   opacity:1 !important;
 }
 
-/* ===== Project list actions / upgrade ===== */
-.project-icon-actions{justify-content:center!important;align-items:center!important;gap:6px!important;flex-wrap:nowrap!important}
-.icon-action-btn{width:34px!important;height:34px!important;min-width:34px!important;padding:0!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;border-radius:9px!important}
-.icon-action-btn svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
-.icon-action-danger:hover{color:var(--red)!important;border-color:var(--red)!important;background:var(--red-soft)!important}
-.icon-action-upgrade{color:var(--gold)!important;font-size:17px!important;font-weight:900!important}
-.icon-action-upgrade:hover{border-color:var(--gold)!important;background:var(--gold-soft)!important;transform:translateY(-1px)}
-.upgrade-arrow{line-height:1;display:inline-block;transform:translateY(-1px)}
-.project-upgrade-card{margin-bottom:16px}
-.project-upgrade-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-.project-upgrade-grid input[readonly]{background:var(--border-soft);font-weight:700}
-.project-upgrade-empty,.project-upgrade-selected{min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px}
-.project-upgrade-selected{flex-direction:row;justify-content:flex-start;text-align:right;min-height:auto;padding:20px}
-.upgrade-icon,.upgrade-selected-icon{font-size:38px;line-height:1;color:var(--gold);font-weight:900}
-.upgrade-selected-icon{font-size:28px}
-.project-upgrade-empty h3,.project-upgrade-selected h3{margin:0;color:var(--navy-2)}
-.project-upgrade-empty p,.project-upgrade-selected p{margin:0;color:var(--ink-soft)}
-@media(max-width:700px){.project-upgrade-grid{grid-template-columns:1fr}.project-upgrade-selected{align-items:flex-start}}
+/* =====================================================================
+   LIGHT THEME — أبيض + أزرق (الكتابة زرقاء)
+   يُفعَّل عبر html[data-theme="light"] ويأتي في آخر الملف عشان يغلب أي ألوان داكنة ثابتة.
+   ===================================================================== */
+html[data-theme="light"]{
+  --bg:#F3F8FF; --surface:#FFFFFF; --surface-2:#F0F6FF;
+  --ink:#0B4DB0; --ink-soft:#3F72C4; --muted:#3F72C4;
+  --border:#B7D0F3; --border-soft:#E4EEFC;
+  --navy:#1257C2; --navy-2:#1769C2;
+  --teal:#1769C2; --teal-soft:#E3EEFD;
+  --gold:#5F8FD8; --gold-soft:#EAF2FE;
+  --red:#C0392B; --red-soft:#FDECEA;
+  color-scheme:light;
+}
+html[data-theme="light"],
+html[data-theme="light"] body{background:#F3F8FF!important;color:var(--ink);}
+html[data-theme="light"] body::before{display:none!important;}
+html[data-theme="light"] body::after{background:linear-gradient(180deg,#F8FBFF,#EAF2FF)!important;}
 
-/* Final project table proportions after simplifying the project list */
-#view-projects .projects-table col.col-project{width:27%!important;}
-#view-projects .projects-table col.col-region{width:18%!important;}
-#view-projects .projects-table col.col-money{width:21%!important;}
-#view-projects .projects-table col.col-action{width:13%!important;}
-#view-projects .projects-table th:last-child,#view-projects .projects-table td:last-child{width:13%!important;min-width:125px!important;}
+/* --- الشريط الجانبي --- */
+html[data-theme="light"] .sidebar{background:#FFFFFF!important;color:var(--ink);border-left:1px solid var(--border);box-shadow:-4px 0 18px rgba(23,105,194,.08);}
+html[data-theme="light"] .brand-text b{color:#0B4DB0;}
+html[data-theme="light"] .brand-text span{color:#3F72C4;}
+html[data-theme="light"] .navlink,
+html[data-theme="light"] .nav-group-toggle{color:#0B4DB0;}
+html[data-theme="light"] .navlink svg,
+html[data-theme="light"] .nav-group-toggle svg{opacity:1;}
+html[data-theme="light"] .navlink:hover,
+html[data-theme="light"] .nav-group-toggle:hover{background:#EAF2FE;color:#0B4DB0;}
+html[data-theme="light"] .navlink.active,
+html[data-theme="light"] .nav-group .nav-child.active{background:#DCEAFD;color:#0B4DB0;border-color:#9DBFEF;box-shadow:inset 3px 0 0 #1769C2;}
+html[data-theme="light"] .nav-group.expanded>.nav-group-toggle{background:#EAF2FE;color:#0B4DB0;border-color:#B7D0F3;}
+html[data-theme="light"] .nav-group-toggle b,
+html[data-theme="light"] .nav-section-label,
+html[data-theme="light"] .sidebar-foot,
+html[data-theme="light"] .theme-toggle{color:#3F72C4;}
+html[data-theme="light"] .sidebar-foot{border-top-color:var(--border);}
+html[data-theme="light"] .nav-child:before{background:#6D9AD8;}
+html[data-theme="light"] .firebase-user-bar{background:#EAF2FE;border-color:var(--border);color:#0B4DB0;}
 
-/* ===== Employee upgrade action ===== */
-#view-employees .icon-action-upgrade{width:34px!important;height:34px!important;min-width:34px!important;padding:0!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;border-radius:9px!important;font-size:17px!important;font-weight:900!important;line-height:1!important;color:var(--gold)!important}
-#view-employees .icon-action-upgrade:hover{border-color:var(--gold)!important;background:var(--gold-soft)!important;transform:translateY(-1px)}
+/* --- الكروت والجداول --- */
+html[data-theme="light"] .card,
+html[data-theme="light"] .section-card,
+html[data-theme="light"] .all-contracts-card,
+html[data-theme="light"] .table-wrap{background:#FFFFFF!important;border-color:var(--border);backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 2px 12px rgba(23,105,194,.08);}
+html[data-theme="light"] .stat-card.accent{background:var(--teal-soft)!important;}
+html[data-theme="light"] .stat-card.gold{background:var(--gold-soft)!important;}
+html[data-theme="light"] .stat-card.warn{background:var(--red-soft)!important;}
+html[data-theme="light"] #view-dashboard .stat-card:hover,
+html[data-theme="light"] #view-dashboard .section-card:hover{box-shadow:0 10px 26px rgba(23,105,194,.16);border-color:#1769C2;}
+html[data-theme="light"] #view-dashboard .stat-card .n{text-shadow:none;}
+html[data-theme="light"] #view-dashboard .topbar{border-bottom-color:var(--border);}
+html[data-theme="light"] thead th{color:#0B4DB0;background:#E4EEFC;}
+html[data-theme="light"] tbody tr:hover{background:#F0F6FF;}
+html[data-theme="light"] .navlink.active{box-shadow:inset 3px 0 0 #1769C2;}
+
+/* --- الرئيسية --- */
+html[data-theme="light"] #view-dashboard .dashboard-hero-title{background:linear-gradient(135deg,#FFFFFF,#E3EEFD);border-color:#9DBFEF;box-shadow:0 6px 24px rgba(23,105,194,.12);backdrop-filter:none;-webkit-backdrop-filter:none;}
+html[data-theme="light"] #view-dashboard .dashboard-hero-title h2{color:#0B4DB0;text-shadow:none;}
+html[data-theme="light"] #view-dashboard .dashboard-hero-title span{color:#3F72C4;}
+html[data-theme="light"] #view-dashboard .dashboard-hero-glow{background:rgba(67,142,226,.14);}
+html[data-theme="light"] #view-dashboard .dashboard-clock{color:#0B4DB0;text-shadow:none;}
+html[data-theme="light"] #view-dashboard .dashboard-live{color:#3F72C4;}
+html[data-theme="light"] #view-dashboard .stat-no-contracts{background:linear-gradient(145deg,#FDECEA,#FFF6F4)!important;border-color:#E9A79F!important;}
+html[data-theme="light"] #view-dashboard .stat-no-contracts .n{color:#C0392B!important;text-shadow:none;}
+html[data-theme="light"] #view-dashboard .dashboard-quick-actions{background:#FFFFFF;border-color:#B7D0F3;backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 2px 12px rgba(23,105,194,.08);}
+html[data-theme="light"] #view-dashboard .quick-action-title{color:#0B4DB0;}
+html[data-theme="light"] #view-dashboard .quick-action-card{background:linear-gradient(145deg,#FFFFFF,#EAF2FE);border-color:#B7D0F3;color:#0B4DB0;}
+html[data-theme="light"] #view-dashboard .quick-action-card:hover{background:linear-gradient(145deg,#EAF2FE,#D9E8FC);border-color:#1769C2;box-shadow:0 10px 24px rgba(23,105,194,.16);}
+html[data-theme="light"] #view-dashboard .quick-icon{background:#E3EEFD;border-color:#B7D0F3;color:#1769C2;}
+
+/* --- الحقول (نص أزرق على أبيض) --- */
+html[data-theme="light"] input:not(#_):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+html[data-theme="light"] select:not(#_),
+html[data-theme="light"] textarea:not(#_){
+  color:#0B4DB0!important; background:#FFFFFF!important; caret-color:#0B4DB0!important; border-color:#9DBFEF!important;
+}
+html[data-theme="light"] input:not(#_):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):focus,
+html[data-theme="light"] select:not(#_):focus,
+html[data-theme="light"] textarea:not(#_):focus{
+  color:#0B4DB0!important; background:#FFFFFF!important; border-color:#1769C2!important; box-shadow:0 0 0 3px rgba(23,105,194,.16)!important;
+}
+html[data-theme="light"] input:not(#_):not([type="checkbox"]):not([type="radio"]):not([type="file"]):disabled,
+html[data-theme="light"] input:not(#_):not([type="checkbox"]):not([type="radio"]):not([type="file"])[readonly],
+html[data-theme="light"] select:not(#_):disabled,
+html[data-theme="light"] textarea:not(#_):disabled,
+html[data-theme="light"] textarea:not(#_)[readonly]{
+  color:#0B4DB0!important; background:#EEF4FE!important; opacity:1;
+}
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder{color:#7FA3DA!important;opacity:1!important;}
+html[data-theme="light"] select option{background:#FFFFFF;color:#0B4DB0;}
+html[data-theme="light"] .field label,
+html[data-theme="light"] label{color:#0B4DB0;}
+
+/* --- الأزرار --- */
+html[data-theme="light"] .btn{background:#FFFFFF;color:#0B4DB0;border-color:#9DBFEF;}
+html[data-theme="light"] .btn:hover{border-color:#1769C2;color:#1769C2;background:#F0F6FF;}
+html[data-theme="light"] .btn-primary{background:#1769C2;border-color:#1769C2;color:#FFFFFF;}
+html[data-theme="light"] .btn-primary:hover{background:#0F58A8;border-color:#0F58A8;color:#FFFFFF;}
+html[data-theme="light"] .btn-ghost{background:transparent;border-color:transparent;color:#3F72C4;}
+html[data-theme="light"] .btn-ghost:hover{background:#E4EEFC;color:#0B4DB0;}
+
+/* --- حالات وشارات --- */
+html[data-theme="light"] .pill-gold,
+html[data-theme="light"] .status-مؤقت{background:#EAF2FE;color:#2F5FA8;}
+html[data-theme="light"] .status-sاري{background:rgba(23,140,90,.12)!important;color:#12734A!important;border-color:rgba(23,140,90,.35)!important;}
+html[data-theme="light"] .status-بدون_عقد{background:rgba(192,57,43,.10)!important;color:#C0392B!important;border-color:rgba(192,57,43,.35)!important;}
+html[data-theme="light"] .derived-field{background:#E3EEFD!important;color:#0B4DB0!important;}
+html[data-theme="light"] #view-add .derived-field{background:#F0F6FF!important;color:#0B4DB0!important;}
+
+/* --- الحضور: ألوان الأكواد تفضل مميزة --- */
+html[data-theme="light"] select.att-select.code-ج:not(#_){background:#F6E0DA!important;color:#8A3A22!important;border-color:#C1522F!important;}
+html[data-theme="light"] select.att-select.code-ط:not(#_){background:#E7EBF0!important;color:#365C91!important;border-color:#7C8FD6!important;}
+html[data-theme="light"] select.att-select.code-راحة:not(#_){background:#EAF2FE!important;color:#2F5FA8!important;border-color:#5F8FD8!important;}
+html[data-theme="light"] select.att-select.code-اضافي:not(#_){background:#EDEBF9!important;color:#5A3E9E!important;border-color:#8B72CE!important;}
+html[data-theme="light"] select.att-select.code-انسحاب:not(#_){background:#F2E2EE!important;color:#8E3A78!important;border-color:#C062AA!important;}
+html[data-theme="light"] select.att-select.code-عيد:not(#_){background:#DDF3EE!important;color:#146B54!important;border-color:#3FA88C!important;}
+
+/* --- حسابات المشاريع / المناقصة --- */
+html[data-theme="light"] .pa-results.three-results>div,
+html[data-theme="light"] .final-cost-summary>div{background:#F0F6FF;border-color:#B7D0F3;color:#0B4DB0;}
+html[data-theme="light"] .offer-grid>div{background:#EAF2FE;}
+html[data-theme="light"] .account-breakdown>div{border-color:#B7D0F3;}
+html[data-theme="light"] .tender-table{background:#FFFFFF;border-color:#B7D0F3;}
+html[data-theme="light"] .tender-row{border-top-color:#D3E3F8;}
+html[data-theme="light"] .tender-row>span:first-child{color:#0B4DB0;}
+html[data-theme="light"] .tender-head{background:#DCEAFD;}
+html[data-theme="light"] .tender-row.highlight{background:#EAF2FE;}
+html[data-theme="light"] .tender-row.total{background:#CFE2FB;}
+html[data-theme="light"] .type-row{background:#F0F6FF;border-color:#B7D0F3;}
+html[data-theme="light"] .pa-role-block{background:#F0F6FF;border-color:#B7D0F3;}
+html[data-theme="light"] .pa-role-summary{border-top-color:#D3E3F8;}
+html[data-theme="light"] .pa-role-title{border-bottom-color:#D3E3F8;}
+html[data-theme="light"] .pa-role-title b{color:#0B4DB0;}
+html[data-theme="light"] .small-btn{border-color:#1769C2;}
+
+/* --- شاشة الدخول --- */
+html[data-theme="light"] #firebaseLogin{background:rgba(232,241,255,.88);}
+html[data-theme="light"] .firebase-login-card{box-shadow:0 20px 60px rgba(23,105,194,.22);}
+html[data-theme="light"] .project-summary-row b,
+html[data-theme="light"] .all-contracts-summary b{color:#0B4DB0;}
+html[data-theme="light"] .project-calc-box b{color:#0B4DB0;}

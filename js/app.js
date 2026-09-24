@@ -10,7 +10,6 @@
   const PROJECT_KEY = 'hr_projects_v1';
   const DEPT_KEY = 'hr_departments_v1';
   const CONTRACT_KEY = 'hr_contracts_v1';
-  const EMP_UPGRADE_KEY = 'hr_employee_upgrades_v1';
   const PROJECT_ACCOUNT_KEY = 'hr_project_accounts_v1';
   const ATT_CODES = ['','ح','غ','ج','ط','راحة','اضافي','انسحاب','عيد'];
   let employees = [];
@@ -22,7 +21,6 @@
   let projects = [];
   let departments = [];
   let contracts = [];
-  let employeeUpgrades = [];
   let projectAccounts = [];
   let currentView = 'dashboard';
   let currentProfileId = null;
@@ -64,7 +62,6 @@
       projects,
       departments: readLocal(DEPT_KEY, []),
       contracts: readLocal(CONTRACT_KEY, []),
-      employeeUpgrades: readLocal(EMP_UPGRADE_KEY, []),
       projectAccounts: readLocal(PROJECT_ACCOUNT_KEY, [])
     };
   }
@@ -78,21 +75,20 @@
     projects = Array.isArray(state?.projects) ? state.projects : [];
     departments = Array.isArray(state?.departments) ? state.departments : [];
     contracts = Array.isArray(state?.contracts) ? state.contracts : [];
-    employeeUpgrades = Array.isArray(state?.employeeUpgrades) ? state.employeeUpgrades : [];
     projectAccounts = Array.isArray(state?.projectAccounts) ? state.projectAccounts : [];
     if(!departments.length && employees.length){
       const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map);
     }
   }
   function currentState(){
-    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,employeeUpgrades,projectAccounts};
+    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,projectAccounts};
   }
   let cloudSaveTimer = null;
   let cloudApplying = false;
   function persistLocal(){
     writeLocal(STORAGE_KEY,employees); writeLocal(ATT_KEY,attendance);
     writeLocal(PEN_KEY,penalties); writeLocal(COV_KEY,coverage); writeLocal(SET_KEY,settings);
-    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(EMP_UPGRADE_KEY,employeeUpgrades); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts);
+    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts);
   }
   function persistCloud(message='تم حفظ التغييرات بنجاح'){
     persistLocal();
@@ -112,7 +108,7 @@
   function loadAux(){
     const state=localState();
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
-    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; employeeUpgrades=state.employeeUpgrades||[]; projectAccounts=state.projectAccounts||[];
+    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; projectAccounts=state.projectAccounts||[];
     if(!departments.length && employees.length){ const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map); }
     persistLocal();
   }
@@ -124,7 +120,6 @@
   function saveProjects(){ persistCloud(); }
   function saveDepartments(){ persistCloud(); }
   function saveContracts(){ persistCloud(); }
-  function saveEmployeeUpgrades(){ persistCloud(); }
   function saveProjectAccounts(){ persistCloud(); }
   
 
@@ -237,18 +232,8 @@
     set('projectSummaryProfitPerson',profit/divisor); set('projectSummaryProfitTotal',profit);
   }
 
-  function projectItemsTotal(items){
-    if(!items || typeof items!=='object') return 0;
-    return Object.values(items).reduce((sum,rows)=>sum+(Array.isArray(rows)?rows.reduce((a,row)=>a+(Number(row?.quantity)||0)*(Number(row?.unit)||0),0):0),0);
-  }
-  function projectTotal(p){
-    const stored=Number(p?.costTotal)||0;
-    return stored || projectItemsTotal(p?.costItems);
-  }
-  function projectRevenueTotal(p){
-    const stored=Number(p?.revenueTotal)||0;
-    return stored || projectItemsTotal(p?.revenueItems);
-  }
+  function projectTotal(p){return Number(p.costTotal)||0;}
+  function projectRevenueTotal(p){return Number(p.revenueTotal)||0;}
   function toggleProjectConfig(){ updateProjectTotals(); }
   function resetProjectForm(){
     document.getElementById('projectForm').reset(); document.getElementById('projectId').value='';
@@ -274,22 +259,12 @@
     }
     updateProjectTotals();
   }
-  function projectActionIcon(type, id){
-    const icons={
-      edit:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.12 2.12 0 0 0-3-3L5 17v3Z"/><path d="m14.5 7.5 2 2"/></svg>',
-      delete:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7l1-3h4l1 3"/></svg>',
-      upgrade:'<span class="upgrade-arrow" aria-hidden="true">▲</span>'
-    };
-    const labels={edit:'تعديل المشروع',delete:'حذف المشروع',upgrade:'ترقية المشروع'};
-    const attr=type==='edit'?`data-project-edit="${escapeAttr(id)}"`:type==='delete'?`data-project-del="${escapeAttr(id)}"`:`data-project-upgrade="${escapeAttr(id)}"`;
-    return `<button type="button" class="btn btn-sm icon-action-btn ${type==='delete'?'icon-action-danger':''} ${type==='upgrade'?'icon-action-upgrade':''}" ${attr} title="${labels[type]}" aria-label="${labels[type]}">${icons[type]}</button>`;
-  }
   function renderProjects(){
     const q=(document.getElementById('projectSearch')?.value||'').trim().toLowerCase();
     const list=projects.filter(p=>!q||[p.name,p.region].some(v=>String(v||'').toLowerCase().includes(q)));
     document.getElementById('projectCount').textContent=`${list.length} مشروع`;
     const body=document.getElementById('projectsTableBody');
-    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b></td><td>${escapeHtml(p.region||'—')}</td><td class="mono"><b>${money(projectRevenueTotal(p))}</b></td><td class="mono"><b>${money(projectTotal(p))}</b></td><td><div class="row-actions project-icon-actions">${projectActionIcon('edit',p.id)}${projectActionIcon('delete',p.id)}${projectActionIcon('upgrade',p.id)}</div></td></tr>`).join('')||'<tr><td colspan="5" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
+    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b></td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
     body.querySelectorAll('[data-project-edit]').forEach(b=>b.onclick=()=>{
       const p=projects.find(x=>x.id===b.dataset.projectEdit);if(!p)return;
       document.getElementById('projectId').value=p.id;document.getElementById('projectName').value=p.name||'';document.getElementById('projectRegion').value=p.region||'';
@@ -300,39 +275,7 @@
       renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();window.scrollTo({top:0,behavior:'smooth'});
     });
     body.querySelectorAll('[data-project-del]').forEach(b=>b.onclick=()=>{if(confirm('حذف المشروع؟')){projects=projects.filter(x=>x.id!==b.dataset.projectDel);saveProjects();renderProjects();refreshEmployeeProjectSelect();}});
-    body.querySelectorAll('[data-project-upgrade]').forEach(b=>b.onclick=()=>openProjectUpgrade(b.dataset.projectUpgrade));
   }
-  function renderProjectUpgrade(selectedId=''){
-    const select=document.getElementById('upgradeProjectSelect'); if(!select)return;
-    const current=selectedId||select.value||'';
-    select.innerHTML='<option value="">اختر المشروع</option>'+projects.map(p=>`<option value="${escapeAttr(p.id)}">${escapeHtml(p.name||'—')} — ${escapeHtml(p.region||'—')}</option>`).join('');
-    select.value=projects.some(p=>p.id===current)?current:'';
-    updateProjectUpgrade(select.value);
-  }
-  function updateProjectUpgrade(id){
-    const p=projects.find(x=>x.id===id);
-    const empty=document.getElementById('projectUpgradeEmpty'), selected=document.getElementById('projectUpgradeSelected');
-    if(!p){
-      ['upgradeProjectName','upgradeProjectRegion','upgradeProjectRevenue','upgradeProjectCost','upgradeProjectProfit'].forEach(k=>{const e=document.getElementById(k);if(e)e.value='';});
-      if(empty)empty.style.display=''; if(selected)selected.style.display='none'; return;
-    }
-    const revenue=projectRevenueTotal(p), cost=projectTotal(p), profit=revenue-cost;
-    document.getElementById('upgradeProjectName').value=p.name||'';
-    document.getElementById('upgradeProjectRegion').value=p.region||'';
-    document.getElementById('upgradeProjectRevenue').value=money(revenue);
-    document.getElementById('upgradeProjectCost').value=money(cost);
-    document.getElementById('upgradeProjectProfit').value=money(profit);
-    document.getElementById('upgradeSelectedTitle').textContent=`ترقية: ${p.name||'—'}`;
-    document.getElementById('upgradeSelectedMeta').textContent=`${p.region||'—'} • الإيرادات ${money(revenue)} • التكاليف ${money(cost)}`;
-    if(empty)empty.style.display='none'; if(selected)selected.style.display='flex';
-  }
-  function openProjectUpgrade(id){
-    renderProjectUpgrade(id);
-    expandParentGroup('projectupgrade');
-    switchView('projectupgrade');
-    const select=document.getElementById('upgradeProjectSelect'); if(select)select.value=id, updateProjectUpgrade(id);
-  }
-
   function refreshRegionSelects(){
     const opts='<option value="">اختر المنطقة</option>'+regions.map(r=>`<option value="${escapeAttr(r.name||r)}">${escapeHtml(r.name||r)}</option>`).join('');
     const e=document.getElementById('projectRegion');if(e){const cur=e.value;e.innerHTML=opts;e.value=cur;}
@@ -391,15 +334,14 @@
     saveProjects();refreshEmployeeProjectSelect();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
   document.getElementById('projectSearch').addEventListener('input',renderProjects);
-  document.getElementById('upgradeProjectSelect')?.addEventListener('change',ev=>updateProjectUpgrade(ev.target.value));
   document.querySelectorAll('[data-project-revenue-toggle],[data-project-cost-toggle]').forEach(cb=>cb.addEventListener('change',()=>{const rv=getDetailData('revenue'),cv=getDetailData('cost');renderDynamicDetails('revenue',rv);renderDynamicDetails('cost',cv);updateProjectTotals();}));
 
 
   /* ===== Universal Excel / PDF / Word exports ===== */
-  const exportableViews=['dashboard','regions','projects','projectupgrade','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','employeeupgrade','projectaccounts','reports'];
+  const exportableViews=['dashboard','regions','projects','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','projectaccounts','reports'];
   function currentViewElement(){ return currentView ? document.getElementById('view-'+currentView) : null; }
   function exportFileBase(){
-    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',projectupgrade:'ترقية المشروع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',employeeupgrade:'ترقية الموظفين',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
+    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
     return titles[currentView]||'تصدير';
   }
   function exportCurrentExcel(){
@@ -466,7 +408,7 @@
     const isLandscape=['projects','allcontracts','coverage'].includes(view);
     st.textContent=`@media print { @page { size: A4 ${isLandscape?'landscape':'portrait'} !important; margin: ${isLandscape?'8mm':'10mm'} !important; } }`;
     document.head.appendChild(st);
-    ['dashboard','regions','projects','projectupgrade','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','employeeupgrade','projectaccounts','reports'].forEach(v=>{
+    ['dashboard','regions','projects','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','projectaccounts','reports'].forEach(v=>{
       document.getElementById('view-'+v).style.display = (v===view)?'':'none';
     });
     document.querySelectorAll('.navlink[data-view]').forEach(a=>{
@@ -478,7 +420,6 @@
     if(view==='dashboard') renderDashboard();
     if(view==='regions'){renderRegions();refreshRegionSelects();}
     if(view==='projects'){renderProjects();refreshRegionSelects();}
-    if(view==='projectupgrade'){renderProjectUpgrade();}
     if(view==='employees') renderEmployeeTable();
     if(view==='departments') renderDepartments();
     if(view==='add'){
@@ -494,7 +435,6 @@
     if(view==='documents') renderDocuments();
     if(view==='contracts') renderContracts();
     if(view==='allcontracts') renderAllContracts();
-    if(view==='employeeupgrade') renderEmployeeUpgrade();
     if(view==='projectaccounts') renderProjectAccount();
     if(view==='reports') renderReports();
     if(view==='reports'){
@@ -581,11 +521,12 @@
 
   /* ===== theme ===== */
   function applyTheme(){
-    const t = localStorage.getItem(THEME_KEY);
-    if(t) document.documentElement.setAttribute('data-theme', t);
+    let t = null;
+    try{ t = localStorage.getItem(THEME_KEY); }catch(e){}
+    document.documentElement.setAttribute('data-theme', t==='light' ? 'light' : 'dark');
   }
   document.getElementById('themeToggle').addEventListener('click', ()=>{
-    const cur = document.documentElement.getAttribute('data-theme');
+    const cur = document.documentElement.getAttribute('data-theme') || 'dark';
     const next = cur==='dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
@@ -896,7 +837,6 @@
           <button class="btn icon-btn btn-ghost" data-act="edit" title="تعديل">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg>
           </button>
-          <button class="btn icon-btn btn-ghost icon-action-upgrade" data-act="upgrade" title="ترقية الموظف" aria-label="ترقية الموظف">▲</button>
           ${contractStatus==='بدون عقد'?`<button class="btn btn-sm btn-primary add-contract-employee" data-act="add-contract" title="إضافة عقد">إضافة عقد</button>`:''}
         </div></td>
       </tr>`;
@@ -906,7 +846,6 @@
         const id = tr.dataset.id;
         const act = ev.target.closest('[data-act]')?.dataset.act;
         if(act==='edit'){ loadIntoForm(id); switchView('add'); }
-        else if(act==='upgrade'){ openEmployeeUpgrade(id); }
         else if(act==='add-contract'){ switchView('contracts'); setTimeout(()=>{ const sel=document.getElementById('contract_emp'); if(sel){sel.value=id; sel.dispatchEvent(new Event('change'));} },80); }
         else{ openProfile(id); }
       });
@@ -2230,56 +2169,6 @@
     el.innerHTML=`<option value="">${placeholder}</option>` + uniqueSorted(values).map(v=>`<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
     if([...el.options].some(o=>o.value===old)) el.value=old;
   }
-  function renderEmployeeUpgrade(selectedId=''){
-    const select=document.getElementById('upgradeEmployeeSelect'); if(!select)return;
-    const current=selectedId||select.value||'';
-    select.innerHTML='<option value="">اختر الموظف</option>'+employees.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'—')} — ${escapeHtml(e.empcode||'—')}</option>`).join('');
-    select.value=employees.some(e=>e.id===current)?current:'';
-    updateEmployeeUpgrade(select.value);
-  }
-  function updateEmployeeUpgrade(id){
-    const e=employees.find(x=>x.id===id);
-    const empty=document.getElementById('employeeUpgradeEmpty'), historyCard=document.getElementById('employeeUpgradeHistoryCard');
-    const ids=['upgradeEmployeeName','upgradeEmployeeCode','upgradeEmployeeRegion','upgradeEmployeeProject','upgradeEmployeeDept','upgradeEmployeeCurrentJob','upgradeEmployeeCurrentSalary'];
-    if(!e){ ids.forEach(k=>{const el=document.getElementById(k);if(el)el.value='';});
-      ['upgradeEmployeeNewJob','upgradeEmployeeNewSalary','upgradeEmployeeEffectiveDate','upgradeEmployeeNotes'].forEach(k=>{const el=document.getElementById(k);if(el)el.value='';});
-      if(empty)empty.style.display=''; if(historyCard)historyCard.style.display='none'; return; }
-    document.getElementById('upgradeEmployeeName').value=e.fullname||'';
-    document.getElementById('upgradeEmployeeCode').value=e.empcode||'';
-    document.getElementById('upgradeEmployeeRegion').value=e.region||'';
-    document.getElementById('upgradeEmployeeProject').value=e.project||'';
-    document.getElementById('upgradeEmployeeDept').value=e.dept||'';
-    document.getElementById('upgradeEmployeeCurrentJob').value=e.jobtitle||'';
-    document.getElementById('upgradeEmployeeCurrentSalary').value=fmt(e.basicsalary||0);
-    const last=employeeUpgrades.filter(x=>x.empId===id).slice(-1)[0];
-    document.getElementById('upgradeEmployeeNewJob').value=last?.newJob||e.jobtitle||'';
-    document.getElementById('upgradeEmployeeNewSalary').value=last?.newSalary??(Number(e.basicsalary)||0);
-    document.getElementById('upgradeEmployeeEffectiveDate').value=last?.effectiveDate||'';
-    document.getElementById('upgradeEmployeeNotes').value=last?.notes||'';
-    if(empty)empty.style.display='none';
-    const rows=employeeUpgrades.filter(x=>x.empId===id).slice().reverse();
-    document.getElementById('employeeUpgradeHistoryBody').innerHTML=rows.map(x=>`<tr><td>${escapeHtml(x.effectiveDate||'—')}</td><td>${escapeHtml(x.oldJob||'—')}</td><td>${escapeHtml(x.newJob||'—')}</td><td class="mono">${fmt(x.oldSalary||0)}</td><td class="mono">${fmt(x.newSalary||0)}</td><td>${escapeHtml(x.notes||'—')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty-note">لا توجد ترقيات مسجلة لهذا الموظف.</td></tr>';
-    if(historyCard)historyCard.style.display='';
-  }
-  function openEmployeeUpgrade(id){
-    renderEmployeeUpgrade(id);
-    expandParentGroup('employeeupgrade');
-    switchView('employeeupgrade');
-    const select=document.getElementById('upgradeEmployeeSelect'); if(select){select.value=id; updateEmployeeUpgrade(id);}
-  }
-  document.getElementById('upgradeEmployeeSelect')?.addEventListener('change',ev=>updateEmployeeUpgrade(ev.target.value));
-  document.getElementById('clearEmployeeUpgradeBtn')?.addEventListener('click',()=>{ const s=document.getElementById('upgradeEmployeeSelect'); if(s){s.value='';updateEmployeeUpgrade('');} });
-  document.getElementById('saveEmployeeUpgradeBtn')?.addEventListener('click',()=>{
-    const id=document.getElementById('upgradeEmployeeSelect')?.value, e=employees.find(x=>x.id===id);
-    if(!e){showToast('اختر الموظف أولاً');return;}
-    const newJob=document.getElementById('upgradeEmployeeNewJob').value.trim()||e.jobtitle||'';
-    const newSalary=Number(document.getElementById('upgradeEmployeeNewSalary').value);
-    if(!newJob || !Number.isFinite(newSalary)){showToast('يرجى إدخال المسمى الوظيفي الجديد والراتب الجديد');return;}
-    const record={id:'up'+Date.now()+Math.random().toString(36).slice(2,7),empId:id,oldJob:e.jobtitle||'',newJob,oldSalary:Number(e.basicsalary)||0,newSalary,effectiveDate:document.getElementById('upgradeEmployeeEffectiveDate').value||new Date().toISOString().slice(0,10),notes:document.getElementById('upgradeEmployeeNotes').value.trim(),createdAt:new Date().toISOString()};
-    employeeUpgrades.push(record); e.jobtitle=newJob; e.basicsalary=newSalary;
-    saveEmployeeUpgrades(); saveEmployees(); renderEmployeeTable(); updateEmployeeUpgrade(id); showToast('تم حفظ ترقية الموظف وتحديث بياناته');
-  });
-
   function renderAllContractsFilters(){
     const savedEmployees=contracts.map(c=>employees.find(e=>e.id===c.empId)).filter(Boolean);
     fillAllContractsFilter('allContractsRegion',savedEmployees.map(e=>e.region),'كل المناطق');
