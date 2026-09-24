@@ -30,6 +30,18 @@
   let currentDocType = 'contract';
   let currentContractId = null;
   let newContractMode = false;
+  let pendingEmployeeFiles = {};
+  const EMPLOYEE_FILE_TYPES = [
+    {key:'contractCopy', label:'تحميل نسخة العقد'},
+    {key:'idCopy', label:'تحميل صورة الهوية'},
+    {key:'nationalAddress', label:'تحميل العنوان الوطني'},
+    {key:'cv', label:'تحميل الـ CV'},
+    {key:'commencement', label:'تحميل مباشرة العمل'},
+    {key:'delegationMemo', label:'تحميل مذكرة التفويض'},
+    {key:'criminalRecord', label:'تحميل صحيفة السوابق'},
+    {key:'bankIban', label:'تحميل الايبان البنكي'},
+    {key:'guaranteeCertificate', label:'شهادة كفالة حضورية'}
+  ];
 
   function readLocal(key, fallback){
     try{
@@ -1499,8 +1511,107 @@
       document.querySelector(`.tabpanel[data-panel="${tab.dataset.tab}"]`).classList.add('active');
     });
   });
+  document.getElementById('employeeFilesRefreshBtn')?.addEventListener('click',renderEmployeeFiles);
+
+  function currentFormEmployeeId(){ return document.getElementById('f_id')?.value || ''; }
+  function employeeFileMap(e){ return (e && e.files && typeof e.files==='object') ? e.files : {}; }
+  function fileEntryFor(e,key){ return employeeFileMap(e)[key] || null; }
+  function renderEmployeeFiles(){
+    const list=document.getElementById('employeeFilesList');
+    if(!list) return;
+    const id=currentFormEmployeeId();
+    const e=employees.find(x=>x.id===id);
+    const saved=employeeFileMap(e);
+    list.innerHTML=EMPLOYEE_FILE_TYPES.map(item=>{
+      const pending=pendingEmployeeFiles[item.key];
+      const entry=pending || saved[item.key];
+      const has=!!entry;
+      const name=entry?.name || '';
+      return `<div class="employee-file-row" data-file-key="${item.key}">
+        <div class="employee-file-title"><span class="employee-file-dot ${has?'has-file':''}"></span><div><strong>${escapeHtml(item.label)}</strong><small>${has?escapeHtml(name):'لم يتم تحميل ملف بعد'}</small></div></div>
+        <div class="employee-file-actions">
+          <input type="file" class="employee-file-input" data-file-key="${item.key}" accept=".pdf,.jpg,.jpeg,.png" hidden>
+          <button type="button" class="btn btn-sm employee-upload-btn" data-file-key="${item.key}">تحميل من الجهاز</button>
+          <button type="button" class="btn btn-sm employee-download-btn" data-file-key="${item.key}" ${has?'':'disabled'}>تنزيل الملف PDF</button>
+          <button type="button" class="btn btn-sm btn-danger employee-remove-file-btn" data-file-key="${item.key}" ${has?'':'disabled'}>إزالة الملف</button>
+        </div>
+      </div>`;
+    }).join('') + `<div class="employee-file-row employee-files-all-row"><div class="employee-file-title"><span class="employee-file-dot"></span><div><strong>تحميل الكل</strong><small>تنزيل جميع الملفات الموجودة للموظف</small></div></div><div class="employee-file-actions"><button type="button" class="btn btn-sm btn-primary" id="employeeDownloadAllBtn">تحميل الكل PDF</button></div></div>`;
+
+    list.querySelectorAll('.employee-upload-btn').forEach(btn=>btn.addEventListener('click',()=>list.querySelector(`.employee-file-input[data-file-key="${btn.dataset.fileKey}"]`)?.click()));
+    list.querySelectorAll('.employee-file-input').forEach(input=>input.addEventListener('change',()=>{
+      const file=input.files?.[0]; if(!file) return;
+      if(!/^(application\/pdf|image\/(jpeg|png))$/i.test(file.type) && !/\.(pdf|jpe?g|png)$/i.test(file.name)){ showToast('يرجى اختيار ملف PDF أو صورة JPG/PNG.'); input.value=''; return; }
+      if(file.size>15*1024*1024){ showToast('حجم الملف يجب ألا يتجاوز 15 ميجابايت.'); input.value=''; return; }
+      pendingEmployeeFiles[input.dataset.fileKey]=file;
+      renderEmployeeFiles();
+      showToast(`تم اختيار ملف «${file.name}» وسيتم حفظه مع الموظف.`);
+    }));
+    list.querySelectorAll('.employee-download-btn').forEach(btn=>btn.addEventListener('click',()=>downloadEmployeeFile(btn.dataset.fileKey)));
+    list.querySelectorAll('.employee-remove-file-btn').forEach(btn=>btn.addEventListener('click',()=>removeEmployeeFile(btn.dataset.fileKey)));
+    document.getElementById('employeeDownloadAllBtn')?.addEventListener('click',downloadAllEmployeeFiles);
+  }
+  async function downloadEmployeeFile(key){
+    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e)return;
+    const pending=pendingEmployeeFiles[key];
+    const entry=pending || fileEntryFor(e,key); if(!entry)return;
+    if(pending){
+      await downloadBlobAsPdf(pending,pending.name);
+      return;
+    }
+    if(entry.type==='application/pdf' || /\.pdf$/i.test(entry.name||'')){
+      const a=document.createElement('a'); a.href=entry.url; a.target='_blank'; a.rel='noopener'; a.download=entry.name||'employee-file.pdf'; document.body.appendChild(a); a.click(); a.remove();
+      return;
+    }
+    try{
+      const res=await fetch(entry.url); const blob=await res.blob(); await downloadBlobAsPdf(blob,entry.name||'employee-file');
+    }catch(err){ window.open(entry.url,'_blank','noopener'); }
+  }
+  async function downloadBlobAsPdf(blob,name){
+    if(blob.type==='application/pdf' || /\.pdf$/i.test(name||'')){
+      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name||'employee-file.pdf'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); return;
+    }
+    if(!window.jspdf?.jsPDF){ showToast('تعذر إنشاء PDF. أعد تحميل الصفحة وحاول مرة أخرى.'); return; }
+    const dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob);});
+    const img=await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=dataUrl;});
+    const pdf=new window.jspdf.jsPDF({orientation:img.width>=img.height?'landscape':'portrait',unit:'pt',format:'a4'});
+    const margin=24, maxW=pdf.internal.pageSize.getWidth()-margin*2, maxH=pdf.internal.pageSize.getHeight()-margin*2;
+    const scale=Math.min(maxW/img.width,maxH/img.height); const w=img.width*scale,h=img.height*scale;
+    pdf.addImage(dataUrl, /\.png$/i.test(name||'') ? 'PNG' : 'JPEG', (pdf.internal.pageSize.getWidth()-w)/2, (pdf.internal.pageSize.getHeight()-h)/2, w,h);
+    pdf.save((name||'employee-file').replace(/\.[^.]+$/,'')+'.pdf');
+  }
+  async function downloadAllEmployeeFiles(){
+    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e)return;
+    const entries=EMPLOYEE_FILE_TYPES.map(x=>({key:x.key,entry:pendingEmployeeFiles[x.key]||fileEntryFor(e,x.key)})).filter(x=>x.entry);
+    if(!entries.length){showToast('لا توجد ملفات لتحميلها.');return;}
+    for(const x of entries) await downloadEmployeeFile(x.key);
+  }
+  async function removeEmployeeFile(key){
+    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e)return;
+    if(pendingEmployeeFiles[key]){ delete pendingEmployeeFiles[key]; renderEmployeeFiles(); showToast('تم إلغاء الملف المختار.'); return; }
+    const entry=fileEntryFor(e,key); if(!entry)return;
+    if(!confirm('هل تريد إزالة هذا الملف نهائياً؟')) return;
+    try{
+      if(entry.path && window.FB?.deleteEmployeeFile) await window.FB.deleteEmployeeFile(entry.path);
+      e.files={...employeeFileMap(e)}; delete e.files[key];
+      saveEmployees(); renderEmployeeFiles(); showToast('تمت إزالة الملف.');
+    }catch(err){ console.error(err); showToast('تعذر إزالة الملف.'); }
+  }
+  async function savePendingEmployeeFiles(employeeId, data){
+    const keys=Object.keys(pendingEmployeeFiles); if(!keys.length)return data;
+    data.files={...employeeFileMap(data)};
+    for(const key of keys){
+      const file=pendingEmployeeFiles[key];
+      if(!file)continue;
+      if(!window.FB?.uploadEmployeeFile) throw new Error('FILE_STORAGE_NOT_READY');
+      data.files[key]=await window.FB.uploadEmployeeFile(employeeId,key,file);
+    }
+    pendingEmployeeFiles={};
+    return data;
+  }
 
   function resetForm(){
+    pendingEmployeeFiles={};
     document.getElementById('f_id').value = '';
     formFields.forEach(f=>{ const el = document.getElementById('f_'+f); if(el) el.value = ''; });
     const statusEl=document.getElementById('f_contractstatus_display'); if(statusEl) statusEl.value='بدون عقد';
@@ -1510,7 +1621,7 @@
     document.getElementById('formTitle').textContent = 'إضافة موظف جديد';
     syncStartDateAction();
     fillNationalityAndIssueRegion(); refreshDepartmentJobSelects(); refreshEmployeeProjectSelect(''); composeFullName(); updateBankFromIBAN(); syncAllowancePercentagesFromData(); clearValidation();
-    document.querySelectorAll('.tab')[0].click();
+    document.querySelectorAll('.tab')[0].click(); renderEmployeeFiles();
   }
   function loadIntoForm(id){
     const e = employees.find(x=>x.id===id);
@@ -1528,7 +1639,8 @@
     document.getElementById('formTitle').textContent = 'تعديل بيانات: ' + (e.fullname||'');
     refreshDepartmentJobSelects(e.dept||'', e.jobtitle||''); fillNationalityAndIssueRegion(); refreshEmployeeProjectSelect(e.region||''); const projectEl=document.getElementById('f_project'); if(projectEl) projectEl.value=e.project||''; composeFullName(); updateBankFromIBAN();
     syncStartDateAction();
-    document.querySelectorAll('.tab')[0].click(); clearValidation();
+    pendingEmployeeFiles={};
+    document.querySelectorAll('.tab')[0].click(); clearValidation(); renderEmployeeFiles();
   }
   function cancelEmployeeForm(){
     const editor=document.getElementById('departmentEditor');
@@ -1742,6 +1854,13 @@
       if(!proceed){ showToast('لم يتم حفظ الموظف.'); return; }
     }
     const idx = employees.findIndex(x=>x.id===id);
+    if(idx>=0) data.files={...employeeFileMap(employees[idx]), ...employeeFileMap(data)};
+    try{
+      if(Object.keys(pendingEmployeeFiles).length) await savePendingEmployeeFiles(id,data);
+    }catch(err){
+      console.error('Employee file upload failed:',err);
+      showToast('تم حفظ بيانات الموظف، لكن تعذر رفع ملف أو أكثر. يمكنك رفعها من تبويب «ملفات الموظف» لاحقاً.');
+    }
     if(idx>=0) employees[idx] = data; else employees.push(data);
     saveEmployees();
     showToast('تم حفظ البيانات بنجاح');

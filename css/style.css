@@ -1950,3 +1950,22 @@ html[data-theme="light"] .pay-auto-hint{background:linear-gradient(90deg,#EAF3FF
 .project-warning-item .warn-title{display:block;color:#D2A53C;font-weight:800;margin-bottom:3px}
 .project-warning-actions{display:flex;gap:10px;justify-content:center;margin-top:20px;flex-wrap:wrap}
 .project-warning-actions .btn{min-width:150px}
+
+/* ===== employee files tab ===== */
+.employee-files-panel{padding:4px 0 8px}
+.employee-files-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:4px 2px 16px;border-bottom:1px solid var(--border)}
+.employee-files-head h3{margin:0 0 5px;color:var(--ink)}
+.employee-files-head p{margin:0;color:var(--ink-soft);font-size:12px}
+.employee-files-list{display:flex;flex-direction:column;gap:10px;padding-top:14px}
+.employee-file-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surface-2,var(--surface));min-width:0}
+.employee-file-title{display:flex;align-items:center;gap:11px;min-width:0;flex:1}
+.employee-file-title>div{min-width:0;display:flex;flex-direction:column;gap:4px}
+.employee-file-title strong{color:var(--ink);font-size:13px}
+.employee-file-title small{color:var(--ink-soft);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:430px}
+.employee-file-dot{width:10px;height:10px;border-radius:50%;background:var(--border);flex:none}
+.employee-file-dot.has-file{background:var(--teal);box-shadow:0 0 0 4px rgba(34,197,170,.10)}
+.employee-file-actions{display:flex;align-items:center;justify-content:flex-end;gap:7px;flex-wrap:wrap}
+.employee-file-actions .btn:disabled{opacity:.45;cursor:not-allowed}
+.employee-files-note{margin-top:14px;padding:10px 12px;border-radius:9px;background:var(--surface-2,var(--surface));color:var(--ink-soft);font-size:11px}
+.employee-files-all-row{border-style:dashed;background:transparent}
+@media(max-width:900px){.employee-file-row{align-items:flex-start;flex-direction:column}.employee-file-actions{width:100%;justify-content:flex-start}.employee-file-title small{max-width:70vw}}

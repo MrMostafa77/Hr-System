@@ -3,6 +3,7 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCnUTSCdtYjQg-OIH8D9GwdKjcow_LTK-k',
@@ -16,10 +17,24 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const firestore = getFirestore(app);
+const storage = getStorage(app);
 const stateRef = doc(firestore, 'hr_system', 'main');
 
 window.FB = {
-  app, auth, firestore,
+  app, auth, firestore, storage,
+  uploadEmployeeFile: async (employeeId, fileKey, file) => {
+    if(!auth.currentUser) throw new Error('AUTH_REQUIRED');
+    const safeName = String(file.name || 'file').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(0,120);
+    const path = `employee-files/${auth.currentUser.uid}/${employeeId}/${fileKey}/${Date.now()}_${safeName}`;
+    const storageRef = ref(storage, path);
+    await uploadBytes(storageRef, file, {contentType:file.type || 'application/octet-stream', customMetadata:{employeeId, fileKey}});
+    const url = await getDownloadURL(storageRef);
+    return {path, url, name:file.name, type:file.type || '', size:file.size || 0, uploadedAt:new Date().toISOString()};
+  },
+  deleteEmployeeFile: async (path) => {
+    if(!path) return;
+    await deleteObject(ref(storage, path));
+  },
   hydrateState: async (fallbackState) => {
     const snap = await getDoc(stateRef);
     if (snap.exists()) return snap.data();

@@ -381,6 +381,7 @@
           <div class="tab" data-tab="job">البيانات الوظيفية</div>
           <div class="tab" data-tab="pay">الرواتب والماليات</div>
           <div class="tab" data-tab="bank">بيانات بنكية</div>
+          <div class="tab" data-tab="files">ملفات الموظف</div>
         </div>
 
         <div class="tabpanel active" data-panel="personal">
@@ -444,6 +445,20 @@
             <div class="field"><label>رقم الحساب البنكي</label><input type="text" id="f_accountno" class="mono" readonly></div>
             <div class="field"><label>رمز البنك</label><input type="text" id="f_bankcode" class="mono" readonly></div>
             <div class="field full bank-memo-nav"><button type="button" class="btn" id="delegationNotesBtn">الانتقال إلى مذكرات التفويض لاحقاً</button></div>
+          </div>
+        </div>
+
+        <div class="tabpanel" data-panel="files">
+          <div class="employee-files-panel">
+            <div class="employee-files-head">
+              <div>
+                <h3>ملفات الموظف</h3>
+                <p>رفع وحفظ ملفات الموظف، مع إمكانية تنزيلها بصيغة PDF أو حذفها.</p>
+              </div>
+              <button type="button" class="btn btn-sm" id="employeeFilesRefreshBtn">تحديث الملفات</button>
+            </div>
+            <div class="employee-files-list" id="employeeFilesList"></div>
+            <div class="employee-files-note">يمكن رفع PDF أو صور الهوية والمستندات. عند تنزيل صورة سيتم تحويلها تلقائياً إلى PDF.</div>
           </div>
         </div>
 
@@ -914,6 +929,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/firebase-init.js" type="module"></script>
 <script src="js/data.js" defer></script>
 <script src="js/app.js" defer></script>
