@@ -192,19 +192,31 @@
     const hP=data.hPct??25, tP=data.tPct??38.5, oth=Number(data.other)||0;
     let basic=data.basic; if(sal&&basic==null) basic=unit?Math.round(unit/(1+(hP+tP)/100)*100)/100:0;
     if(sal) unit=(Number(basic)||0)*(1+(Number(hP)+Number(tP))/100)+oth;
+    const numA=(c,l,v,a)=>`<div class="field"><label>${l}</label><input type="number" class="${c}" min="0" step="0.01" value="${v}"><small class="pd-amt ${a}"></small></div>`;
     const num=(c,l,v,st='0.01')=>`<div class="field"><label>${l}</label><input type="number" class="${c}" min="0" step="${st}" value="${v}"></div>`;
     return `<div class="project-detail-card" data-project-detail="${mode}-${key}" data-key="${key}">
       <div class="project-detail-head"><h4>${title}</h4>${isType?`<button type="button" class="small-btn danger project-remove-detail">×</button>`:''}</div>
       ${isType?`<div class="field"><label>النوع</label><input class="pd-type" value="${escapeAttr(type)}" placeholder="اكتب النوع"></div>`:''}
       <div class="field-grid project-detail-fields">
         ${num('pd-qty','العدد',qty,'1')}
-        ${sal?num('pd-basic','الأساسي',basic)+num('pd-hpct','سكن %',hP)+num('pd-tpct','مواصلات %',tP)+num('pd-other','بدلات أخرى (ريال)',oth)
+        ${sal?num('pd-basic','الأساسي',basic)+numA('pd-hpct','سكن %',hP,'pd-hamt')+numA('pd-tpct','مواصلات %',tP,'pd-tamt')+num('pd-other','بدلات أخرى (ريال)',oth)
           +`<div class="field"><label>إجمالي الراتب / فرد</label><input type="number" class="pd-unit" value="${unit.toFixed(2)}" readonly></div>`
           :num('pd-unit',mode==='revenue'?'الإيراد / القطعة':'الراتب / القطعة',unit)}
         <div class="project-calc-box"><span>الإجمالي للقطعة</span><b class="pd-unit-total">${money(unit)}</b></div>
         <div class="project-calc-box"><span>الإجمالي للعدد</span><b class="pd-total">${money(qty*unit)}</b></div>
       </div>
+      ${sal?'<div class="pd-si project-si" hidden></div>':''}
     </div>`;
+  }
+  function refreshSalaryCard(card){
+    if(!card.querySelector('.pd-basic'))return;
+    const g=c=>Number(card.querySelector(c).value)||0, basic=g('.pd-basic'), h=basic*g('.pd-hpct')/100, t=basic*g('.pd-tpct')/100, q=g('.pd-qty');
+    card.querySelector('.pd-hamt').textContent='= '+money(h)+' / فرد';
+    card.querySelector('.pd-tamt').textContent='= '+money(t)+' / فرد';
+    const box=card.querySelector('.pd-si'), on=!!document.getElementById('projectSiToggle')?.checked;
+    box.hidden=!on; if(!on){box.innerHTML='';return;}
+    const base=basic+h, part=(cls,title,rate)=>`<div class="project-si-box ${cls}"><div class="si-head"><h4>${title}</h4><span class="si-rate">${rate}%</span></div><div class="pd-si-row"><span>للفرد</span><b>${money(base*rate/100)}</b></div><div class="pd-si-row"><span>للعدد (${fmt(q)})</span><b>${money(base*rate/100*q)}</b></div></div>`;
+    box.innerHTML=`<div class="project-si-title">التأمينات الاجتماعية <small>محسوبة على الأساسي + السكن (${money(base)})</small></div><div class="project-si-grid">${part('si-guard','حصة الموظف',SI_GUARD_RATE)}${part('si-company','حصة الشركة',SI_COMPANY_RATE)}</div>`;
   }
   function getDetailData(mode){
     const out={};
@@ -236,6 +248,7 @@
       card.querySelectorAll('input').forEach(i=>i.addEventListener('input',recalc));
       card.querySelector('.project-remove-detail')?.addEventListener('click',()=>{card.remove();updateProjectTotals();});
     });
+    document.querySelectorAll('#projectCostDetails .project-detail-card').forEach(refreshSalaryCard);
     document.querySelectorAll('.project-add-detail').forEach(btn=>btn.onclick=()=>{
       const [mode,key]=btn.dataset.addDetail.split('-');
       const box=document.getElementById(mode==='revenue'?'projectRevenueDetails':'projectCostDetails');
@@ -266,9 +279,21 @@
     set('projectSummaryRevenuePerson',totalRevenue/divisor); set('projectSummaryRevenueTotal',totalRevenue);
     set('projectSummaryCostPerson',totalCost/divisor); set('projectSummaryCostTotal',totalCost);
     set('projectSummaryProfitPerson',profit/divisor); set('projectSummaryProfitTotal',profit);
-    renderSocialInsurance(); renderBreakdowns(); renderProjectCapacity();
+    document.querySelectorAll('#projectCostDetails .project-detail-card').forEach(refreshSalaryCard);
+    renderBreakdowns(); renderProjectCapacity();
   }
 
+
+  /* ===== طي / فرد المستطيلات ===== */
+  document.querySelectorAll('#view-projects .card').forEach(card=>{
+    const head=card.querySelector(':scope > .project-section-head, :scope > .project-summary-title, :scope > h3'); if(!head)return;
+    card.classList.add('pj-collapsible'); head.classList.add('pj-head'); head.tabIndex=0; head.setAttribute('role','button');
+    (head.matches('.project-section-head')?head.querySelector('h3'):head).insertAdjacentHTML('afterbegin','<span class="pj-arrow" aria-hidden="true">▾</span> ');
+    const toggle=()=>{card.classList.toggle('collapsed'); head.setAttribute('aria-expanded',String(!card.classList.contains('collapsed')));};
+    head.setAttribute('aria-expanded','true');
+    head.addEventListener('click',e=>{ if(e.target.closest('button'))return; toggle(); });
+    head.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&e.target===head){e.preventDefault();toggle();} });
+  });
 
   /* ===== بيانات التواصل المتعددة ===== */
   const pjRow=(kind,val='')=>`<div class="multi-row">${kind==='phone'?'<span class="pj-pfx" dir="ltr">+966</span>':''}<input class="pj-${kind}" dir="ltr" ${kind==='phone'?'inputmode="numeric" maxlength="9" placeholder="5XXXXXXXX"':'type="email" placeholder="name@example.com"'} value="${escapeAttr(val)}"><button type="button" class="small-btn danger pj-rm">×</button></div>`;
