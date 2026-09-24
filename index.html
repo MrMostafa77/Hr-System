@@ -39,6 +39,7 @@
           <a class="navlink nav-child" data-view="add"><span>إضافة موظف</span></a>
           <a class="navlink nav-child" data-view="contracts"><span>عقود الموظفين</span></a>
           <a class="navlink nav-child" data-view="allcontracts"><span>كل العقود</span></a>
+          <a class="navlink nav-child" data-view="commencements"><span>مباشرات الموظفين</span></a>
         </div>
       </div>
 
@@ -554,6 +555,53 @@
           </table>
         </div>
         <div id="allContractsEmpty" class="empty-note" style="display:none;text-align:center;padding:25px">لا توجد عقود محفوظة تطابق الفلاتر الحالية.</div>
+      </div>
+    </section>
+
+    <!-- ===== EMPLOYEE COMMENCEMENTS ===== -->
+    <section id="view-commencements" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle"><h1>مباشرات الموظفين</h1><p>اختيار المشروع ثم الموظف الذي تم إنشاء عقد له على نفس المشروع لإعداد المباشرة</p></div>
+        <div class="topbar-actions"></div>
+      </div>
+      <div class="card commencement-card">
+        <h3>اختيار المشروع والموظف</h3>
+        <div class="field-grid">
+          <div class="field"><label>المشروع</label><select id="comm_project"><option value="">اختر المشروع</option></select></div>
+          <div class="field"><label>الحارس صاحب العقد</label><select id="comm_employee" disabled><option value="">اختر المشروع أولاً</option></select></div>
+          <div class="field"><label>تاريخ المباشرة</label><input type="date" id="comm_startdate"></div>
+        </div>
+      </div>
+      <div class="card commencement-card" id="comm_employee_data" style="display:none">
+        <h3>بيانات الموظف</h3>
+        <div class="field-grid commencement-data-grid">
+          <div class="field"><label>الاسم الكامل</label><input id="comm_fullname" readonly></div>
+          <div class="field"><label>الرقم الوظيفي</label><input id="comm_empcode" readonly></div>
+          <div class="field"><label>رقم الهوية / الإقامة</label><input id="comm_idnum" readonly></div>
+          <div class="field"><label>الجنسية</label><input id="comm_nationality" readonly></div>
+          <div class="field"><label>الجنس</label><input id="comm_gender" readonly></div>
+          <div class="field"><label>تاريخ الميلاد</label><input id="comm_dob" readonly></div>
+          <div class="field"><label>رقم الجوال</label><input id="comm_phone" readonly></div>
+          <div class="field"><label>البريد الإلكتروني</label><input id="comm_email" readonly></div>
+          <div class="field"><label>القسم / الإدارة</label><input id="comm_dept" readonly></div>
+          <div class="field"><label>المسمى الوظيفي</label><input id="comm_jobtitle" readonly></div>
+          <div class="field"><label>المنطقة / المدينة</label><input id="comm_region" readonly></div>
+          <div class="field"><label>المشروع</label><input id="comm_project_display" readonly></div>
+          <div class="field"><label>الراتب الأساسي</label><input id="comm_basicsalary" readonly></div>
+          <div class="field"><label>بدل السكن</label><input id="comm_housing" readonly></div>
+          <div class="field"><label>بدل المواصلات</label><input id="comm_transport" readonly></div>
+          <div class="field"><label>بدلات أخرى</label><input id="comm_otherallow" readonly></div>
+          <div class="field"><label>الأجر الأخير</label><input id="comm_lastwage" readonly></div>
+          <div class="field"><label>رقم العقد</label><input id="comm_contractcode" readonly></div>
+          <div class="field"><label>بداية العقد</label><input id="comm_contractstart" readonly></div>
+          <div class="field"><label>نهاية العقد</label><input id="comm_contractend" readonly></div>
+          <div class="field full"><label>ملاحظات المباشرة</label><textarea id="comm_notes" rows="3"></textarea></div>
+        </div>
+        <div class="action-row"><button type="button" class="btn btn-primary" id="saveCommencementBtn">حفظ المباشرة</button><button type="button" class="btn" id="resetCommencementBtn">إضافة مباشرة جديدة</button></div>
+      </div>
+      <div class="card commencement-card">
+        <h3>المباشرات المحفوظة</h3>
+        <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الموظف</th><th>الرقم الوظيفي</th><th>المشروع</th><th>الوظيفة</th><th>رقم العقد</th></tr></thead><tbody id="commencementTableBody"></tbody></table></div>
       </div>
     </section>
 

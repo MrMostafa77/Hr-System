@@ -1863,3 +1863,9 @@ html[data-theme="light"] .pay-auto-hint{background:linear-gradient(90deg,#EAF3FF
 .project-reports-panel .topbar{margin-bottom:12px}
 @media(max-width:900px){.project-revenue-fields,.project-cost-fields{grid-template-columns:repeat(2,minmax(0,1fr)) !important}}
 @media(max-width:600px){.project-revenue-fields,.project-cost-fields{grid-template-columns:1fr !important}.project-subtabs{overflow:auto}.project-subtab{white-space:nowrap}}
+/* ===== Employee commencements ===== */
+#view-commencements .commencement-card{margin-bottom:16px}
+#view-commencements .commencement-data-grid input[readonly]{background:var(--surface-2,#f4f6f8);cursor:default}
+#view-commencements .commencement-data-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:900px){#view-commencements .commencement-data-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){#view-commencements .commencement-data-grid{grid-template-columns:1fr}}
