@@ -1845,3 +1845,21 @@ html[data-theme="light"] .pay-auto-hint{background:linear-gradient(90deg,#EAF3FF
 .pj-tab-btn:hover{background:rgba(184,134,11,.22)}.pj-tab-x:hover{background:rgba(229,72,77,.25);color:#e5484d}
 .pj-dot{color:#e5a30b;font-style:normal;font-size:11px}
 @media print{.pj-tabs{display:none !important}}
+
+
+/* ===== Project sub-tabs / item cards ===== */
+.project-data-tabs-card{padding:0;overflow:visible}
+.project-subtabs{display:flex;gap:8px;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--surface),var(--gold-soft));border-radius:14px 14px 0 0}
+.project-subtab{border:1px solid var(--border);background:var(--surface);color:var(--ink);padding:9px 20px;border-radius:10px;font-weight:800;cursor:pointer}
+.project-subtab.active{background:var(--navy-2);color:#fff;border-color:var(--navy-2);box-shadow:0 4px 12px rgba(0,0,0,.12)}
+.project-subpanel{padding:14px}.project-subpanel:not(.active){display:none}
+.project-details-outside{margin:14px 0 18px;display:grid;grid-template-columns:1fr;gap:12px}
+.project-details-outside[style*="display:none"]{display:none!important}
+.project-revenue-fields{grid-template-columns:repeat(5,minmax(0,1fr)) !important}
+.project-cost-fields{grid-template-columns:repeat(4,minmax(0,1fr)) !important}
+.project-revenue-fields .field:first-child,.project-cost-fields .field:first-child{grid-column:auto}
+.project-save-card{margin-top:8px}
+.project-reports-panel{margin-top:18px}
+.project-reports-panel .topbar{margin-bottom:12px}
+@media(max-width:900px){.project-revenue-fields,.project-cost-fields{grid-template-columns:repeat(2,minmax(0,1fr)) !important}}
+@media(max-width:600px){.project-revenue-fields,.project-cost-fields{grid-template-columns:1fr !important}.project-subtabs{overflow:auto}.project-subtab{white-space:nowrap}}
