@@ -289,7 +289,7 @@
 
 
   /* ===== طي / فرد المستطيلات ===== */
-  document.querySelectorAll('#view-projects .card').forEach(card=>{
+  document.querySelectorAll('#view-projects .card, #reportProjectPanels .card').forEach(card=>{
     const head=card.querySelector(':scope > .project-section-head, :scope > .project-summary-title, :scope > h3'); if(!head)return;
     card.classList.add('pj-collapsible'); head.classList.add('pj-head'); head.tabIndex=0; head.setAttribute('role','button');
     (head.matches('.project-section-head')?head.querySelector('h3'):head).insertAdjacentHTML('afterbegin','<span class="pj-arrow" aria-hidden="true">▾</span> ');
@@ -412,7 +412,7 @@
     renderDynamicDetails('revenue',{});renderDynamicDetails('cost',{});
     refreshRegionSelects();
     document.getElementById('projectRegion').value='';setMulti('phone',[]);setMulti('email',[]);
-    updateProjectTotals();toggleProjectConfig();
+    updateProjectTotals();toggleProjectConfig();pjCleanReportsDirty();syncReportProject();
   }
   function resetProjectSection(section){
     if(section==='basic'){
@@ -429,6 +429,27 @@
     }
     updateProjectTotals();
   }
+  function loadProjectIntoForm(p){
+      document.getElementById('projectId').value=p.id;document.getElementById('projectName').value=p.name||'';document.getElementById('projectRegion').value=p.region||'';
+      const sv=(id,v)=>document.getElementById(id).value=v??''; sv('projectCR',p.cr);sv('projectVatNo',p.vatNo);sv('projectAddress',p.address);sv('projectRepId',p.repId);sv('projectRepName',p.repName);sv('projectVat',p.vatRate??15);setMulti('phone',p.phones);setMulti('email',p.emails);
+      const rev=p.revenueItems||{}, cost=p.costItems||{};
+      document.querySelectorAll('[data-project-revenue-toggle]').forEach(c=>c.checked=c.dataset.projectRevenueToggle==='guards' || Array.isArray(rev[c.dataset.projectRevenueToggle]));
+      document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards' || Array.isArray(cost[c.dataset.projectCostToggle]));
+      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled;
+      renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();
+    pjCleanReportsDirty(); syncReportProject();
+  }
+  function pjCleanReportsDirty(){ try{ if(pjTabs.dirty.delete('reports')) pjTabsRender(); }catch(e){} }
+  function syncReportProject(){
+    const sel=document.getElementById('reportProjectSelect'); if(!sel)return;
+    const cur=document.getElementById('projectId')?.value||'';
+    sel.innerHTML='<option value="">اختر المشروع</option>'+projects.map(p=>`<option value="${escapeAttr(p.id)}">${escapeHtml(p.name||'—')}${p.region?' — '+escapeHtml(p.region):''}</option>`).join('');
+    sel.value=projects.some(p=>p.id===cur)?cur:'';
+    const has=!!sel.value;
+    const panels=document.getElementById('reportProjectPanels'); if(panels) panels.style.display=has?'':'none';
+    const empty=document.getElementById('reportProjectEmpty'); if(empty) empty.style.display=has?'none':'';
+    const sv=document.getElementById('reportProjectSave'); if(sv) sv.disabled=!has;
+  }
   function renderProjects(){
     const q=(document.getElementById('projectSearch')?.value||'').trim().toLowerCase();
     const list=projects.filter(p=>!q||[p.name,p.region].some(v=>String(v||'').toLowerCase().includes(q)));
@@ -437,13 +458,7 @@
     body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b>${projectOverList(p.name,Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]))).map(o=>`<div class="pj-over">⚠ عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('')}</td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-view="${p.id}">عرض</button><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
     body.querySelectorAll('[data-project-edit]').forEach(b=>b.onclick=()=>{
       const p=projects.find(x=>x.id===b.dataset.projectEdit);if(!p)return;
-      document.getElementById('projectId').value=p.id;document.getElementById('projectName').value=p.name||'';document.getElementById('projectRegion').value=p.region||'';
-      const sv=(id,v)=>document.getElementById(id).value=v??''; sv('projectCR',p.cr);sv('projectVatNo',p.vatNo);sv('projectAddress',p.address);sv('projectRepId',p.repId);sv('projectRepName',p.repName);sv('projectVat',p.vatRate??15);setMulti('phone',p.phones);setMulti('email',p.emails);
-      const rev=p.revenueItems||{}, cost=p.costItems||{};
-      document.querySelectorAll('[data-project-revenue-toggle]').forEach(c=>c.checked=c.dataset.projectRevenueToggle==='guards' || Array.isArray(rev[c.dataset.projectRevenueToggle]));
-      document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards' || Array.isArray(cost[c.dataset.projectCostToggle]));
-      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled;
-      renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();window.scrollTo({top:0,behavior:'smooth'});
+      loadProjectIntoForm(p);window.scrollTo({top:0,behavior:'smooth'});
     });
     body.querySelectorAll('[data-project-view]').forEach(b=>b.onclick=()=>{const p=projects.find(x=>x.id===b.dataset.projectView); if(p)showProjectView(p);});
     body.querySelectorAll('[data-project-del]').forEach(b=>b.onclick=()=>{if(confirm('حذف المشروع؟')){projects=projects.filter(x=>x.id!==b.dataset.projectDel);saveProjects();renderProjects();refreshEmployeeProjectSelect();}});
@@ -470,6 +485,7 @@
   document.querySelectorAll('[data-project-section-reset]').forEach(btn=>btn.addEventListener('click',()=>resetProjectSection(btn.dataset.projectSectionReset)));
   document.getElementById('projectForm').addEventListener('submit',ev=>{
     ev.preventDefault();
+    const keepLoaded=window.__pjKeepLoaded===true; window.__pjKeepLoaded=false;
     const revenueItems=getDetailData('revenue'), costItems=getDetailData('cost');
     const sumQty=(obj,key)=>Array.isArray(obj[key])?obj[key].reduce((a,r)=>a+(Number(r.quantity)||0),0):0;
     const unitFrom=(obj,key)=>Array.isArray(obj[key])&&obj[key][0]?Number(obj[key][0].unit)||0:0;
@@ -505,9 +521,19 @@
     const capacityError=validateProjectCapacities(existing?existing.name:data.name,null,data);
     if(capacityError){showToast(capacityError);}
     const idx=projects.findIndex(x=>x.id===data.id);if(idx>=0)projects[idx]=data;else projects.push(data);
-    saveProjects();refreshEmployeeProjectSelect();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
+    saveProjects();refreshEmployeeProjectSelect();renderProjects();if(keepLoaded){loadProjectIntoForm(data);}else{resetProjectForm();}showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
   document.getElementById('projectSearch').addEventListener('input',renderProjects);
+  document.getElementById('reportProjectSelect')?.addEventListener('change',e=>{
+    let dirty=false; try{dirty=pjTabs.dirty.has('reports');}catch(err){}
+    if(dirty && !confirm('هناك تعديلات غير محفوظة على المشروع الحالي. هل تريد تجاهلها؟')){ syncReportProject(); return; }
+    const p=projects.find(x=>x.id===e.target.value);
+    if(p) loadProjectIntoForm(p); else resetProjectForm();
+  });
+  document.getElementById('reportProjectSave')?.addEventListener('click',()=>{
+    if(!document.getElementById('projectId').value)return;
+    window.__pjKeepLoaded=true; document.getElementById('projectForm').requestSubmit();
+  });
   ['projectSiToggle','projectMedToggle'].forEach(id=>document.getElementById(id)?.addEventListener('change',updateProjectTotals));
   ['projectVat','projectName'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateProjectTotals));
   renderDynamicDetails('revenue',{});renderDynamicDetails('cost',{});updateProjectTotals();  // عرض بطاقة الحارس فور فتح التبويب
@@ -629,14 +655,14 @@
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
   const PJ_TITLES={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
-  const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],projectaccounts:['btn','saveProjectAccountBtn']};
+  const PJ_SAVE={reports:['btn','reportProjectSave'],add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],projectaccounts:['btn','saveProjectAccountBtn']};
   const pjTabs={open:[],dirty:new Set()};
   function pjTabOpen(v){return pjTabs.open.includes(v);}
   function pjTitle(v){return v==='reports'?(PJ_REPORTS[window.currentReport||'payroll']||PJ_TITLES.reports):(PJ_TITLES[v]||v);}
   function pjTabsSync(view){ if(!pjTabs.open.includes(view)) pjTabs.open.push(view); pjTabsRender(view); }
   function pjTabsRender(active){
     const bar=document.getElementById('pjTabs'); if(!bar)return; active=active||currentView;
-    bar.innerHTML=pjTabs.open.map(v=>`<div class="pj-tab${v===active?' active':''}" data-tab="${v}" role="tab" aria-selected="${v===active}"><span class="pj-tab-title">${pjTitle(v)}${pjTabs.dirty.has(v)?' <i class="pj-dot" title="بيانات غير محفوظة">●</i>':''}</span>${PJ_SAVE[v]?`<button type="button" class="pj-tab-btn" data-tab-save="${v}" title="حفظ" aria-label="حفظ">💾</button>`:''}<button type="button" class="pj-tab-btn pj-tab-x" data-tab-close="${v}" title="إغلاق التبويب" aria-label="إغلاق">✕</button></div>`).join('');
+    bar.innerHTML=pjTabs.open.map(v=>`<div class="pj-tab${v===active?' active':''}" data-tab="${v}" role="tab" aria-selected="${v===active}"><span class="pj-tab-title">${pjTitle(v)}${pjTabs.dirty.has(v)?' <i class="pj-dot" title="بيانات غير محفوظة">●</i>':''}</span>${PJ_SAVE[v]&&(v!=='reports'||window.currentReport==='projects')?`<button type="button" class="pj-tab-btn" data-tab-save="${v}" title="حفظ" aria-label="حفظ">💾</button>`:''}<button type="button" class="pj-tab-btn pj-tab-x" data-tab-close="${v}" title="إغلاق التبويب" aria-label="إغلاق">✕</button></div>`).join('');
     bar.querySelector('.pj-tab.active')?.scrollIntoView({block:'nearest',inline:'nearest'});
   }
   function pjSave(v){
@@ -666,7 +692,7 @@
   document.querySelector('main')?.addEventListener('input',e=>{
     const sec=e.target.closest('section[id^="view-"]'); if(!sec)return; const v=sec.id.slice(5);
     if(!PJ_SAVE[v]||e.target.type==='search')return;
-    if(!(e.target.closest('form')||v==='contracts'||v==='projectaccounts'))return;
+    if(!(e.target.closest('form')||v==='contracts'||v==='projectaccounts'||(v==='reports'&&e.target.closest('#reportProjectPanels'))))return;
     if(!pjTabs.dirty.has(v)){ pjTabs.dirty.add(v); pjTabsRender(); }
   });
   const pjClean=e=>{ const sec=e.target.closest?.('section[id^="view-"]'); if(sec && pjTabs.dirty.delete(sec.id.slice(5))) pjTabsRender(); };
@@ -1631,6 +1657,11 @@
     return {ym,day,allowances,overtime,gross,deduction,absence,penalty,withdrawal,other,net,gosi,insuranceBase};
   }
   function renderReports(){
+    const isPjReport=(window.currentReport||'payroll')==='projects';
+    const rp=document.getElementById('reportPayroll'), rj=document.getElementById('reportProjects');
+    if(rp) rp.style.display=isPjReport?'none':''; if(rj) rj.style.display=isPjReport?'':'none';
+    const sub=document.querySelector('#view-reports .pagetitle p'); if(sub) sub.textContent=isPjReport?'الإيرادات والتكاليف وملخص المشروع الشهري لكل مشروع':'مسير الرواتب بتصميم مطابق للمسير المرفق مع ربطه بالحضور والانصراف';
+    if(isPjReport){ syncReportProject(); return; }
     const body = document.getElementById('reportTableBody');
     const q = (document.getElementById('payrollSearch')?.value || '').trim().toLowerCase();
     const list = employees.filter(e=>!q || [e.fullname,e.empcode,e.region,e.project,e.jobtitle].some(v=>String(v||'').toLowerCase().includes(q)));

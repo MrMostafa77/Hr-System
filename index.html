@@ -194,7 +194,7 @@
 
     <!-- ===== PROJECTS ===== -->
     <section id="view-projects" style="display:none">
-      <div class="topbar"><div class="pagetitle"><h1>المشاريع</h1><p>البيانات الأساسية والإيرادات والتكاليف الخاصة بكل مشروع</p></div><div class="topbar-actions"><button class="btn btn-primary" id="addProjectBtn">+ إضافة مشروع</button></div></div>
+      <div class="topbar"><div class="pagetitle"><h1>المشاريع</h1><p>البيانات الأساسية الخاصة بكل مشروع</p></div><div class="topbar-actions"><button class="btn btn-primary" id="addProjectBtn">+ إضافة مشروع</button></div></div>
       <form id="projectForm">
         <input type="hidden" id="projectId">
         <input type="hidden" id="projectBasic"><input type="hidden" id="projectHousing"><input type="hidden" id="projectTransport"><input type="hidden" id="projectOther">
@@ -216,50 +216,9 @@
         </div></div>
 
 
-        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>2 — الإيرادات</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="revenue">↻ إعادة ضبط القسم</button></div>
-          <div class="project-options-title">العناصر المتوفرة في المشروع</div>
-          <div class="project-check-grid">
-            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="guards" checked><span>حارس أمن</span></label>
-            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="guardsFemale"><span>حارسات أمن</span></label>
-            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="supervisors"><span>مشرفين</span></label>
-            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="managers"><span>مدير أمن</span></label>
-            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="patrols"><span>دوريات أمنية</span></label>
-            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="devices"><span>أجهزة اتصالات</span></label>
-            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="uniforms"><span>بدل أمن</span></label>
-            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="extras"><span>ملحقات مشروع</span></label>
-          </div>
-          <div id="projectRevenueDetails" class="project-dynamic-grid"></div>
-          <div id="projectRevenueBreakdown" class="pj-bd-wrap"></div>
-        </div>
 
-        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>3 — التكاليف</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="cost">↻ إعادة ضبط القسم</button></div>
-          <div class="project-options-title">العناصر المتوفرة في المشروع</div>
-          <div class="project-check-grid">
-            <label class="project-check"><input type="checkbox" data-project-cost-toggle="guards" checked><span>حارس أمن</span></label>
-            <label class="project-check"><input type="checkbox" data-project-cost-toggle="guardsFemale"><span>حارسات أمن</span></label>
-            <label class="project-check"><input type="checkbox" data-project-cost-toggle="supervisors"><span>مشرفين</span></label>
-            <label class="project-check"><input type="checkbox" data-project-cost-toggle="managers"><span>مدير أمن</span></label>
-            <label class="project-check"><input type="checkbox" data-project-cost-toggle="patrols"><span>دوريات أمنية</span></label>
-            <label class="project-check"><input type="checkbox" data-project-cost-toggle="devices"><span>أجهزة اتصالات</span></label>
-            <label class="project-check"><input type="checkbox" data-project-cost-toggle="uniforms"><span>بدل أمن</span></label>
-            <label class="project-check"><input type="checkbox" data-project-cost-toggle="extras"><span>ملحقات مشروع</span></label>
-          </div>
-          <div id="projectCostDetails" class="project-dynamic-grid"></div>
-          <div id="projectCostBreakdown" class="pj-bd-wrap"></div>
-        </div>
-
-        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>4 — الحفظ</h3></div><div class="project-form-actions"><button class="btn btn-primary" type="submit">حفظ المشروع</button><button class="btn" type="button" id="newProjectEntryBtn">+ إدخالات جديدة</button><button class="btn" type="button" id="cancelProjectBtn">إلغاء</button></div></div>
+        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>2 — الحفظ</h3></div><div class="project-form-actions"><button class="btn btn-primary" type="submit">حفظ المشروع</button><button class="btn" type="button" id="newProjectEntryBtn">+ إدخالات جديدة</button><button class="btn" type="button" id="cancelProjectBtn">إلغاء</button></div></div>
       </form>
-      <div class="card section-card project-summary-card">
-        <div class="project-summary-title">ملخص المشروع الشهري</div>
-        <div class="project-summary-grid">
-          <div class="project-summary-box revenue-summary"><div class="project-summary-label">كل إيرادات المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryRevenuePerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryRevenueTotal">0 ريال</b></div></div>
-          <div class="project-summary-box cost-summary"><div class="project-summary-label">كل تكاليف المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryCostPerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryCostTotal">0 ريال</b></div></div>
-          <div class="project-summary-box profit-summary"><div class="project-summary-label">هامش ربح المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryProfitPerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryProfitTotal">0 ريال</b></div></div>
-        </div>
-        <div class="project-summary-note">متوسط الفرد محسوب على إجمالي عدد الأفراد في المشروع.</div>
-        <div id="projectSummaryDetail" class="pj-bd-wrap"></div>
-      </div>
       <div class="card section-card project-panel-card" id="projectCapacityCard"><div class="project-section-head"><h3>سعة المشروع</h3></div><div id="projectCapacity" class="pj-bd-wrap"></div></div>
       <div class="card section-card full-page-card"><div class="filters" style="margin:0 0 16px"><div class="search-box" style="max-width:420px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="search" id="projectSearch" placeholder="بحث باسم المشروع"></div><span class="pill pill-gray" id="projectCount">0 مشروع</span></div><h3>قائمة المشاريع</h3><div class="table-wrap"><table class="payroll-table projects-table"><colgroup><col class="col-project"><col class="col-region"><col class="col-guards"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-action"></colgroup><thead><tr><th>المشروع</th><th>المنطقة</th><th>الحراس</th><th>إيرادات الحراس</th><th>تكاليف الحراس</th><th>إجمالي الإيرادات</th><th>إجمالي التكاليف</th><th>الإجراء</th></tr></thead><tbody id="projectsTableBody"></tbody></table></div></div>
     </section>
@@ -785,6 +744,7 @@
           </button>
         </div>
       </div>
+      <div id="reportPayroll">
       <div class="card section-card full-page-data-card" style="margin-bottom:18px;">
         <div class="att-toolbar">
           <input type="month" id="payrollMonth" style="min-width:170px;">
@@ -796,6 +756,60 @@
             <thead><tr><th>م</th><th>الاسم</th><th>الموقع</th><th>الوظيفة</th><th>اليوم</th><th>اساسي</th><th>بدلات</th><th>اضافي</th><th>الاجمال</th><th>خصومات</th><th>غيابات</th><th>جزاء</th><th>بدلة</th><th>صحيفة</th><th>انسحاب</th><th>اخري</th><th>خصم</th><th>الصافي</th><th>البنك</th><th>السبب</th><th>الإجراء</th></tr></thead>
             <tbody id="reportTableBody"></tbody>
           </table>
+        </div>
+      </div>
+      </div>
+      <div id="reportProjects" style="display:none">
+        <div class="card section-card" style="margin-bottom:18px;">
+          <div class="att-toolbar">
+            <select id="reportProjectSelect" style="min-width:300px;"><option value="">اختر المشروع</option></select>
+            <button type="button" class="btn btn-primary" id="reportProjectSave" disabled>حفظ الإيرادات والتكاليف</button>
+          </div>
+        </div>
+        <p class="empty-note" id="reportProjectEmpty">اختر مشروعاً لعرض وتعديل إيراداته وتكاليفه وملخصه الشهري.</p>
+        <div id="reportProjectPanels" style="display:none">
+        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>الإيرادات</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="revenue">↻ إعادة ضبط القسم</button></div>
+          <div class="project-options-title">العناصر المتوفرة في المشروع</div>
+          <div class="project-check-grid">
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="guards" checked><span>حارس أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="guardsFemale"><span>حارسات أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="supervisors"><span>مشرفين</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="managers"><span>مدير أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="patrols"><span>دوريات أمنية</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="devices"><span>أجهزة اتصالات</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="uniforms"><span>بدل أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-revenue-toggle="extras"><span>ملحقات مشروع</span></label>
+          </div>
+          <div id="projectRevenueDetails" class="project-dynamic-grid"></div>
+          <div id="projectRevenueBreakdown" class="pj-bd-wrap"></div>
+        </div>
+
+        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>التكاليف</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="cost">↻ إعادة ضبط القسم</button></div>
+          <div class="project-options-title">العناصر المتوفرة في المشروع</div>
+          <div class="project-check-grid">
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="guards" checked><span>حارس أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="guardsFemale"><span>حارسات أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="supervisors"><span>مشرفين</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="managers"><span>مدير أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="patrols"><span>دوريات أمنية</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="devices"><span>أجهزة اتصالات</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="uniforms"><span>بدل أمن</span></label>
+            <label class="project-check"><input type="checkbox" data-project-cost-toggle="extras"><span>ملحقات مشروع</span></label>
+          </div>
+          <div id="projectCostDetails" class="project-dynamic-grid"></div>
+          <div id="projectCostBreakdown" class="pj-bd-wrap"></div>
+        </div>
+
+      <div class="card section-card project-summary-card">
+        <div class="project-summary-title">ملخص المشروع الشهري</div>
+        <div class="project-summary-grid">
+          <div class="project-summary-box revenue-summary"><div class="project-summary-label">كل إيرادات المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryRevenuePerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryRevenueTotal">0 ريال</b></div></div>
+          <div class="project-summary-box cost-summary"><div class="project-summary-label">كل تكاليف المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryCostPerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryCostTotal">0 ريال</b></div></div>
+          <div class="project-summary-box profit-summary"><div class="project-summary-label">هامش ربح المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryProfitPerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryProfitTotal">0 ريال</b></div></div>
+        </div>
+        <div class="project-summary-note">متوسط الفرد محسوب على إجمالي عدد الأفراد في المشروع.</div>
+        <div id="projectSummaryDetail" class="pj-bd-wrap"></div>
+      </div>
         </div>
       </div>
     </section>
