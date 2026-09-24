@@ -101,6 +101,7 @@
   }
   let cloudSaveTimer = null;
   let cloudApplying = false;
+  let forceOperationalReset = false;
   function persistLocal(){
     writeLocal(STORAGE_KEY,employees); writeLocal(ATT_KEY,attendance);
     writeLocal(PEN_KEY,penalties); writeLocal(COV_KEY,coverage); writeLocal(SET_KEY,settings);
@@ -869,6 +870,7 @@
     if(!ok2) return;
     try{
       cloudApplying = true;
+      forceOperationalReset = true;
       clearTimeout(cloudSaveTimer);
 
       // Remove uploaded employee files that belong to the employee records being cleared.
@@ -910,6 +912,7 @@
       console.error('Operational data reset failed:',err);
       showToast('تعذر إكمال تصفير البيانات. تحقق من الاتصال ثم حاول مرة أخرى.');
     }finally{
+      forceOperationalReset = false;
       cloudApplying = false;
     }
   }
@@ -3146,9 +3149,10 @@
         if(!state) return;
         cloudApplying=true;
         try{
-          // لا تسمح لقيمة employees الفارغة القادمة من السحابة بمسح
-          // الموظفين الموجودين بالفعل محليًا.
-          if(Array.isArray(state.employees) && state.employees.length===0 && employees.length>0){
+          // أثناء تنفيذ "بدء دورة بيانات جديدة" يجب قبول الحالة الفارغة
+          // القادمة من Firestore وعدم استرجاع البيانات القديمة من الذاكرة المحلية.
+          // في الحالات العادية فقط نحمي البيانات المحلية من snapshot فارغ قديم.
+          if(!forceOperationalReset && Array.isArray(state.employees) && state.employees.length===0 && employees.length>0){
             const keepState=currentState();
             persistLocal();
             window.FB.saveState(keepState).catch(err=>console.error('Employee restore sync failed:',err));
