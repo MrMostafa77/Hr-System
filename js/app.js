@@ -1611,7 +1611,7 @@
     list.querySelectorAll('.employee-file-input').forEach(input=>input.addEventListener('change',()=>{
       const file=input.files?.[0]; if(!file) return;
       if(!/^(application\/pdf|image\/(jpeg|png))$/i.test(file.type) && !/\.(pdf|jpe?g|png)$/i.test(file.name)){ showToast('يرجى اختيار ملف PDF أو صورة JPG/PNG.'); input.value=''; return; }
-      if(file.size>15*1024*1024){ showToast('حجم الملف يجب ألا يتجاوز 15 ميجابايت.'); input.value=''; return; }
+      if(file.size>MAX_EMPLOYEE_FILE_BYTES){ showToast(`حجم الملف يجب ألا يتجاوز ${Math.round(MAX_EMPLOYEE_FILE_BYTES/1024)} كيلوبايت تقريباً (${(MAX_EMPLOYEE_FILE_BYTES/1024/1024).toFixed(2)} ميجا). جرّب ضغط الملف أو تصغير الصورة.`); input.value=''; return; }
       pendingEmployeeFiles[input.dataset.fileKey]=file;
       renderEmployeeFiles();
       showToast(`تم اختيار ملف «${file.name}» وسيتم حفظه مع الموظف.`);
@@ -1623,6 +1623,15 @@
     document.getElementById('employeeFileAllInput')?.addEventListener('change',handleUploadAllEmployeeFiles);
     document.getElementById('employeeRemoveAllBtn')?.addEventListener('click',removeAllEmployeeFiles);
   }
+  async function resolveEmployeeFileBlob(entry, employeeId, key){
+    // ملفات قديمة (رُفعت سابقاً عبر Cloud Storage) عندها entry.url — نجيبها بنفس الطريقة القديمة.
+    if(entry.url){ const res=await fetch(entry.url); return await res.blob(); }
+    // ملفات جديدة: نجيب المحتوى (base64) من مستند Firestore الخاص بالملف.
+    if(!window.FB?.getEmployeeFileData) throw new Error('FILE_STORAGE_NOT_READY');
+    const doc=await withTimeout(window.FB.getEmployeeFileData(employeeId,key), 15000, 'download:'+key);
+    if(!doc?.dataUrl) throw new Error('FILE_NOT_FOUND');
+    const res=await fetch(doc.dataUrl); return await res.blob();
+  }
   async function downloadEmployeeFile(key){
     const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e){showToast('اختر موظفاً أولاً.');return;}
     const pending=pendingEmployeeFiles[key];
@@ -1632,13 +1641,10 @@
       await downloadBlobAsPdf(pending,pending.name);
       return;
     }
-    if(entry.type==='application/pdf' || /\.pdf$/i.test(entry.name||'')){
-      const a=document.createElement('a'); a.href=entry.url; a.target='_blank'; a.rel='noopener'; a.download=entry.name||'employee-file.pdf'; document.body.appendChild(a); a.click(); a.remove();
-      return;
-    }
     try{
-      const res=await fetch(entry.url); const blob=await res.blob(); await downloadBlobAsPdf(blob,entry.name||'employee-file');
-    }catch(err){ window.open(entry.url,'_blank','noopener'); }
+      const blob=await resolveEmployeeFileBlob(entry,id,key);
+      await downloadBlobAsPdf(blob,entry.name||'employee-file');
+    }catch(err){ console.error(err); showToast('تعذر جلب الملف. حاول مرة أخرى.'); }
   }
   async function downloadBlobAsPdf(blob,name){
     if(blob.type==='application/pdf' || /\.pdf$/i.test(name||'')){
@@ -1659,8 +1665,8 @@
       const file=pendingEmployeeFiles.__all; const url=URL.createObjectURL(file); const a=document.createElement('a'); a.href=url; a.download=file.name || `ملف-الموظف-${id||'employee'}`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); return;
     }
     const savedAll=e.files?.__all;
-    if(savedAll?.url){
-      try{ const res=await fetch(savedAll.url); const blob=await res.blob(); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=savedAll.name || `ملف-الموظف-${id||'employee'}`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); return; }catch(err){ console.error(err); }
+    if(savedAll){
+      try{ const blob=await resolveEmployeeFileBlob(savedAll,id,'__all'); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=savedAll.name || `ملف-الموظف-${id||'employee'}`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); return; }catch(err){ console.error(err); }
     }
     const entries=EMPLOYEE_FILE_TYPES.map(x=>({key:x.key,entry:pendingEmployeeFiles[x.key]||fileEntryFor(e,x.key)})).filter(x=>x.entry);
     if(!entries.length){showToast('لا توجد ملفات لتحميلها.');return;}
@@ -1669,7 +1675,7 @@
     for(const x of entries){
       try{
         let blob=x.entry instanceof File ? x.entry : null;
-        if(!blob){ const res=await fetch(x.entry.url); blob=await res.blob(); }
+        if(!blob){ blob=await resolveEmployeeFileBlob(x.entry,id,x.key); }
         zip.file(x.entry.name || `${x.key}.pdf`,blob);
       }catch(err){ console.error('employee bundle fetch failed',x.key,err); }
     }
@@ -1678,10 +1684,10 @@
   }
   async function handleUploadAllEmployeeFiles(ev){
     const file=ev.target.files?.[0]; ev.target.value=''; if(!file)return;
-    if(file.size>100*1024*1024){showToast('حجم الملف الكامل يجب ألا يتجاوز 100 ميجابايت.');return;}
     // يقبل سطر تحميل الكل أي صيغة ملف. ملفات ZIP يتم فكها وتوزيعها على مستندات الموظف،
     // وأي صيغة أخرى تُحفظ كملف كامل مستقل كما هي بدون تغيير الامتداد أو المحتوى.
     if(!/\.zip$/i.test(file.name)){
+      if(file.size>MAX_EMPLOYEE_FILE_BYTES){ showToast(`حجم الملف الكامل يجب ألا يتجاوز ${Math.round(MAX_EMPLOYEE_FILE_BYTES/1024)} كيلوبايت تقريباً (${(MAX_EMPLOYEE_FILE_BYTES/1024/1024).toFixed(2)} ميجا) لأنه يُحفظ داخل قاعدة البيانات مباشرة. جرّب ضغط الملف.`); return; }
       pendingEmployeeFiles.__all = file;
       renderEmployeeFiles();
       showToast('تم اختيار الملف الكامل وسيتم حفظه كما هو.');
@@ -1692,20 +1698,24 @@
       const zip=await window.JSZip.loadAsync(file);
       const byBase=new Map(EMPLOYEE_FILE_TYPES.map(x=>[x.key.toLowerCase(),x]));
       const nameMap=new Map(EMPLOYEE_FILE_TYPES.map(x=>[x.label.toLowerCase(),x]));
-      let count=0;
+      let count=0, skippedLarge=0;
       for(const [path,entry] of Object.entries(zip.files)){
         if(entry.dir)continue;
         const base=path.split('/').pop().replace(/\.[^.]+$/,'').trim().toLowerCase();
         const item=byBase.get(base)||nameMap.get(base);
         if(!item)continue;
         const blob=await entry.async('blob');
+        if(blob.size>MAX_EMPLOYEE_FILE_BYTES){ skippedLarge++; continue; }
         const ext=(path.match(/\.[^.]+$/)||['.pdf'])[0].toLowerCase();
         const mime=ext==='.pdf'?'application/pdf':(ext==='.png'?'image/png':'image/jpeg');
         pendingEmployeeFiles[item.key]=new File([blob],path.split('/').pop(),{type:mime});
         count++;
       }
-      if(!count){showToast('لم يتم العثور داخل الملف الكامل على أسماء ملفات مطابقة لملفات الموظف.');return;}
-      renderEmployeeFiles(); showToast(`تم اختيار ${count} ملف/ملفات وسيتم حفظها مع الموظف.`);
+      if(!count && !skippedLarge){showToast('لم يتم العثور داخل الملف الكامل على أسماء ملفات مطابقة لملفات الموظف.');return;}
+      renderEmployeeFiles();
+      let msg=`تم اختيار ${count} ملف/ملفات وسيتم حفظها مع الموظف.`;
+      if(skippedLarge) msg+=` تم تجاهل ${skippedLarge} ملف/ملفات تجاوز حجمها ${Math.round(MAX_EMPLOYEE_FILE_BYTES/1024)} كيلوبايت.`;
+      showToast(msg);
     }catch(err){console.error(err);showToast('تعذر قراءة الملف الكامل.');}
   }
   async function removeAllEmployeeFiles(){
@@ -1719,12 +1729,14 @@
       else if(e.files?.__all){
         const entry=e.files.__all;
         if(entry.path && window.FB?.deleteEmployeeFile) await window.FB.deleteEmployeeFile(entry.path);
+        else if(window.FB?.deleteEmployeeFileData) await window.FB.deleteEmployeeFileData(id,'__all');
         if(e.files) delete e.files.__all;
       }
       for(const key of keys){
         if(pendingEmployeeFiles[key]){delete pendingEmployeeFiles[key];continue;}
         const entry=fileEntryFor(e,key);
         if(entry?.path && window.FB?.deleteEmployeeFile) await window.FB.deleteEmployeeFile(entry.path);
+        else if(entry && window.FB?.deleteEmployeeFileData) await window.FB.deleteEmployeeFileData(id,key);
         if(e.files) delete e.files[key];
       }
       saveEmployees(); renderEmployeeFiles(); showToast('تمت إزالة جميع ملفات الموظف.');
@@ -1737,6 +1749,7 @@
     if(!confirm('هل تريد إزالة هذا الملف نهائياً؟')) return;
     try{
       if(entry.path && window.FB?.deleteEmployeeFile) await window.FB.deleteEmployeeFile(entry.path);
+      else if(window.FB?.deleteEmployeeFileData) await window.FB.deleteEmployeeFileData(id,key);
       e.files={...employeeFileMap(e)}; delete e.files[key];
       saveEmployees(); renderEmployeeFiles(); showToast('تمت إزالة الملف.');
     }catch(err){ console.error(err); showToast('تعذر إزالة الملف.'); }
@@ -1747,17 +1760,24 @@
       new Promise((_,reject)=>setTimeout(()=>reject(new Error('TIMEOUT:'+label)), ms))
     ]);
   }
+  const MAX_EMPLOYEE_FILE_BYTES = 650*1024; // حد آمن لحفظ الملف كـ base64 داخل مستند Firestore (بدون Storage/Blaze)
+  function readFileAsDataUrl(file){
+    return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsDataURL(file); });
+  }
   async function savePendingEmployeeFiles(employeeId, data){
     const keys=Object.keys(pendingEmployeeFiles); if(!keys.length)return data;
     data.files={...employeeFileMap(data)};
     for(const key of keys){
       const file=pendingEmployeeFiles[key];
       if(!file)continue;
-      if(!window.FB?.uploadEmployeeFile) throw new Error('FILE_STORAGE_NOT_READY');
-      // مهلة 20 ثانية لكل ملف: لو تعطّل الاتصال بـ Firebase Storage (مثلاً
-      // التخزين غير مفعّل بمشروع Firebase، أو مشكلة صلاحيات)، لا يتجمّد
-      // الحفظ إلى الأبد — نكمل حفظ بيانات الموظف بدون الملف ونبلّغ المستخدم.
-      data.files[key]=await withTimeout(window.FB.uploadEmployeeFile(employeeId,key,file), 20000, 'upload:'+key);
+      if(!window.FB?.saveEmployeeFileData) throw new Error('FILE_STORAGE_NOT_READY');
+      const dataUrl=await readFileAsDataUrl(file);
+      // مهلة 20 ثانية: لو تعطّل الاتصال، لا يتجمّد الحفظ إلى الأبد — نكمل حفظ
+      // بيانات الموظف بدون الملف ونبلّغ المستخدم.
+      data.files[key]=await withTimeout(
+        window.FB.saveEmployeeFileData(employeeId,key,{name:file.name,type:file.type||'',size:file.size||0,dataUrl}),
+        20000, 'upload:'+key
+      );
     }
     pendingEmployeeFiles={};
     return data;
