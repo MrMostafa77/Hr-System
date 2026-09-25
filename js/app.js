@@ -1933,7 +1933,8 @@
 
   document.getElementById('empForm').addEventListener('submit', async (ev)=>{
     ev.preventDefault();
-    clearValidation(); composeFullName();
+    try{
+      clearValidation(); composeFullName();
     const id = document.getElementById('f_id').value || ('e'+Date.now());
     const data = {id};
     formFields.forEach(f=>{ const el = document.getElementById('f_'+f); data[f] = el ? el.value : ''; });
@@ -2004,6 +2005,10 @@
     showToast('تم حفظ البيانات بنجاح');
     resetForm();
     switchView('employees');
+    }catch(err){
+      console.error('Employee save failed:',err);
+      showToast('تعذر حفظ بيانات الموظف. راجع الحقول المطلوبة أو حاول مرة أخرى.');
+    }
   });
 
   /* ===== payroll statement ===== */
