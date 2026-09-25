@@ -1800,6 +1800,17 @@
   }
   // Use both direct and delegated handlers so Cancel still works if another
   // initialization step failed before the direct binding was reached.
+  // تأكيد تشغيل زر الحفظ حتى لو حدث تعارض مع أي handler آخر على النموذج.
+  // نمنع الإرسال الافتراضي ونطلق submit واحداً بشكل صريح.
+  document.querySelector('#empForm button[type=submit]')?.addEventListener('click', (ev)=>{
+    ev.preventDefault();
+    const form=document.getElementById('empForm');
+    if(form){
+      if(typeof form.requestSubmit==='function') form.requestSubmit();
+      else form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
+    }
+  });
+
   document.getElementById('cancelFormBtn')?.addEventListener('click', (ev)=>{
     ev.preventDefault();
     ev.stopImmediatePropagation();
@@ -2001,8 +2012,14 @@
       showToast('تم حفظ بيانات الموظف، لكن تعذر رفع ملف أو أكثر. يمكنك رفعها من تبويب «ملفات الموظف» لاحقاً.');
     }
     if(idx>=0) employees[idx] = data; else employees.push(data);
-    saveEmployees();
-    showToast('تم حفظ البيانات بنجاح');
+    // احفظ محلياً فوراً، ثم انتظر حفظ Firestore قبل إغلاق النموذج حتى لا يعيد
+    // الـ realtime snapshot القديم البيانات مرة أخرى.
+    persistLocal();
+    if(window.FB?.saveState){
+      await window.FB.saveState(currentState());
+    }
+    try{ renderProjectCapacity(); renderProjects(); }catch(e){}
+    showToast('تم حفظ بيانات الموظف بنجاح');
     resetForm();
     switchView('employees');
     }catch(err){
