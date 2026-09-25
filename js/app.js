@@ -1741,6 +1741,12 @@
       saveEmployees(); renderEmployeeFiles(); showToast('تمت إزالة الملف.');
     }catch(err){ console.error(err); showToast('تعذر إزالة الملف.'); }
   }
+  function withTimeout(promise, ms, label){
+    return Promise.race([
+      promise,
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('TIMEOUT:'+label)), ms))
+    ]);
+  }
   async function savePendingEmployeeFiles(employeeId, data){
     const keys=Object.keys(pendingEmployeeFiles); if(!keys.length)return data;
     data.files={...employeeFileMap(data)};
@@ -1748,7 +1754,10 @@
       const file=pendingEmployeeFiles[key];
       if(!file)continue;
       if(!window.FB?.uploadEmployeeFile) throw new Error('FILE_STORAGE_NOT_READY');
-      data.files[key]=await window.FB.uploadEmployeeFile(employeeId,key,file);
+      // مهلة 20 ثانية لكل ملف: لو تعطّل الاتصال بـ Firebase Storage (مثلاً
+      // التخزين غير مفعّل بمشروع Firebase، أو مشكلة صلاحيات)، لا يتجمّد
+      // الحفظ إلى الأبد — نكمل حفظ بيانات الموظف بدون الملف ونبلّغ المستخدم.
+      data.files[key]=await withTimeout(window.FB.uploadEmployeeFile(employeeId,key,file), 20000, 'upload:'+key);
     }
     pendingEmployeeFiles={};
     return data;
@@ -1950,6 +1959,14 @@
 
   document.getElementById('empForm').addEventListener('submit', async (ev)=>{
     ev.preventDefault();
+    // نعطّل الزر ونظهر حالة "جارٍ الحفظ" حتى لا يبدو الزر متجمداً وقت
+    // انتظار رفع الملفات أو مزامنة Firestore، ونضمن إعادته بأي حال (finally).
+    const saveBtn=document.getElementById('empSaveBtn');
+    const saveBtnLabel=document.getElementById('empSaveBtnLabel');
+    const prevLabel=saveBtnLabel?.textContent;
+    if(saveBtn) saveBtn.disabled=true;
+    if(saveBtnLabel) saveBtnLabel.textContent='جارٍ الحفظ...';
+    try{
     try{
       clearValidation(); composeFullName();
     const id = document.getElementById('f_id').value || ('e'+Date.now());
@@ -2022,7 +2039,7 @@
     // الـ realtime snapshot القديم البيانات مرة أخرى.
     persistLocal();
     if(window.FB?.saveState){
-      await window.FB.saveState(currentState());
+      await withTimeout(window.FB.saveState(currentState()), 20000, 'saveState');
     }
     try{ renderProjectCapacity(); renderProjects(); }catch(e){}
     showToast('تم حفظ بيانات الموظف بنجاح');
@@ -2031,6 +2048,10 @@
     }catch(err){
       console.error('Employee save failed:',err);
       showToast('تعذر حفظ بيانات الموظف. راجع الحقول المطلوبة أو حاول مرة أخرى.');
+    }
+    }finally{
+      if(saveBtn) saveBtn.disabled=false;
+      if(saveBtnLabel) saveBtnLabel.textContent=prevLabel||'حفظ بيانات الموظف';
     }
   });
 
