@@ -1030,9 +1030,15 @@
       document.getElementById('departmentOldJob').value=b.dataset.job||'';
       document.getElementById('departmentName').value=d.name||'';
       document.getElementById('departmentJob').value=b.dataset.job||'';
-      document.getElementById('departmentNameField').style.display='';
-      document.getElementById('jobDepartmentField').style.display='none';
+      document.getElementById('departmentNameField').style.display='none';
+      document.getElementById('jobDepartmentField').style.display='';
       document.getElementById('departmentJobField').style.display='';
+      // نعبّئ قائمة الأقسام ونحدد قسم هذه الوظيفة الحالي، وإلا يظهر الحقل
+      // فارغاً ويطلب اختيار القسم رغم أنه معروف بالفعل (تعديل وظيفة).
+      const deptSelect=document.getElementById('jobDepartmentSelect');
+      const depts=uniqueDepts();
+      deptSelect.innerHTML='<option value="">اختر القسم</option>'+depts.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join('');
+      deptSelect.value=depts.find(x=>normalizeDepartmentName(x)===normalizeDepartmentName(d.name))||'';
     });
     body?.querySelectorAll('[data-dept-edit]').forEach(b=>b.onclick=()=>{
       const d=departments.find(x=>normalizeDepartmentName(x.name)===normalizeDepartmentName(b.dataset.deptEdit)); if(!d)return;
@@ -3201,6 +3207,13 @@
   applyTheme();
   loadEmployees();
   loadAux();
+  // نعبّئ القوائم (المناطق/المشاريع/الأقسام) فوراً من البيانات المحلية قبل
+  // انتظار Firebase، حتى لا تظهر قائمة "المنطقة" فارغة إذا كان الاتصال بطيئاً
+  // أو تأخر تسجيل الدخول، مما كان يمنع حفظ الموظف بصمت.
+  renderRegions();
+  renderProjects();
+  refreshRegionSelects();
+  refreshEmployeeProjectSelect();
   await initCloud();
   renderRegions();
   renderProjects();
