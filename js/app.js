@@ -3154,7 +3154,7 @@
     if(!dateStr)return '';
     const d=new Date(dateStr+'T00:00:00');
     if(Number.isNaN(d.getTime()))return dateStr;
-    return `${String(d.getDate()).padStart(2,'0')} / ${String(d.getMonth()+1).padStart(2,'0')} / ${d.getFullYear()} م`;
+    return `${String(d.getDate()).padStart(2,'0')} / ${String(d.getMonth()+1).padStart(2,'0')} / ${d.getFullYear()}`;
   }
   function formatHijri(dateStr){
     if(!dateStr)return '';
@@ -3164,7 +3164,7 @@
       const day=parts.find(x=>x.type==='day')?.value||'';
       const month=parts.find(x=>x.type==='month')?.value||'';
       const year=parts.find(x=>x.type==='year')?.value||'';
-      return `${day} / ${month} / ${year} هـ`;
+      return `${day} / ${month} / ${year}`;
     }catch(e){return ''; }
   }
   function renderCommencementProjects(){
