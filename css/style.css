@@ -2077,14 +2077,14 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 #view-commencements .paper-toolbar span:last-child{font-size:11px;color:var(--ink-soft);font-weight:400}
 #view-commencements .comm-paper-wrap{position:relative;width:100%;max-width:760px;margin:0 auto;line-height:1}
 #view-commencements .comm-paper-bg{display:block;width:100%;height:auto}
-#view-commencements .paper-field{position:absolute;border:0;background:transparent;color:#111;text-align:center;font-family:'JF Flat Regular','Segoe UI',sans-serif;font-weight:700;font-size:clamp(8px,1.1vw,15px);padding:1px 3px;outline:none;direction:rtl;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#view-commencements .paper-field{position:absolute;border:0;background:transparent;color:#111;text-align:center;font-family:'JF Flat Regular','Segoe UI',sans-serif;font-weight:700;font-size:clamp(8px,1.1vw,15px);padding:0 3px;outline:none;direction:rtl;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;height:2.55%;line-height:1.1}
 #view-commencements .paper-name{top:18.1%;left:56.5%;width:34.5%}
 #view-commencements .paper-project{top:18.1%;left:34%;width:22.5%}
 #view-commencements .paper-job{top:18.1%;left:10.5%;width:23.5%}
-#view-commencements .paper-date-g{top:25.2%;left:19%;width:32%;font-size:clamp(7px,1vw,13px)}
-#view-commencements .paper-date-h{top:25.2%;left:51%;width:33%;font-size:clamp(7px,1vw,13px)}
-#view-commencements .paper-id{top:38.1%;left:25%;width:55%;text-align:center}
-#view-commencements .paper-guard-name{top:48%;left:48%;width:39%;text-align:right}
+#view-commencements .paper-date-g{top:29.75%;left:19%;width:32%;font-size:clamp(7px,1vw,13px);height:2.55%}
+#view-commencements .paper-date-h{top:29.75%;left:51%;width:33%;font-size:clamp(7px,1vw,13px);height:2.55%}
+#view-commencements .paper-id{top:46.15%;left:20.2%;width:21.8%;text-align:center;font-size:clamp(7px,.95vw,13px);height:2.35%}
+#view-commencements .paper-guard-name{top:46.15%;left:54%;width:30%;text-align:center;font-size:clamp(7px,.95vw,13px);height:2.35%}
 /* الحفاظ على تنسيق الكتابة المُدخلة في نموذج المباشرة متناسقًا مع الورقة الظاهرة خلفه،
    لأن تنسيق الإدخال الموحّد في باقي النظام (خلفية كحلية ونص أبيض) كان يطغى بـ !important
    على خانات النموذج المخصصة ليبدو الإدخال وكأنه مكتوب على الورقة نفسها. */
@@ -2102,10 +2102,10 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 #view-commencements .paper-check input{opacity:0;position:absolute;inset:0}
 #view-commencements .paper-check span{position:absolute;inset:0;border:1.5px solid #222;border-radius:4px;background:rgba(255,255,255,.18)}
 #view-commencements .paper-check input:checked+span:after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(12px,1.8vw,24px);font-weight:800;color:#111}
-#view-commencements .paper-new{top:30.1%;left:55.1%}
-#view-commencements .paper-reassign{top:30.1%;left:18.4%}
-#view-commencements .paper-vacation{top:33%;left:55.1%}
-#view-commencements .paper-other{top:33%;left:18.4%}
+#view-commencements .paper-new{top:36.3%;left:54.8%}
+#view-commencements .paper-reassign{top:36.3%;left:18.4%}
+#view-commencements .paper-vacation{top:40.1%;left:54.8%}
+#view-commencements .paper-other{top:40.1%;left:18.4%}
 #view-commencement-list .commencement-list-card{padding:16px}
 #view-commencement-list .comm-list-filters{display:grid;grid-template-columns:minmax(220px,1fr) 220px auto;gap:9px;margin-bottom:14px}
 #view-commencement-list .comm-list-table td,#view-commencement-list .comm-list-table th{white-space:nowrap}
