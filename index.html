@@ -36,7 +36,6 @@
         <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="8.5" r="2.5"/><path d="M15.5 14.2c2.6.4 4.5 2.6 4.5 5.3"/></svg>الموظفين</span><b>⌄</b></button>
         <div class="nav-submenu">
           <a class="navlink nav-child" data-view="add"><span>إضافة موظف</span></a>
-          <a class="navlink nav-child" data-view="employees"><span>كل الموظفين</span></a>
           <a class="navlink nav-child" data-view="contracts"><span>عقود الموظفين</span></a>
           <a class="navlink nav-child" data-view="allcontracts"><span>كل العقود</span></a>
         </div>
@@ -199,24 +198,7 @@
         <input type="hidden" id="projectBasic"><input type="hidden" id="projectHousing"><input type="hidden" id="projectTransport"><input type="hidden" id="projectOther">
         <div class="card section-card project-panel-card"><div class="project-section-head"><h3>1 — البيانات الأساسية للمشروع</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="basic">↻ إعادة ضبط القسم</button></div><div class="field-grid project-basic-grid">
           <div class="field"><label>اسم المشروع <span class="req">*</span></label><input id="projectName" required></div>
-<<<<<<< HEAD
           <div class="field"><label>اختيار المنطقة <span class="req">*</span></label><select id="projectRegion" required></select></div>
-=======
-          <div class="field"><label>المنطقة <span class="req">*</span></label><select id="projectRegion" required></select></div>
-          <div class="field"><label>السجل التجاري</label><input id="projectCR" inputmode="numeric"></div>
-          <div class="field"><label>الرقم الضريبي</label><input id="projectVatNo" inputmode="numeric"></div>
-          <div class="field full"><label>العنوان</label><input id="projectAddress"></div>
-          <div class="field"><label>أرقام التواصل</label><div id="projectPhones" class="multi-list"></div><button type="button" class="small-btn add-type" id="addProjectPhone">+ إضافة رقم</button></div>
-          <div class="field"><label>إيميلات التواصل</label><div id="projectEmails" class="multi-list"></div><button type="button" class="small-btn add-type" id="addProjectEmail">+ إضافة إيميل</button></div>
-          <div class="field"><label>هوية ممثل الشركة</label><input id="projectRepId" inputmode="numeric"></div>
-          <div class="field"><label>اسم ممثل الشركة</label><input id="projectRepName"></div>
-          <div class="pj-flags-wrap"><div class="pj-flags">
-            <div class="field pj-vat"><label>ضريبة القيمة المضافة %</label><input type="number" id="projectVat" value="15" min="0" step="0.01"></div>
-            <label class="project-check project-check-si"><input type="checkbox" id="projectSiToggle" data-project-si-toggle><span>التأمينات الاجتماعية</span></label>
-            <label class="project-check project-check-si"><input type="checkbox" id="projectSiDefault"><span>لائحة افتراضية</span></label>
-            <label class="project-check project-check-si"><input type="checkbox" id="projectMedToggle"><span>التأمين الطبي</span></label>
-          </div></div>
->>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
         </div></div>
 
 
@@ -233,10 +215,6 @@
             <label class="project-check"><input type="checkbox" data-project-revenue-toggle="extras"><span>ملحقات مشروع</span></label>
           </div>
           <div id="projectRevenueDetails" class="project-dynamic-grid"></div>
-<<<<<<< HEAD
-=======
-          <div id="projectRevenueBreakdown" class="pj-bd-wrap"></div>
->>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
         </div>
 
         <div class="card section-card project-panel-card"><div class="project-section-head"><h3>3 — التكاليف</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="cost">↻ إعادة ضبط القسم</button></div>
@@ -252,16 +230,9 @@
             <label class="project-check"><input type="checkbox" data-project-cost-toggle="extras"><span>ملحقات مشروع</span></label>
           </div>
           <div id="projectCostDetails" class="project-dynamic-grid"></div>
-<<<<<<< HEAD
         </div>
 
         <div class="card section-card project-panel-card"><div class="project-section-head"><h3>4 — الملاحظات والحفظ</h3><button class="btn btn-sm project-section-reset" type="button" data-project-section-reset="notes">↻ إعادة ضبط القسم</button></div><div class="field"><label>ملاحظات</label><input id="projectNotes"></div><div class="project-form-actions"><button class="btn btn-primary" type="submit">حفظ المشروع</button><button class="btn" type="button" id="newProjectEntryBtn">+ إدخالات جديدة</button><button class="btn" type="button" id="cancelProjectBtn">إلغاء</button></div></div>
-=======
-          <div id="projectCostBreakdown" class="pj-bd-wrap"></div>
-        </div>
-
-        <div class="card section-card project-panel-card"><div class="project-section-head"><h3>4 — الحفظ</h3></div><div class="project-form-actions"><button class="btn btn-primary" type="submit">حفظ المشروع</button><button class="btn" type="button" id="newProjectEntryBtn">+ إدخالات جديدة</button><button class="btn" type="button" id="cancelProjectBtn">إلغاء</button></div></div>
->>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
       </form>
       <div class="card section-card project-summary-card">
         <div class="project-summary-title">ملخص المشروع الشهري</div>
@@ -271,13 +242,7 @@
           <div class="project-summary-box profit-summary"><div class="project-summary-label">هامش ربح المشروع</div><div class="project-summary-row"><span>للفرد</span><b id="projectSummaryProfitPerson">0 ريال</b></div><div class="project-summary-row"><span>الإجمالي الشهري</span><b id="projectSummaryProfitTotal">0 ريال</b></div></div>
         </div>
         <div class="project-summary-note">متوسط الفرد محسوب على إجمالي عدد الأفراد في المشروع.</div>
-<<<<<<< HEAD
       </div>
-=======
-        <div id="projectSummaryDetail" class="pj-bd-wrap"></div>
-      </div>
-      <div class="card section-card project-panel-card" id="projectCapacityCard"><div class="project-section-head"><h3>سعة المشروع</h3></div><div id="projectCapacity" class="pj-bd-wrap"></div></div>
->>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
       <div class="card section-card full-page-card"><div class="filters" style="margin:0 0 16px"><div class="search-box" style="max-width:420px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="search" id="projectSearch" placeholder="بحث باسم المشروع"></div><span class="pill pill-gray" id="projectCount">0 مشروع</span></div><h3>قائمة المشاريع</h3><div class="table-wrap"><table class="payroll-table projects-table"><colgroup><col class="col-project"><col class="col-region"><col class="col-guards"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-action"></colgroup><thead><tr><th>المشروع</th><th>المنطقة</th><th>الحراس</th><th>إيرادات الحراس</th><th>تكاليف الحراس</th><th>إجمالي الإيرادات</th><th>إجمالي التكاليف</th><th>الإجراء</th></tr></thead><tbody id="projectsTableBody"></tbody></table></div></div>
     </section>
 
@@ -313,18 +278,15 @@
       </div>
 
       <div class="table-wrap">
-        <table class="all-employees-table">
+        <table>
           <thead>
             <tr>
               <th>الموظف</th>
-              <th>الكود الوظيفي</th>
               <th>القسم</th>
               <th>المسمى الوظيفي</th>
-              <th>المشروع</th>
-              <th>حالة المباشرة</th>
-              <th>الأجر الأخير</th>
-              <th>رقم العقد</th>
-              <th>الإجراءات</th>
+              <th>حالة العقد</th>
+              <th>الراتب الأساسي</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="empTableBody"></tbody>
