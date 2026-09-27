@@ -417,7 +417,7 @@
   function resetProjectSection(section){
     if(section==='basic'){
       ['projectName','projectCR','projectVatNo','projectAddress','projectRepId','projectRepName'].forEach(id=>document.getElementById(id).value='');
-      document.getElementById('projectVat').value='15'; const siB=document.getElementById('projectSiToggle'); if(siB) siB.checked=false; const medB=document.getElementById('projectMedToggle'); if(medB) medB.checked=false; setMulti('phone',[]);setMulti('email',[]);
+      document.getElementById('projectVat').value='15'; const siB=document.getElementById('projectSiToggle'); if(siB) siB.checked=false; const medB=document.getElementById('projectMedToggle'); if(medB) medB.checked=false; const sid=document.getElementById('projectSiDefault'); if(sid) sid.checked=false; const md=document.getElementById('projectMedDefault'); if(md) md.checked=false; setMulti('phone',[]);setMulti('email',[]);
       refreshRegionSelects();
       document.getElementById('projectRegion').value='';
     }else if(section==='revenue'){
@@ -442,7 +442,7 @@
       const rev=p.revenueItems||{}, cost=p.costItems||{};
       document.querySelectorAll('[data-project-revenue-toggle]').forEach(c=>c.checked=c.dataset.projectRevenueToggle==='guards' || Array.isArray(rev[c.dataset.projectRevenueToggle]));
       document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards' || Array.isArray(cost[c.dataset.projectCostToggle]));
-      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled;
+      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled; const sid=document.getElementById('projectSiDefault'); if(sid) sid.checked=!!p.siDefault; const md=document.getElementById('projectMedDefault'); if(md) md.checked=!!p.medDefault;
       renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();window.scrollTo({top:0,behavior:'smooth'});
     });
     body.querySelectorAll('[data-project-view]').forEach(b=>b.onclick=()=>{const p=projects.find(x=>x.id===b.dataset.projectView); if(p)showProjectView(p);});
@@ -487,13 +487,13 @@
     const guardRevenue=unitFrom(revenueItems,'guards');
     const data={
       id:document.getElementById('projectId').value||'p'+Date.now(), name:document.getElementById('projectName').value.trim(), region:document.getElementById('projectRegion').value,
-      cr:document.getElementById('projectCR').value.trim(), vatNo:document.getElementById('projectVatNo').value.trim(), address:document.getElementById('projectAddress').value.trim(), phones:getMulti('phone'), emails:getMulti('email'), repId:document.getElementById('projectRepId').value.trim(), repName:document.getElementById('projectRepName').value.trim(), vatRate:vatRate(), medEnabled:!!document.getElementById('projectMedToggle')?.checked,
+      cr:document.getElementById('projectCR').value.trim(), vatNo:document.getElementById('projectVatNo').value.trim(), address:document.getElementById('projectAddress').value.trim(), phones:getMulti('phone'), emails:getMulti('email'), repId:document.getElementById('projectRepId').value.trim(), repName:document.getElementById('projectRepName').value.trim(), vatRate:vatRate(), medEnabled:!!document.getElementById('projectMedToggle')?.checked, siDefault:!!document.getElementById('projectSiDefault')?.checked, medDefault:!!document.getElementById('projectMedDefault')?.checked,
       guards, guardsFemale, supervisors:supervisorQty, managers:managerQty, patrols:patrolQty, devices:deviceQty, uniforms:uniformQty, cones:extraQty,
       revenueGuard:guardRevenue, costGuard:guardSalary, revenueTotal:guards*guardRevenue, costTotal:costGuards*guardSalary,
       revenueItems, costItems, guardBasic:guardSalary, guardHousing:0, guardTransport:0, guardOther:0,
       supervisorBasic:unitFrom(costItems,'supervisors'), supervisorHousing:0, supervisorTransport:0, supervisorOther:0,
       managerBasic:unitFrom(costItems,'managers'), managerHousing:0, managerTransport:0, managerOther:0,
-      projectCostGuards:costGuards, includeBreaks:false, socialInsurance:false, socialInsuranceRate:0, siEnabled:!!document.getElementById('projectSiToggle')?.checked, siGuardRate:SI_GUARD_RATE, siCompanyRate:SI_COMPANY_RATE, siGuardTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().guardTotal:0, siCompanyTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0, patrolBilling:''
+      projectCostGuards:costGuards, includeBreaks:false, socialInsurance:false, socialInsuranceRate:0, siEnabled:!!document.getElementById('projectSiToggle')?.checked, siDefault:!!document.getElementById('projectSiDefault')?.checked, medDefault:!!document.getElementById('projectMedDefault')?.checked, siGuardRate:SI_GUARD_RATE, siCompanyRate:SI_COMPANY_RATE, siGuardTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().guardTotal:0, siCompanyTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0, patrolBilling:''
     };
     const allCostCards=[...document.querySelectorAll('#projectCostDetails .project-detail-card')];
     data.costTotal=allCostCards.reduce((a,c)=>a+(Number(c.querySelector('.pd-qty')?.value)||0)*(Number(c.querySelector('.pd-unit')?.value)||0),0);
@@ -508,7 +508,7 @@
     saveProjects();refreshEmployeeProjectSelect();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
   document.getElementById('projectSearch').addEventListener('input',renderProjects);
-  ['projectSiToggle','projectMedToggle'].forEach(id=>document.getElementById(id)?.addEventListener('change',updateProjectTotals));
+  ['projectSiToggle','projectMedToggle','projectSiDefault','projectMedDefault'].forEach(id=>document.getElementById(id)?.addEventListener('change',updateProjectTotals));
   ['projectVat','projectName'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateProjectTotals));
   renderDynamicDetails('revenue',{});renderDynamicDetails('cost',{});updateProjectTotals();  // عرض بطاقة الحارس فور فتح التبويب
   document.querySelectorAll('[data-project-revenue-toggle],[data-project-cost-toggle]').forEach(cb=>cb.addEventListener('change',()=>{const rv=getDetailData('revenue'),cv=getDetailData('cost');renderDynamicDetails('revenue',rv);renderDynamicDetails('cost',cv);updateProjectTotals();}));
@@ -2594,12 +2594,17 @@
       <tr><td>5</td><td>النوم أثناء العمل أو عدم التقيد بالتعليمات أو الانشغال بالجوال والأجهزة الذكية</td><td>حسم ثلاثة أيام</td></tr>
       <tr><td>6</td><td>مخالفات أخرى لم تذكر أعلاه</td><td>وفق الحالة واللائحة المعتمدة</td></tr></tbody></table>`;
     }else if(currentDocType==='directwork'){
-      html=`<h2>مباشرة عمل</h2><div class="doc-date">التاريخ: ${today}</div>
-      <table class="doc-mini-table"><tbody><tr><th>اسم الموظف</th><td>${blank(e.fullname)}</td></tr><tr><th>المسمى الوظيفي</th><td>${blank(e.jobtitle)}</td></tr><tr><th>القسم</th><td>${blank(e.dept)}</td></tr><tr><th>الموقع</th><td>${blank(e.project||e.region)}</td></tr></tbody></table>
-      <p>نفيدكم بأن الموظف المذكور أعلاه باشر العمل لدينا اعتباراً من:</p><p>التاريخ: <span class="blank">/ / 144هـ</span> الموافق: <span class="blank">/ / 202م</span></p>
-      <p>نوع المباشرة: ☐ تعيين جديد &nbsp;&nbsp; ☐ إعادة تعيين &nbsp;&nbsp; ☐ عودة من الإجازة &nbsp;&nbsp; ☐ أخرى</p>
-      <p>أقر أنا الموظف بأنني باشرت العمل لدى ${blank(co)} وألتزم بأنظمة الشركة وتعليماتها وفترة التجربة المحددة في عقد العمل.</p>
-      <div class="sign-row"><div>اسم الموظف<br>${blank(e.fullname)}<br>التوقيع: ....................</div><div>الموارد البشرية<br>...........................</div><div>رئيس العمليات<br>...........................</div></div>`;
+      const safeName=escapeHtml(e.fullname||'');
+      const safeJob=escapeHtml(e.jobtitle||'');
+      const safeLocation=escapeHtml(e.project||e.region||'');
+      const safeId=escapeHtml(e.idnum||'');
+      html=`<div class="directwork-official-page" role="document" aria-label="نموذج مباشرة عمل الرسمي">
+        <img class="directwork-template" src="assets/directwork-official-template.jpg" alt="نموذج مباشرة العمل الرسمي بالشعار والعلامة المائية">
+        <span class="directwork-field directwork-name">${safeName}</span>
+        <span class="directwork-field directwork-location">${safeLocation}</span>
+        <span class="directwork-field directwork-job">${safeJob}</span>
+        <span class="directwork-field directwork-id">${safeId}</span>
+      </div>`;
     }else if(currentDocType==='fileundertaking'){
       html = `
         <h2>إقرار وتعهد بإكمال ملف التوظيف</h2>
