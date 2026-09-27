@@ -2077,20 +2077,20 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 #view-commencements .paper-toolbar span:last-child{font-size:11px;color:var(--ink-soft);font-weight:400}
 #view-commencements .comm-paper-wrap{position:relative;width:100%;max-width:760px;margin:0 auto;line-height:1;background:#fff}
 #view-commencements .comm-paper-bg{display:block;width:100%;height:auto}
-#view-commencements .paper-field{position:absolute;border:0;background:transparent;color:#111;text-align:center;font-family:'JF Flat Regular','Segoe UI',sans-serif;font-weight:700;font-size:clamp(8px,1.05vw,14px);padding:0 3px;outline:none;direction:rtl;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.15}
+#view-commencements .paper-field{position:absolute;border:0;background:transparent;color:#111;text-align:center;font-family:'JF Flat Regular','Segoe UI',sans-serif;font-weight:700;font-size:clamp(9px,0.95vw,13px);padding:0 2px;outline:none;direction:rtl;white-space:nowrap;overflow:hidden;text-overflow:clip;line-height:1.05;box-sizing:border-box}
 #view-commencements .paper-field,#view-commencements .paper-field:read-only,#view-commencements .paper-field:focus{background:transparent !important;color:#111 !important;border-color:transparent !important;box-shadow:none !important;caret-color:transparent !important;opacity:1 !important}
 /* مواضع الخانات مطابقة لورقة الـPDF الأصلية */
 #view-commencements .paper-name{top:20.85%;left:57.2%;width:31.2%;height:2.45%}
 #view-commencements .paper-project{top:20.85%;left:34.2%;width:22.4%;height:2.45%}
 #view-commencements .paper-job{top:20.85%;left:10.8%;width:21.8%;height:2.45%}
 /* التاريخ والموافق: نغطي مساحة الأرقام فقط حتى لا تتداخل مع النص المطبوع */
-#view-commencements .paper-date-h{top:30.15%;left:60.0%;width:17.5%;height:2.0%;font-size:clamp(10px,1.05vw,15px);background:#fff !important;line-height:1.25;border-radius:2px}
-#view-commencements .paper-date-g{top:30.15%;left:18.2%;width:20.2%;height:2.0%;font-size:clamp(10px,1.05vw,15px);background:#fff !important;line-height:1.25;border-radius:2px}
+#view-commencements .paper-date-h{top:30.15%;left:60.0%;width:17.5%;height:2.0%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
+#view-commencements .paper-date-g{top:30.15%;left:18.2%;width:20.2%;height:2.0%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
 /* اسم الحارس ورقم الهوية في سطر الإقرار */
-#view-commencements .paper-guard-line-name{top:46.65%;left:52.8%;width:25.0%;height:2.25%;font-size:clamp(11px,1.15vw,16px);background:#fff !important;line-height:1.2;border-radius:2px}
-#view-commencements .paper-id{top:46.65%;left:19.5%;width:21.5%;height:2.25%;font-size:clamp(10px,1.05vw,15px);background:#fff !important;line-height:1.2;border-radius:2px}
+#view-commencements .paper-guard-line-name{top:46.65%;left:52.8%;width:25.0%;height:2.25%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
+#view-commencements .paper-id{top:46.65%;left:19.5%;width:21.5%;height:2.25%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
 /* اسم الحارس في الخانة السفلية - أكبر بوضوح من اسم العنوان العلوي */
-#view-commencements .paper-guard-name{top:57.55%;left:55.2%;width:27.0%;height:2.35%;text-align:center;font-size:clamp(12px,1.35vw,19px);font-weight:800;background:#fff !important;line-height:1.2;border-radius:2px}
+#view-commencements .paper-guard-name{top:57.55%;left:53.8%;width:30.0%;height:2.35%;text-align:center;font-size:clamp(9px,0.95vw,13px);font-weight:700;background:#fff !important;line-height:1.05;border-radius:2px;padding:0 2px}
 /* المربعات موجودة أصلاً داخل الورقة؛ نضع علامة الاختيار فقط فوقها */
 #view-commencements .paper-check{position:absolute;width:7.0%;height:2.7%;display:block;cursor:default}
 #view-commencements .paper-check input{opacity:0;position:absolute;inset:0}
