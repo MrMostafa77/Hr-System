@@ -156,6 +156,7 @@
     guards:'حارس أمن', guardsFemale:'حارسات أمن', supervisors:'مشرفين', managers:'مدير أمن', patrols:'دوريات أمنية', devices:'أجهزة اتصالات', uniforms:'بدل أمن', extras:'ملحقات مشروع'
   };
   function money(v){return `${fmt(Number(v)||0)} ريال`;}
+<<<<<<< HEAD
   function detailCard(mode,key,title,data={}){
     const isType=key==='devices'||key==='uniforms';
     const qty=Number(data.quantity||data.count||0)||0, unit=Number(data.unit||data.price||data.salary||0)||0;
@@ -166,16 +167,81 @@
       <div class="field-grid project-detail-fields">
         <div class="field"><label>العدد</label><input type="number" class="pd-qty" min="0" step="1" value="${qty}"></div>
         <div class="field"><label>${mode==='revenue'?'الإيراد / القطعة':'الراتب / القطعة'}</label><input type="number" class="pd-unit" min="0" step="0.01" value="${unit}"></div>
+=======
+
+  /* ===== التأمينات الاجتماعية (في تكاليف المشروع) ===== */
+  const SI_GUARD_RATE=10.75, SI_COMPANY_RATE=12.75;   // نسبة حصة الحارس / حصة الشركة (%)
+  const siRoles=['guards','guardsFemale','supervisors','managers'];
+  function socialInsuranceCalc(){
+    const data=getDetailData('cost'); const rows=[];
+    siRoles.forEach(key=>(data[key]||[]).forEach(r=>rows.push({key,name:projectKinds[key],salary:(r.basic!=null?(Number(r.basic)||0)*(1+(Number(r.hPct)||0)/100):Number(r.unit)||0),qty:Number(r.quantity)||0})));
+    const sum=rate=>rows.reduce((a,r)=>a+r.salary*rate/100*r.qty,0);
+    return {rows,guardTotal:sum(SI_GUARD_RATE),companyTotal:sum(SI_COMPANY_RATE)};
+  }
+  function renderSocialInsurance(){
+    const box=document.getElementById('projectSocialInsurance'); if(!box)return;
+    const on=!!document.getElementById('projectSiToggle')?.checked;
+    box.hidden=!on;
+    if(!on){box.innerHTML='';return;}
+    const calc=socialInsuranceCalc();
+    const build=(cls,title,rate,total)=>`<div class="project-si-box ${cls}">
+        <div class="si-head"><h4>${title}</h4><span class="si-rate">${rate}%</span></div>
+        ${calc.rows.length?calc.rows.map(r=>`<div class="si-row">
+          <div class="si-role"><b>${r.name}</b><small>الأساسي + السكن: ${money(r.salary)} × ${fmt(r.qty)}</small></div>
+          <div class="si-amt"><span>للفرد</span><b>${money(r.salary*rate/100)}</b></div>
+          <div class="si-amt"><span>للعدد</span><b>${money(r.salary*rate/100*r.qty)}</b></div>
+        </div>`).join(''):'<div class="si-empty">أضف حارس أمن وراتبه في التكاليف لحساب المبلغ.</div>'}
+        <div class="si-total"><span>إجمالي ${title}</span><b>${money(total)}</b></div>
+      </div>`;
+    box.innerHTML=`<div class="project-si-title">التأمينات الاجتماعية <small>محسوبة على الأساسي + السكن</small></div>
+      <div class="project-si-grid">${build('si-guard','حصة الحارس',SI_GUARD_RATE,calc.guardTotal)}${build('si-company','حصة الشركة',SI_COMPANY_RATE,calc.companyTotal)}</div>`;
+  }
+  const ampBoxes=a=>`<div class="pd-amt-boxes"><div class="project-calc-box"><span>للفرد</span><b class="${a}">0 ريال</b></div><div class="project-calc-box"><span>للعدد</span><b class="${a}-n">0 ريال</b></div></div>`;
+  function detailCard(mode,key,title,data={}){
+    const isType=key==='devices'||key==='uniforms', sal=mode==='cost'&&siRoles.includes(key);
+    const qty=Number(data.quantity||data.count||0)||0; let unit=Number(data.unit||data.price||data.salary||0)||0;
+    const type=data.type||'';
+    const hP=data.hPct??25, tP=data.tPct??38.5, oth=Number(data.other)||0;
+    let basic=data.basic; if(sal&&basic==null) basic=unit?Math.round(unit/(1+(hP+tP)/100)*100)/100:0;
+    if(sal) unit=(Number(basic)||0)*(1+(Number(hP)+Number(tP))/100)+oth;
+    const numA=(c,l,v,a)=>`<div class="field"><label>${l}</label><input type="number" class="${c}" min="0" step="0.01" value="${v}">${ampBoxes(a)}</div>`;
+    const num=(c,l,v,st='0.01')=>`<div class="field"><label>${l}</label><input type="number" class="${c}" min="0" step="${st}" value="${v}"></div>`;
+    return `<div class="project-detail-card" data-project-detail="${mode}-${key}" data-key="${key}">
+      <div class="project-detail-head"><h4>${title}</h4>${isType?`<button type="button" class="small-btn danger project-remove-detail">×</button>`:''}</div>
+      ${isType?`<div class="field"><label>النوع</label><input class="pd-type" value="${escapeAttr(type)}" placeholder="اكتب النوع"></div>`:''}
+      <div class="field-grid project-detail-fields ${sal?'pd-cols-7':'pd-cols-4'}">
+        ${num('pd-qty','العدد',qty,'1')}
+        ${sal?num('pd-basic','الأساسي',basic)+numA('pd-hpct','سكن %',hP,'pd-hamt')+numA('pd-tpct','مواصلات %',tP,'pd-tamt')+`<div class="field"><label>بدلات أخرى (ريال)</label><input type="number" class="pd-other" min="0" step="0.01" value="${oth}">${ampBoxes('pd-oamt')}</div>`
+          +`<input type="hidden" class="pd-unit" value="${unit.toFixed(2)}">`
+          :num('pd-unit',mode==='revenue'?'الإيراد / القطعة':'الراتب / القطعة',unit)}
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
         <div class="project-calc-box"><span>الإجمالي للقطعة</span><b class="pd-unit-total">${money(unit)}</b></div>
         <div class="project-calc-box"><span>الإجمالي للعدد</span><b class="pd-total">${money(qty*unit)}</b></div>
       </div>
+      ${sal?'<div class="pd-si project-si" hidden></div>':''}
+      ${sal?`<div class="pd-med project-si" hidden><div class="project-si-title">التأمين الطبي <small>الشهري = التكلفة السنوية ÷ 12</small></div><div class="pd-med-fields"><div class="field"><label>التكلفة السنوية للفرد (ريال)</label><input type="number" class="pd-med-annual" min="0" step="0.01" value="${Number(data.medAnnual)||0}"></div><div class="project-calc-box"><span>شهريًا للفرد</span><b class="pd-med-m">0 ريال</b></div><div class="project-calc-box"><span>شهريًا للعدد</span><b class="pd-med-mn">0 ريال</b></div></div></div>`:''}
     </div>`;
   }
+<<<<<<< HEAD
+=======
+  function refreshSalaryCard(card){
+    if(!card.querySelector('.pd-basic'))return;
+    const g=c=>Number(card.querySelector(c).value)||0, basic=g('.pd-basic'), h=basic*g('.pd-hpct')/100, t=basic*g('.pd-tpct')/100, q=g('.pd-qty');
+    const o=g('.pd-other'), put=(c,v)=>{card.querySelector('.'+c).textContent=money(v);card.querySelector('.'+c+'-n').textContent=money(v*q);};
+    put('pd-hamt',h);put('pd-tamt',t);put('pd-oamt',o);
+    const medBox=card.querySelector('.pd-med'), medOn=!!document.getElementById('projectMedToggle')?.checked; medBox.hidden=!medOn;
+    if(medOn){const a=g('.pd-med-annual'); card.querySelector('.pd-med-m').textContent=money(a/12); card.querySelector('.pd-med-mn').textContent=money(a/12*q);}
+    const box=card.querySelector('.pd-si'), on=!!document.getElementById('projectSiToggle')?.checked;
+    box.hidden=!on; if(!on){box.innerHTML='';return;}
+    const base=basic+h, part=(cls,title,rate)=>`<div class="project-si-box ${cls}"><div class="si-head"><h4>${title}</h4><span class="si-rate">${rate}%</span></div><div class="pd-si-row"><span>للفرد</span><b>${money(base*rate/100)}</b></div><div class="pd-si-row"><span>للعدد (${fmt(q)})</span><b>${money(base*rate/100*q)}</b></div></div>`;
+    box.innerHTML=`<div class="project-si-title">التأمينات الاجتماعية <small>محسوبة على الأساسي + السكن (${money(base)})</small></div><div class="project-si-grid">${part('si-guard','حصة الموظف',SI_GUARD_RATE)}${part('si-company','حصة الشركة',SI_COMPANY_RATE)}</div>`;
+  }
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
   function getDetailData(mode){
     const out={};
     document.querySelectorAll(`#project${mode==='revenue'?'Revenue':'Cost'}Details .project-detail-card`).forEach(card=>{
       const key=card.dataset.key; if(!out[key])out[key]=[];
-      out[key].push({type:card.querySelector('.pd-type')?.value||'',quantity:Number(card.querySelector('.pd-qty')?.value)||0,unit:Number(card.querySelector('.pd-unit')?.value)||0});
+      out[key].push({type:card.querySelector('.pd-type')?.value||'',quantity:Number(card.querySelector('.pd-qty')?.value)||0,unit:Number(card.querySelector('.pd-unit')?.value)||0,...(card.querySelector('.pd-basic')?{basic:Number(card.querySelector('.pd-basic').value)||0,hPct:Number(card.querySelector('.pd-hpct').value)||0,tPct:Number(card.querySelector('.pd-tpct').value)||0,other:Number(card.querySelector('.pd-other').value)||0,medAnnual:Number(card.querySelector('.pd-med-annual')?.value)||0}:{})});
     });
     return out;
   }
@@ -197,10 +263,15 @@
   }
   function bindProjectDetailInputs(){
     document.querySelectorAll('#projectRevenueDetails .project-detail-card,#projectCostDetails .project-detail-card').forEach(card=>{
+<<<<<<< HEAD
       const recalc=()=>{const q=Number(card.querySelector('.pd-qty')?.value)||0,u=Number(card.querySelector('.pd-unit')?.value)||0;card.querySelector('.pd-unit-total').textContent=money(u);card.querySelector('.pd-total').textContent=money(q*u);updateProjectTotals();};
+=======
+      const recalc=()=>{const bE=card.querySelector('.pd-basic'); if(bE){const g=c=>Number(card.querySelector(c).value)||0; card.querySelector('.pd-unit').value=(g('.pd-basic')*(1+(g('.pd-hpct')+g('.pd-tpct'))/100)+g('.pd-other')).toFixed(2);} const q=Number(card.querySelector('.pd-qty')?.value)||0,u=Number(card.querySelector('.pd-unit')?.value)||0;card.querySelector('.pd-unit-total').textContent=money(u);card.querySelector('.pd-total').textContent=money(q*u);updateProjectTotals();};
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
       card.querySelectorAll('input').forEach(i=>i.addEventListener('input',recalc));
       card.querySelector('.project-remove-detail')?.addEventListener('click',()=>{card.remove();updateProjectTotals();});
     });
+    document.querySelectorAll('#projectCostDetails .project-detail-card').forEach(refreshSalaryCard);
     document.querySelectorAll('.project-add-detail').forEach(btn=>btn.onclick=()=>{
       const [mode,key]=btn.dataset.addDetail.split('-');
       const box=document.getElementById(mode==='revenue'?'projectRevenueDetails':'projectCostDetails');
@@ -230,6 +301,127 @@
     set('projectSummaryRevenuePerson',totalRevenue/divisor); set('projectSummaryRevenueTotal',totalRevenue);
     set('projectSummaryCostPerson',totalCost/divisor); set('projectSummaryCostTotal',totalCost);
     set('projectSummaryProfitPerson',profit/divisor); set('projectSummaryProfitTotal',profit);
+<<<<<<< HEAD
+=======
+    document.querySelectorAll('#projectCostDetails .project-detail-card').forEach(refreshSalaryCard);
+    renderBreakdowns(); renderProjectCapacity();
+  }
+
+
+  /* ===== طي / فرد المستطيلات ===== */
+  document.querySelectorAll('#view-projects .card').forEach(card=>{
+    const head=card.querySelector(':scope > .project-section-head, :scope > .project-summary-title, :scope > h3'); if(!head)return;
+    card.classList.add('pj-collapsible'); head.classList.add('pj-head'); head.tabIndex=0; head.setAttribute('role','button');
+    (head.matches('.project-section-head')?head.querySelector('h3'):head).insertAdjacentHTML('afterbegin','<span class="pj-arrow" aria-hidden="true">▾</span> ');
+    const toggle=()=>{card.classList.toggle('collapsed'); head.setAttribute('aria-expanded',String(!card.classList.contains('collapsed')));};
+    head.setAttribute('aria-expanded','true');
+    head.addEventListener('click',e=>{ if(e.target.closest('button'))return; toggle(); });
+    head.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&e.target===head){e.preventDefault();toggle();} });
+  });
+
+  /* ===== بيانات التواصل المتعددة ===== */
+  const pjRow=(kind,val='')=>`<div class="multi-row">${kind==='phone'?'<span class="pj-pfx" dir="ltr">+966</span>':''}<input class="pj-${kind}" dir="ltr" ${kind==='phone'?'inputmode="numeric" maxlength="9" placeholder="5XXXXXXXX"':'type="email" placeholder="name@example.com"'} value="${escapeAttr(val)}"><button type="button" class="small-btn danger pj-rm">×</button></div>`;
+  function setMulti(kind,arr){const box=document.getElementById(kind==='phone'?'projectPhones':'projectEmails'); if(!box)return; const l=(arr&&arr.length)?arr:['']; box.innerHTML=l.map(v=>pjRow(kind,kind==='phone'?String(v).replace(/^\+966/,''):v)).join('');}
+  function getMulti(kind){return [...document.querySelectorAll('.pj-'+kind)].map(i=>{let v=i.value.trim(); if(kind==='phone'){v=normalizeDigits(v).replace(/^0+/,'').slice(0,9); return v?'+966'+v:'';} return v;}).filter(Boolean);}
+  document.getElementById('addProjectPhone')?.addEventListener('click',()=>document.getElementById('projectPhones').insertAdjacentHTML('beforeend',pjRow('phone')));
+  document.getElementById('addProjectEmail')?.addEventListener('click',()=>document.getElementById('projectEmails').insertAdjacentHTML('beforeend',pjRow('email')));
+  document.getElementById('view-projects')?.addEventListener('click',e=>{const b=e.target.closest('.pj-rm'); if(!b)return; const row=b.closest('.multi-row'); if(row.parentElement.children.length>1) row.remove(); else row.querySelector('input').value='';});
+  document.getElementById('view-projects')?.addEventListener('input',e=>{if(e.target.matches('.pj-phone'))e.target.value=normalizeDigits(e.target.value).slice(0,9);});
+  setMulti('phone',[]);setMulti('email',[]);
+
+  /* ===== جداول الإيرادات/التكاليف/الملخص + سعة المشروع ===== */
+  const vatRate=()=>{const v=parseFloat(document.getElementById('projectVat')?.value);return isNaN(v)?15:v;};
+  function medicalTotal(cv){return siRoles.reduce((a,key)=>a+(Array.isArray(cv[key])?cv[key].reduce((s,r)=>s+(Number(r.quantity)||0)*(Number(r.medAnnual)||0)/12,0):0),0);}
+  // التكلفة الحقيقية للفرد = إجمالي الراتب − حصة الموظف + حصة الشركة (تأمينات) + التأمين الطبي (بدون ضريبة)
+  function rowRealCost(key,r,siOn,medOn){
+    const u=Number(r.unit)||0; if(!siRoles.includes(key)) return u;
+    let c=u;
+    if(siOn){const base=r.basic!=null?(Number(r.basic)||0)*(1+(Number(r.hPct)||0)/100):u; c+=base*(SI_COMPANY_RATE-SI_GUARD_RATE)/100;}
+    if(medOn) c+=(Number(r.medAnnual)||0)/12;
+    return c;
+  }
+  function breakdownFrom(rv,cv,vat,siOn,medOn){
+    const k=1+vat/100, rev=[], cost=[], q=r=>Number(r.quantity)||0;
+    Object.keys(projectKinds).forEach(key=>{
+      if(Array.isArray(rv[key])){const ex=rv[key].reduce((a,r)=>a+q(r)*(Number(r.unit)||0),0);rev.push({k:key,name:projectKinds[key],n:rv[key].reduce((a,r)=>a+q(r),0),ex,inc:ex*k});}
+      if(Array.isArray(cv[key])){const ex=cv[key].reduce((a,r)=>a+q(r)*rowRealCost(key,r,siOn,medOn),0);cost.push({k:key,name:projectKinds[key],n:cv[key].reduce((a,r)=>a+q(r),0),ex,inc:ex});}
+    });
+    return {rev,cost};
+  }
+  function projectBreakdown(){
+    return breakdownFrom(getDetailData('revenue'),getDetailData('cost'),vatRate(),!!document.getElementById('projectSiToggle')?.checked,!!document.getElementById('projectMedToggle')?.checked);
+  }
+  function profitRows(rev,cost){
+    return [...new Set([...rev,...cost].map(r=>r.k))].map(key=>{
+      const a=rev.find(r=>r.k===key)||{n:0,ex:0,inc:0}, b=cost.find(r=>r.k===key)||{n:0,ex:0,inc:0};
+      return {k:key,name:a.name||b.name||projectKinds[key],n:a.n||b.n,ex:a.ex-b.ex,inc:a.inc-b.inc};
+    });
+  }
+  const sumRows=rows=>rows.reduce((a,r)=>({n:a.n+r.n,ex:a.ex+r.ex,inc:a.inc+r.inc}),{n:0,ex:0,inc:0});
+  function bdTable(title,rows,person,vat=true,cm=false){
+    const t=sumRows(rows), per=(ex,n)=>n?money(ex/n):'—', cnt=r=>(r.k==='si'||r.k==='med')?'—':fmt(r.n), cols=2+(person?1:0)+1+(vat?2:0);
+    const cells=r=>`<td class="mono">${money(r.ex)}</td>${vat?`<td class="mono">${money(r.inc-r.ex)}</td><td class="mono">${money(r.inc)}</td>`:''}`;
+    return `<div class="pj-bd-title">${title}</div><div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>الفئة</th><th>العدد</th>${person?`<th>${cm?'الفرد':'للفرد'}</th>`:''}<th>${cm?'كل الأفراد':'الإجمالي'}</th>${vat?'<th>الضريبة</th><th>الإجمالي بالضريبة</th>':''}</tr></thead><tbody>${
+      rows.map(r=>`<tr><td>${r.name}</td><td class="mono">${cnt(r)}</td>${person?`<td class="mono">${per(r.ex,r.n)}</td>`:''}${cells(r)}</tr>`).join('')||`<tr><td colspan="${cols}" class="empty-note">لا توجد بنود.</td></tr>`
+    }<tr class="pj-bd-total"><td>الإجمالي</td><td class="mono">${fmt(t.n)}</td>${person?`<td class="mono">${per(t.ex,t.n)}</td>`:''}${cells(t)}</tr></tbody></table></div>`;
+  }
+  function renderBreakdowns(){
+    const {rev,cost}=projectBreakdown(), set=(id,h)=>{const e=document.getElementById(id);if(e)e.innerHTML=h;};
+    set('projectRevenueBreakdown',bdTable('إجمالي إيرادات المشروع الشهرية',rev,false,true));
+    set('projectCostBreakdown',bdTable('إجمالي تكاليف المشروع الشهرية (الرواتب)',cost,true,false,true)+'<div class="project-summary-note">التكلفة الحقيقية للفرد = إجمالي الراتب − حصة الموظف + حصة الشركة (التأمينات الاجتماعية) + التأمين الطبي، بدون ضريبة.</div>');
+    const profit=profitRows(rev,cost);
+    set('projectSummaryDetail',bdTable('تفصيل الإيرادات بالفئات (شهريًا)',rev,true,true)+bdTable('تفصيل التكاليف بالفئات (شهريًا)',cost,true,false,true)+bdTable('هامش الربح بالفئات (شهريًا)',profit,true,true));
+  }
+
+  /* ===== عرض المشروع (قراءة فقط) ===== */
+  function closeProjectView(){document.getElementById('pjViewModal')?.remove();}
+  function showProjectView(p){
+    closeProjectView();
+    const vat=p.vatRate??15, {rev,cost}=breakdownFrom(p.revenueItems||{},p.costItems||{},vat,!!p.siEnabled,!!p.medEnabled);
+    const kv=(l,v)=>`<div class="pv-item"><span>${l}</span><b>${escapeHtml(String(v||'—'))}</b></div>`;
+    const sal=[]; siRoles.forEach(key=>(p.costItems?.[key]||[]).forEach(r=>{
+      const hP=r.hPct??25,tP=r.tPct??38.5,oth=Number(r.other)||0,u=Number(r.unit)||0,b=r.basic!=null?Number(r.basic)||0:Math.round(u/(1+(hP+tP)/100)*100)/100, q=Number(r.quantity)||0;
+      sal.push(`<tr><td>${projectKinds[key]}</td><td class="mono">${fmt(q)}</td><td class="mono">${money(b)}</td><td class="mono">${money(b*hP/100)} <small>(${hP}%)</small></td><td class="mono">${money(b*tP/100)} <small>(${tP}%)</small></td><td class="mono">${money(oth)}</td><td class="mono">${money(u)}</td><td class="mono">${money(u*q)}</td></tr>`);
+    }));
+    const counts=projectEmployeeCounts(p.name,null), caps=Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]));
+    const capRows=Object.keys(roleCapacityLabels).filter(k=>caps[k]>0).map(k=>{const over=(counts[k]||0)-caps[k];return `<tr class="${over>0?'pj-over-row':''}"><td>${roleCapacityLabels[k]}</td><td class="mono">${fmt(caps[k])}</td><td class="mono">${fmt(counts[k]||0)}</td><td class="mono">${over>0?'زيادة '+fmt(over):fmt(caps[k]-(counts[k]||0))}</td></tr>`;});
+    const alerts=projectOverList(p.name,caps).map(o=>`<div class="pj-over">⚠ تنبيه: عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('');
+    const tr=sumRows(rev), tc=sumRows(cost);
+    const el=document.createElement('div'); el.id='pjViewModal'; el.className='pj-modal';
+    el.innerHTML=`<div class="pj-modal-box" role="dialog" aria-modal="true"><div class="pj-modal-head"><h3>${escapeHtml(p.name||'')}</h3><div><button class="btn btn-sm" data-pv-edit>تعديل</button> <button class="btn btn-sm" data-pv-close>إغلاق ✕</button></div></div>
+      <div class="pj-modal-body">
+        <div class="pj-bd-title">البيانات الأساسية</div>
+        <div class="pv-grid">${kv('المنطقة',p.region)}${kv('السجل التجاري',p.cr)}${kv('الرقم الضريبي',p.vatNo)}${kv('العنوان',p.address)}${kv('أرقام التواصل',(p.phones||[]).join(' ، '))}${kv('إيميلات التواصل',(p.emails||[]).join(' ، '))}${kv('اسم ممثل الشركة',p.repName)}${kv('هوية ممثل الشركة',p.repId)}${kv('نسبة الضريبة',vat+'%')}${kv('التأمينات الاجتماعية',p.siEnabled?'مفعّلة':'غير مفعّلة')}${kv('التأمين الطبي',p.medEnabled?'مفعّل':'غير مفعّل')}</div>
+        ${bdTable('الإيرادات الشهرية',rev,false,true)}
+        ${sal.length?`<div class="pj-bd-title">رواتب المشروع</div><div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>الفئة</th><th>العدد</th><th>الأساسي</th><th>السكن</th><th>المواصلات</th><th>بدلات أخرى</th><th>إجمالي الراتب / فرد</th><th>الإجمالي للعدد</th></tr></thead><tbody>${sal.join('')}</tbody></table></div>`:''}
+        ${bdTable('التكاليف الشهرية (التكلفة الحقيقية)',cost,true,false,true)}
+        <div class="project-summary-grid pj-view-sum">
+          <div class="project-summary-box"><div class="project-summary-label">الإيرادات</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tr.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tr.inc)}</b></div></div>
+          <div class="project-summary-box"><div class="project-summary-label">التكاليف</div><div class="project-summary-row"><span>الإجمالي (بدون ضريبة)</span><b>${money(tc.ex)}</b></div></div>
+          <div class="project-summary-box"><div class="project-summary-label">هامش الربح</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tr.ex-tc.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tr.inc-tc.inc)}</b></div></div>
+        </div>
+        <div class="pj-bd-title">سعة المشروع</div>${alerts}
+        <div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>البند</th><th>السعة</th><th>المضاف فعليًا</th><th>المتبقي</th></tr></thead><tbody>${capRows.join('')||'<tr><td colspan="4" class="empty-note">لا توجد سعة محددة.</td></tr>'}</tbody></table></div>
+      </div></div>`;
+    document.body.appendChild(el);
+    el.addEventListener('click',e=>{ if(e.target===el||e.target.closest('[data-pv-close]')) closeProjectView(); if(e.target.closest('[data-pv-edit]')){closeProjectView();document.querySelector(`[data-project-edit="${p.id}"]`)?.click();} });
+  }
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')closeProjectView();});
+  function projectOverList(name,caps){   // caps: {key:capacity}
+    const counts=name?projectEmployeeCounts(name,null):{}, out=[];
+    Object.keys(roleCapacityLabels).forEach(k=>{const cap=Number(caps[k])||0, over=(counts[k]||0)-cap; if(cap>0&&over>0) out.push({k,over,label:roleCapacityLabels[k]});});
+    return out;
+  }
+  function renderProjectCapacity(){
+    const box=document.getElementById('projectCapacity'); if(!box)return;
+    const name=document.getElementById('projectName')?.value.trim()||'', cv=getDetailData('cost');
+    const counts=name?projectEmployeeCounts(name,null):{}, caps={}, rows=[];
+    Object.keys(projectKinds).forEach(k=>{ if(!cv[k])return; const cap=cv[k].reduce((a,r)=>a+r.quantity,0); caps[k]=cap;
+      const human=roleCapacityLabels[k]!==undefined, used=human?(counts[k]||0):null, over=human?used-cap:0;
+      rows.push(`<tr class="${over>0?'pj-over-row':''}"><td>${projectKinds[k]}</td><td class="mono">${fmt(cap)}</td><td class="mono">${human?fmt(used):'—'}</td><td class="mono">${human?fmt(Math.max(cap-used,0)):'—'}</td></tr>`); });
+    const alerts=projectOverList(name,caps).map(o=>`<div class="pj-over">⚠ تنبيه: عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('');
+    box.innerHTML=alerts+`<div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>البند</th><th>السعة (حسب التكاليف)</th><th>المضاف فعليًا</th><th>المتبقي</th></tr></thead><tbody>${rows.join('')||'<tr><td colspan="4" class="empty-note">أضف بنودًا في التكاليف.</td></tr>'}</tbody></table></div>`;
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
   }
 
   function projectTotal(p){return Number(p.costTotal)||0;}
@@ -245,7 +437,12 @@
   }
   function resetProjectSection(section){
     if(section==='basic'){
+<<<<<<< HEAD
       document.getElementById('projectName').value='';
+=======
+      ['projectName','projectCR','projectVatNo','projectAddress','projectRepId','projectRepName'].forEach(id=>document.getElementById(id).value='');
+      document.getElementById('projectVat').value='15'; const siB=document.getElementById('projectSiToggle'); if(siB) siB.checked=false; const medB=document.getElementById('projectMedToggle'); if(medB) medB.checked=false; const sid=document.getElementById('projectSiDefault'); if(sid) sid.checked=false; setMulti('phone',[]);setMulti('email',[]);
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
       refreshRegionSelects();
       document.getElementById('projectRegion').value='';
     }else if(section==='revenue'){
@@ -264,7 +461,11 @@
     const list=projects.filter(p=>!q||[p.name,p.region].some(v=>String(v||'').toLowerCase().includes(q)));
     document.getElementById('projectCount').textContent=`${list.length} مشروع`;
     const body=document.getElementById('projectsTableBody');
+<<<<<<< HEAD
     body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b></td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
+=======
+    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b>${projectOverList(p.name,Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]))).map(o=>`<div class="pj-over">⚠ عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('')}</td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-view="${p.id}">عرض</button><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
     body.querySelectorAll('[data-project-edit]').forEach(b=>b.onclick=()=>{
       const p=projects.find(x=>x.id===b.dataset.projectEdit);if(!p)return;
       document.getElementById('projectId').value=p.id;document.getElementById('projectName').value=p.name||'';document.getElementById('projectRegion').value=p.region||'';
@@ -272,6 +473,10 @@
       const rev=p.revenueItems||{}, cost=p.costItems||{};
       document.querySelectorAll('[data-project-revenue-toggle]').forEach(c=>c.checked=c.dataset.projectRevenueToggle==='guards' || Array.isArray(rev[c.dataset.projectRevenueToggle]));
       document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards' || Array.isArray(cost[c.dataset.projectCostToggle]));
+<<<<<<< HEAD
+=======
+      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled; const sid=document.getElementById('projectSiDefault'); if(sid) sid.checked=!!(p.siDefault||p.medDefault);
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
       renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();window.scrollTo({top:0,behavior:'smooth'});
     });
     body.querySelectorAll('[data-project-del]').forEach(b=>b.onclick=()=>{if(confirm('حذف المشروع؟')){projects=projects.filter(x=>x.id!==b.dataset.projectDel);saveProjects();renderProjects();refreshEmployeeProjectSelect();}});
@@ -315,12 +520,20 @@
     const guardRevenue=unitFrom(revenueItems,'guards');
     const data={
       id:document.getElementById('projectId').value||'p'+Date.now(), name:document.getElementById('projectName').value.trim(), region:document.getElementById('projectRegion').value,
+<<<<<<< HEAD
+=======
+      cr:document.getElementById('projectCR').value.trim(), vatNo:document.getElementById('projectVatNo').value.trim(), address:document.getElementById('projectAddress').value.trim(), phones:getMulti('phone'), emails:getMulti('email'), repId:document.getElementById('projectRepId').value.trim(), repName:document.getElementById('projectRepName').value.trim(), vatRate:vatRate(), medEnabled:!!document.getElementById('projectMedToggle')?.checked, siDefault:!!document.getElementById('projectSiDefault')?.checked, medDefault:!!document.getElementById('projectSiDefault')?.checked,
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
       guards, guardsFemale, supervisors:supervisorQty, managers:managerQty, patrols:patrolQty, devices:deviceQty, uniforms:uniformQty, cones:extraQty,
       revenueGuard:guardRevenue, costGuard:guardSalary, revenueTotal:guards*guardRevenue, costTotal:costGuards*guardSalary,
       revenueItems, costItems, guardBasic:guardSalary, guardHousing:0, guardTransport:0, guardOther:0,
       supervisorBasic:unitFrom(costItems,'supervisors'), supervisorHousing:0, supervisorTransport:0, supervisorOther:0,
       managerBasic:unitFrom(costItems,'managers'), managerHousing:0, managerTransport:0, managerOther:0,
+<<<<<<< HEAD
       projectCostGuards:costGuards, includeBreaks:false, socialInsurance:false, socialInsuranceRate:0, patrolBilling:'', notes:document.getElementById('projectNotes').value.trim()
+=======
+      projectCostGuards:costGuards, includeBreaks:false, socialInsurance:false, socialInsuranceRate:0, siEnabled:!!document.getElementById('projectSiToggle')?.checked, siDefault:!!document.getElementById('projectSiDefault')?.checked, medDefault:!!document.getElementById('projectSiDefault')?.checked, siGuardRate:SI_GUARD_RATE, siCompanyRate:SI_COMPANY_RATE, siGuardTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().guardTotal:0, siCompanyTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0, patrolBilling:''
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
     };
     const allCostCards=[...document.querySelectorAll('#projectCostDetails .project-detail-card')];
     data.costTotal=allCostCards.reduce((a,c)=>a+(Number(c.querySelector('.pd-qty')?.value)||0)*(Number(c.querySelector('.pd-unit')?.value)||0),0);
@@ -334,6 +547,12 @@
     saveProjects();refreshEmployeeProjectSelect();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
   document.getElementById('projectSearch').addEventListener('input',renderProjects);
+<<<<<<< HEAD
+=======
+  ['projectSiToggle','projectMedToggle','projectSiDefault'].forEach(id=>document.getElementById(id)?.addEventListener('change',updateProjectTotals));
+  ['projectVat','projectName'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateProjectTotals));
+  renderDynamicDetails('revenue',{});renderDynamicDetails('cost',{});updateProjectTotals();  // عرض بطاقة الحارس فور فتح التبويب
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
   document.querySelectorAll('[data-project-revenue-toggle],[data-project-cost-toggle]').forEach(cb=>cb.addEventListener('change',()=>{const rv=getDetailData('revenue'),cv=getDetailData('cost');renderDynamicDetails('revenue',rv);renderDynamicDetails('cost',cv);updateProjectTotals();}));
 
 
@@ -447,6 +666,57 @@
     window.scrollTo(0,0);
   }
   window.switchView = switchView;
+<<<<<<< HEAD
+=======
+
+  /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
+  const PJ_TITLES={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
+  const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
+  const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],projectaccounts:['btn','saveProjectAccountBtn']};
+  const pjTabs={open:[],dirty:new Set()};
+  function pjTabOpen(v){return pjTabs.open.includes(v);}
+  function pjTitle(v){return v==='reports'?(PJ_REPORTS[window.currentReport||'payroll']||PJ_TITLES.reports):(PJ_TITLES[v]||v);}
+  function pjTabsSync(view){ if(!pjTabs.open.includes(view)) pjTabs.open.push(view); pjTabsRender(view); }
+  function pjTabsRender(active){
+    const bar=document.getElementById('pjTabs'); if(!bar)return; active=active||currentView;
+    bar.innerHTML=pjTabs.open.map(v=>`<div class="pj-tab${v===active?' active':''}" data-tab="${v}" role="tab" aria-selected="${v===active}"><span class="pj-tab-title">${pjTitle(v)}${pjTabs.dirty.has(v)?' <i class="pj-dot" title="بيانات غير محفوظة">●</i>':''}</span>${PJ_SAVE[v]?`<button type="button" class="pj-tab-btn" data-tab-save="${v}" title="حفظ" aria-label="حفظ">💾</button>`:''}<button type="button" class="pj-tab-btn pj-tab-x" data-tab-close="${v}" title="إغلاق التبويب" aria-label="إغلاق">✕</button></div>`).join('');
+    bar.querySelector('.pj-tab.active')?.scrollIntoView({block:'nearest',inline:'nearest'});
+  }
+  function pjSave(v){
+    const t=PJ_SAVE[v]; if(!t)return;
+    if(currentView!==v){ expandParentGroup(v); switchView(v); }
+    setTimeout(()=>{ const el=document.getElementById(t[1]); if(!el)return; if(t[0]==='form') el.requestSubmit(); else el.click(); },60);
+  }
+  function pjResetView(v){
+    if(v==='add') resetForm();
+    else if(v==='projects') document.getElementById('cancelProjectBtn')?.click();
+    else document.querySelectorAll('#view-'+v+' form').forEach(f=>f.reset());
+  }
+  function pjClose(v){
+    if(pjTabs.dirty.has(v) && !confirm('هذا التبويب به بيانات لم تُحفظ بعد. هل تريد إغلاقه وتجاهلها؟')) return;
+    const i=pjTabs.open.indexOf(v); if(i<0)return;
+    pjTabs.open.splice(i,1); pjTabs.dirty.delete(v);
+    try{ pjResetView(v); }catch(e){ console.error(e); }
+    if(currentView===v){ const next=pjTabs.open[i]||pjTabs.open[i-1]||'dashboard'; expandParentGroup(next); switchView(next); }
+    else pjTabsRender();
+  }
+  document.getElementById('pjTabs')?.addEventListener('click',e=>{
+    const sv=e.target.closest('[data-tab-save]'), cl=e.target.closest('[data-tab-close]'), tab=e.target.closest('.pj-tab');
+    if(sv){ pjSave(sv.dataset.tabSave); return; }
+    if(cl){ pjClose(cl.dataset.tabClose); return; }
+    if(tab && tab.dataset.tab!==currentView){ expandParentGroup(tab.dataset.tab); switchView(tab.dataset.tab); }
+  });
+  document.querySelector('main')?.addEventListener('input',e=>{
+    const sec=e.target.closest('section[id^="view-"]'); if(!sec)return; const v=sec.id.slice(5);
+    if(!PJ_SAVE[v]||e.target.type==='search')return;
+    if(!(e.target.closest('form')||v==='contracts'||v==='projectaccounts'))return;
+    if(!pjTabs.dirty.has(v)){ pjTabs.dirty.add(v); pjTabsRender(); }
+  });
+  const pjClean=e=>{ const sec=e.target.closest?.('section[id^="view-"]'); if(sec && pjTabs.dirty.delete(sec.id.slice(5))) pjTabsRender(); };
+  document.addEventListener('submit',pjClean,true);
+  ['saveContractBtn','saveProjectAccountBtn'].forEach(id=>document.getElementById(id)?.addEventListener('click',pjClean));
+  pjTabsSync(currentView);
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
   if(!window.__hrNavFallbackInstalled){
     window.__hrNavFallbackInstalled = true;
     document.addEventListener('click', (ev)=>{
@@ -525,7 +795,11 @@
     if(t) document.documentElement.setAttribute('data-theme', t);
   }
   document.getElementById('themeToggle').addEventListener('click', ()=>{
+<<<<<<< HEAD
     const cur = document.documentElement.getAttribute('data-theme');
+=======
+    const cur = document.documentElement.getAttribute('data-theme') || 'dark';
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
     const next = cur==='dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
@@ -803,7 +1077,8 @@
   }
   function refreshDeptFilterOptions(){ const sel=document.getElementById('filterDept'); if(!sel)return; const cur=sel.value; sel.innerHTML='<option value="">كل الأقسام</option>'+uniqueDepts().map(d=>`<option>${escapeHtml(d)}</option>`).join(''); sel.value=cur; }
 
-  /* ===== employees table ===== */
+  /* ===== all employees table ===== */
+  function employeeHasDirectWork(e){ return !!(e && (e.directworkDone || e.startdate || e.directWorkDate)); }
   function renderEmployeeTable(){
     refreshDeptFilterOptions();
     const q = (document.getElementById('searchInput').value||'').trim().toLowerCase();
@@ -813,7 +1088,7 @@
       if(fd && e.dept!==fd) return false;
       if(fs && employeeContractStatus(e)!==fs) return false;
       if(q){
-        const hay = [e.fullname,e.idnum,e.empcode,e.jobtitle].join(' ').toLowerCase();
+        const hay = [e.fullname,e.idnum,e.empcode,e.jobtitle,e.project,e.dept].join(' ').toLowerCase();
         if(!hay.includes(q)) return false;
       }
       return true;
@@ -822,33 +1097,41 @@
     const body = document.getElementById('empTableBody');
     document.getElementById('empEmptyNote').style.display = list.length ? 'none' : '';
     body.innerHTML = list.map(e=>{
-      const contractStatus=employeeContractStatus(e); const statusClass = 'status-' + contractStatus.replace(/\s+/g,'_');
-      return `<tr data-id="${e.id}">
+      const info=employeeContractInfo(e.id), contract=info.contract;
+      const hasDirect=employeeHasDirectWork(e);
+      const lastWage=Number(e.lastwage)||((Number(e.basicsalary)||0)+(Number(e.housing)||0)+(Number(e.transport)||0)+(Number(e.otherallow)||0));
+      const contractNumber=contract ? (contract.contractCode||contract.contractNo||contract.number||'—') : 'بدون عقد';
+      return `<tr data-id="${escapeAttr(e.id)}">
         <td><div class="emp-name-cell"><div class="avatar">${escapeHtml(initials(e.fullname))}</div><div class="emp-name"><b>${escapeHtml(e.fullname||'—')}</b><span>${escapeHtml(e.idnum||'')}</span></div></div></td>
+        <td class="mono">${escapeHtml(e.empcode||'—')}</td>
         <td>${escapeHtml(e.dept||'—')}</td>
         <td>${escapeHtml(e.jobtitle||'—')}</td>
-        <td><span class="status-badge ${statusClass}">${escapeHtml(contractStatus)}</span></td>
-        <td class="mono">${fmt(e.basicsalary)}</td>
+        <td>${escapeHtml(e.project||'—')}</td>
+        <td>${hasDirect?'<span class="status-badge status-active">تم عمل مباشرة</span>':'<span class="status-badge status-pending">لم تتم المباشرة</span>'}</td>
+        <td class="mono">${money(lastWage)}</td>
+        <td>${escapeHtml(contractNumber)}</td>
         <td><div class="row-actions">
-          <button class="btn icon-btn btn-ghost" data-act="view" title="عرض">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
-          <button class="btn icon-btn btn-ghost" data-act="edit" title="تعديل">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg>
-          </button>
-          ${contractStatus==='بدون عقد'?`<button class="btn btn-sm btn-primary add-contract-employee" data-act="add-contract" title="إضافة عقد">إضافة عقد</button>`:''}
+          ${!hasDirect?`<button class="btn btn-sm btn-primary" data-act="directwork">عمل مباشرة</button>`:''}
+          <button class="btn icon-btn btn-ghost" data-act="view" title="عرض" aria-label="عرض"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button class="btn icon-btn btn-ghost" data-act="edit" title="تعديل" aria-label="تعديل"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg></button>
         </div></td>
       </tr>`;
     }).join('');
     body.querySelectorAll('tr').forEach(tr=>{
       tr.addEventListener('click', (ev)=>{
-        const id = tr.dataset.id;
-        const act = ev.target.closest('[data-act]')?.dataset.act;
+        const id=tr.dataset.id, act=ev.target.closest('[data-act]')?.dataset.act;
         if(act==='edit'){ loadIntoForm(id); switchView('add'); }
-        else if(act==='add-contract'){ switchView('contracts'); setTimeout(()=>{ const sel=document.getElementById('contract_emp'); if(sel){sel.value=id; sel.dispatchEvent(new Event('change'));} },80); }
-        else{ openProfile(id); }
+        else if(act==='directwork'){ openDirectWorkForEmployee(id); }
+        else if(act==='view'){ openProfile(id); }
       });
     });
+  }
+  function openDirectWorkForEmployee(id){
+    switchView('documents');
+    const select=document.getElementById('doc_emp');
+    if(select){ select.value=id; select.dispatchEvent(new Event('change')); }
+    const btn=document.querySelector('.doc-type-btn[data-doc="directwork"]');
+    if(btn){ document.querySelectorAll('.doc-type-btn').forEach(b=>b.classList.toggle('active',b===btn)); currentDocType='directwork'; renderDocSheet(); }
   }
   ['searchInput','filterDept','filterStatus'].forEach(id=>{
     document.getElementById(id).addEventListener('input', renderEmployeeTable);
@@ -1088,6 +1371,61 @@
   }
   document.getElementById('f_project').addEventListener('change', ()=>{ const p=projects.find(x=>x.name===document.getElementById('f_project').value); if(p && document.getElementById('f_region')) { document.getElementById('f_region').value=p.region||''; refreshEmployeeProjectSelect(p.region||''); document.getElementById('f_project').value=p.name||''; updateEmployeeCode(true); } });
   document.getElementById('f_region')?.addEventListener('change',()=>{ refreshEmployeeProjectSelect(document.getElementById('f_region').value); updateEmployeeCode(true); });
+<<<<<<< HEAD
+=======
+
+  /* ===== تعبئة الراتب تلقائياً من راتب المشروع حسب فئة الوظيفة ===== */
+  const AUTO_HOUSING_PCT=25, AUTO_TRANSPORT_PCT=38.5, AUTO_OTHER_PCT=0;   // نسب التوزيع على الراتب الأساسي
+  function projectRoleSalary(project,key){
+    if(!project||!key) return 0;
+    const rows=Array.isArray(project.costItems?.[key])?project.costItems[key]:[];
+    const row=rows.find(x=>Number(x?.unit)>0)||rows[0];
+    const legacy={guards:project.costGuard??project.guardBasic, supervisors:project.supervisorBasic, managers:project.managerBasic}[key];
+    return Number(row?.unit)||Number(legacy)||0;
+  }
+  // يحسب الأساسي بحيث (أساسي + سكن + مواصلات + أخرى) = راتب المشروع بالضبط بعد تقريب الهللات
+  function solveBasicForTotal(total,hp,tp,op){
+    const target=Math.round(total*100), c0=Math.round(total/(1+(hp+tp+op)/100)*100);
+    let best=null;
+    for(let d=-5;d<=5;d++){
+      const b=(c0+d)/100;
+      const sum=Math.round((b+allowanceAmount(b,hp)+allowanceAmount(b,tp)+allowanceAmount(b,op))*100);
+      const diff=Math.abs(sum-target);
+      if(!best||diff<best.diff||(diff===best.diff&&Math.abs(d)<Math.abs(best.d))) best={b,diff,d};
+    }
+    return best.b;
+  }
+  function applyProjectSalaryToEmployee(){
+    const pName=document.getElementById('f_project')?.value||'';
+    const job=document.getElementById('f_jobtitle')?.value||'';
+    if(!pName||!job) return;
+    const key=roleCapacityKey(job); if(!key) return;
+    const project=projects.find(x=>String(x.name||'')===String(pName)); if(!project) return;
+    const hint=document.getElementById('payAutoHint');
+    const total=projectRoleSalary(project,key);
+    if(!(total>0)){ if(hint) hint.hidden=true; showToast(`لا يوجد راتب محدد لفئة «${job}» في مشروع ${pName}`); return; }
+    const editing=!!document.getElementById('f_id')?.value;
+    const currentTotal=Number(document.getElementById('f_lastwage')?.value)||0;
+    if(editing && currentTotal>0 && Math.abs(currentTotal-total)>=0.01 && !confirm(`تحديث راتب الموظف إلى راتب فئة «${job}» في المشروع (${money(total)}) بدل الراتب الحالي (${money(currentTotal)})؟`)) return;
+    document.getElementById('f_housing_pct').value=AUTO_HOUSING_PCT;
+    document.getElementById('f_transport_pct').value=AUTO_TRANSPORT_PCT;
+    document.getElementById('f_otherallow_pct').value=AUTO_OTHER_PCT;
+    const b0=solveBasicForTotal(total,AUTO_HOUSING_PCT,AUTO_TRANSPORT_PCT,AUTO_OTHER_PCT);
+    const hAmt=allowanceAmount(b0,AUTO_HOUSING_PCT), tAmt=allowanceAmount(b0,AUTO_TRANSPORT_PCT), oAmt=allowanceAmount(b0,AUTO_OTHER_PCT);
+    const residual=Math.round(total*100)-Math.round((b0+hAmt+tAmt+oAmt)*100);      // فرق هللات نادر بسبب التقريب يُضاف على الأساسي
+    document.getElementById('f_basicsalary').value=(b0+residual/100).toFixed(2);
+    syncAllAllowances();
+    document.getElementById('f_housing').value=hAmt.toFixed(2);
+    document.getElementById('f_transport').value=tAmt.toFixed(2);
+    document.getElementById('f_otherallow').value=oAmt.toFixed(2);
+    updateLastWage();
+    if(hint){ hint.textContent=`تم توزيع الراتب تلقائياً من مشروع «${pName}» لفئة «${job}» — إجمالي الراتب ${money(total)}.`; hint.hidden=false; }
+    showToast('تم تعبئة الرواتب والماليات من راتب المشروع');
+  }
+  document.getElementById('f_project')?.addEventListener('change',applyProjectSalaryToEmployee);
+  document.getElementById('f_jobtitle')?.addEventListener('change',applyProjectSalaryToEmployee);
+  ['f_basicsalary','f_housing_pct','f_transport_pct','f_otherallow_pct'].forEach(id=>document.getElementById(id)?.addEventListener('input',()=>{ const h=document.getElementById('payAutoHint'); if(h) h.hidden=true; }));
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
   ['firstname','fathername','grandname','familyname'].forEach(id=>document.getElementById('f_'+id)?.addEventListener('input',composeFullName));
   document.getElementById('f_idnum')?.addEventListener('input',e=>{e.target.value=normalizeDigits(e.target.value).slice(0,10);});
   document.getElementById('f_phone9')?.addEventListener('input',e=>{e.target.value=normalizeDigits(e.target.value).slice(0,9);});
@@ -1275,7 +1613,11 @@
     const limit=projectRoleCapacity(project,k);
     // إذا لم يتم تعريف سعة الوظيفة في المشروع، لا نمنع الإضافة. أما إذا كانت السعة معرفة، فنطبقها على نفس الوظيفة فقط.
     if(limit<=0) return null;
+<<<<<<< HEAD
     if(counts[k]>=limit) return `لا يمكن إضافة الموظف: سعة ${roleCapacityLabels[k]} في مشروع «${project.name}» هي ${limit} فقط، والموجود حالياً ${counts[k]}.`;
+=======
+    if(counts[k]>=limit) return `تنبيه: سعة ${roleCapacityLabels[k]} في مشروع «${project.name}» هي ${limit} فقط، والموجود حالياً ${counts[k]}.`;
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
     return null;
   }
 
@@ -1321,7 +1663,11 @@
     data.idnum=normalizeDigits(data.idnum); data.iban=data.iban.replace(/\s+/g,'').toUpperCase();
     if(id && employees.find(x=>x.id===id)?.empcode) data.empcode=employees.find(x=>x.id===id).empcode; else data.empcode=nextEmployeeCode(data.region,'');
     const capacityError=validateEmployeeCapacity(data,id);
+<<<<<<< HEAD
     if(capacityError){ showToast(capacityError); return; }
+=======
+    if(capacityError){ showToast(capacityError); }
+>>>>>>> 135170b0fc3d2bb6e27ed2e3bf0fa1befc3ca83e
     const idx = employees.findIndex(x=>x.id===id);
     if(idx>=0) employees[idx] = data; else employees.push(data);
     saveEmployees();
@@ -2278,7 +2624,7 @@
     });
   });
   document.getElementById('doc_emp').addEventListener('change', renderDocSheet);
-  document.getElementById('printDocBtn').addEventListener('click', ()=>window.print());
+  document.getElementById('printDocBtn').addEventListener('click', ()=>{ if(currentDocType==='directwork'){ const id=document.getElementById('doc_emp').value; const emp=employees.find(e=>e.id===id); if(emp){ emp.directworkDone=true; emp.directWorkDate=new Date().toISOString().slice(0,10); saveEmployees(); } } window.print(); });
   function blank(v){ return v ? escapeHtml(v) : '<span class="blank">.......................</span>'; }
   function renderDocuments(){
     refreshEmpSelect(document.getElementById('doc_emp'), '— اختر الموظف —');
@@ -2307,12 +2653,17 @@
       <tr><td>5</td><td>النوم أثناء العمل أو عدم التقيد بالتعليمات أو الانشغال بالجوال والأجهزة الذكية</td><td>حسم ثلاثة أيام</td></tr>
       <tr><td>6</td><td>مخالفات أخرى لم تذكر أعلاه</td><td>وفق الحالة واللائحة المعتمدة</td></tr></tbody></table>`;
     }else if(currentDocType==='directwork'){
-      html=`<h2>مباشرة عمل</h2><div class="doc-date">التاريخ: ${today}</div>
-      <table class="doc-mini-table"><tbody><tr><th>اسم الموظف</th><td>${blank(e.fullname)}</td></tr><tr><th>المسمى الوظيفي</th><td>${blank(e.jobtitle)}</td></tr><tr><th>القسم</th><td>${blank(e.dept)}</td></tr><tr><th>الموقع</th><td>${blank(e.project||e.region)}</td></tr></tbody></table>
-      <p>نفيدكم بأن الموظف المذكور أعلاه باشر العمل لدينا اعتباراً من:</p><p>التاريخ: <span class="blank">/ / 144هـ</span> الموافق: <span class="blank">/ / 202م</span></p>
-      <p>نوع المباشرة: ☐ تعيين جديد &nbsp;&nbsp; ☐ إعادة تعيين &nbsp;&nbsp; ☐ عودة من الإجازة &nbsp;&nbsp; ☐ أخرى</p>
-      <p>أقر أنا الموظف بأنني باشرت العمل لدى ${blank(co)} وألتزم بأنظمة الشركة وتعليماتها وفترة التجربة المحددة في عقد العمل.</p>
-      <div class="sign-row"><div>اسم الموظف<br>${blank(e.fullname)}<br>التوقيع: ....................</div><div>الموارد البشرية<br>...........................</div><div>رئيس العمليات<br>...........................</div></div>`;
+      const safeName=escapeHtml(e.fullname||'');
+      const safeJob=escapeHtml(e.jobtitle||'');
+      const safeLocation=escapeHtml(e.project||e.region||'');
+      const safeId=escapeHtml(e.idnum||'');
+      html=`<div class="directwork-official-page" role="document" aria-label="نموذج مباشرة عمل الرسمي">
+        <img class="directwork-template" src="assets/directwork-official-template.jpg" alt="نموذج مباشرة العمل الرسمي بالشعار والعلامة المائية">
+        <span class="directwork-field directwork-name">${safeName}</span>
+        <span class="directwork-field directwork-location">${safeLocation}</span>
+        <span class="directwork-field directwork-job">${safeJob}</span>
+        <span class="directwork-field directwork-id">${safeId}</span>
+      </div>`;
     }else if(currentDocType==='fileundertaking'){
       html = `
         <h2>إقرار وتعهد بإكمال ملف التوظيف</h2>
