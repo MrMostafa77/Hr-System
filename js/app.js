@@ -1276,6 +1276,14 @@
     return list.sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''))[0]||null;
   }
   function employeeCommencementStatus(e){ return employeeCommencementInfo(e) ? 'مباشر' : 'غير مباشر'; }
+  function employeeAlertList(e){
+    const today=new Date(); today.setHours(0,0,0,0);
+    const problems=[];
+    if(e.iddate_expiry){const d=new Date(e.iddate_expiry+'T00:00:00'); if(!Number.isNaN(d.getTime()) && d<=today) problems.push('الإقامة منتهية');}
+    if(!employeeContractInfo(e.id).contract) problems.push('لا يوجد عقد');
+    if(!employeeCommencementInfo(e)) problems.push('لا توجد مباشرة عمل');
+    return problems;
+  }
   function renderAllEmployeeProjectFilter(){
     const sel=document.getElementById('allEmployeesProjectFilter'); if(!sel)return;
     const cur=sel.value;
@@ -1386,10 +1394,17 @@
     if(!e) return;
     currentProfileId = id;
     const net = netSalary(e);
+    const alerts = employeeAlertList(e);
     document.getElementById('profileBody').innerHTML = `
       <div class="profile-head">
         <div class="profile-avatar">${escapeHtml(initials(e.fullname))}</div>
         <div><h2>${escapeHtml(e.fullname||'—')}</h2><p>${escapeHtml(e.jobtitle||'—')} · ${escapeHtml(e.dept||'—')}</p></div>
+      </div>
+      <div class="info-block">
+        <h4>التنبيهات</h4>
+        ${alerts.length
+          ? `<div class="profile-alerts-list">${alerts.map(a=>`<span class="project-employee-alert">⚠ ${escapeHtml(a)}</span>`).join('')}</div>`
+          : `<div class="project-alert-ok">✓ لا توجد تنبيهات على هذا الموظف.</div>`}
       </div>
       <div class="info-block">
         <h4>البيانات الشخصية</h4>
