@@ -2083,10 +2083,14 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 #view-commencements .paper-name{top:20.85%;left:57.2%;width:31.2%;height:2.45%}
 #view-commencements .paper-project{top:20.85%;left:34.2%;width:22.4%;height:2.45%}
 #view-commencements .paper-job{top:20.85%;left:10.8%;width:21.8%;height:2.45%}
-#view-commencements .paper-date-h{top:30.0%;left:58.5%;width:9.0%;height:2.0%;font-size:clamp(7px,.85vw,11px)}
-#view-commencements .paper-date-g{top:30.0%;left:38.0%;width:9.0%;height:2.0%;font-size:clamp(7px,.85vw,11px)}
-#view-commencements .paper-id{top:46.7%;left:20.0%;width:21.5%;height:2.0%;font-size:clamp(8px,.95vw,12px)}
-#view-commencements .paper-guard-name{top:56.9%;left:56.5%;width:25.5%;height:2.0%;text-align:center;font-size:clamp(8px,.95vw,12px)}
+/* التاريخ والموافق: نغطي مساحة الأرقام فقط حتى لا تتداخل مع النص المطبوع */
+#view-commencements .paper-date-h{top:29.45%;left:54.0%;width:20.5%;height:2.55%;font-size:clamp(10px,1.05vw,15px);background:#fff !important;line-height:1.25;border-radius:2px}
+#view-commencements .paper-date-g{top:29.45%;left:20.0%;width:18.5%;height:2.55%;font-size:clamp(10px,1.05vw,15px);background:#fff !important;line-height:1.25;border-radius:2px}
+/* اسم الحارس ورقم الهوية في سطر الإقرار */
+#view-commencements .paper-guard-line-name{top:45.95%;left:50.0%;width:28.0%;height:2.65%;font-size:clamp(11px,1.15vw,16px);background:#fff !important;line-height:1.2}
+#view-commencements .paper-id{top:45.95%;left:16.5%;width:22.5%;height:2.65%;font-size:clamp(10px,1.05vw,15px);background:#fff !important;line-height:1.2}
+/* اسم الحارس في الخانة السفلية - أكبر بوضوح من اسم العنوان العلوي */
+#view-commencements .paper-guard-name{top:56.65%;left:55.0%;width:28.0%;height:2.7%;text-align:center;font-size:clamp(12px,1.35vw,19px);font-weight:800;background:#fff !important;line-height:1.2;border-radius:2px}
 /* المربعات موجودة أصلاً داخل الورقة؛ نضع علامة الاختيار فقط فوقها */
 #view-commencements .paper-check{position:absolute;width:7.0%;height:2.7%;display:block;cursor:default}
 #view-commencements .paper-check input{opacity:0;position:absolute;inset:0}

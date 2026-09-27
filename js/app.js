@@ -3160,8 +3160,12 @@
     if(!dateStr)return '';
     try{
       const d=new Date(dateStr+'T00:00:00');
-      return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura',{day:'2-digit',month:'2-digit',year:'numeric'}).format(d).replace(/[٠-٩]/g,m=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(m)));
-    }catch(e){return '';}
+      const parts=new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura',{day:'2-digit',month:'2-digit',year:'numeric'}).formatToParts(d);
+      const day=parts.find(x=>x.type==='day')?.value||'';
+      const month=parts.find(x=>x.type==='month')?.value||'';
+      const year=parts.find(x=>x.type==='year')?.value||'';
+      return `${day} / ${month} / ${year} هـ`;
+    }catch(e){return ''; }
   }
   function renderCommencementProjects(){
     const sel=document.getElementById('comm_project'); if(!sel)return;
@@ -3196,7 +3200,7 @@
     if(!e){
       document.getElementById('comm_jobtitle').value='';
       document.getElementById('commPaperStatus').textContent='اختر الموقع والحارس لتعبئة النموذج';
-      ['paper_name','paper_project','paper_job','paper_date_g','paper_date_h','paper_id','paper_guard_name'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+      ['paper_name','paper_project','paper_job','paper_date_g','paper_date_h','paper_guard_line_name','paper_id','paper_guard_name'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
       setPaperTypes([]); return;
     }
     const c=contractForEmployeeProject(e,project);
@@ -3211,7 +3215,7 @@
     document.getElementById('comm_other_type').value=existing?.otherType||'';
     const g=formatGregorianArabic(date?.value||'');
     const h=formatHijri(date?.value||'');
-    const vals={paper_name:e.fullname||'',paper_project:project,paper_job:e.jobtitle||'',paper_date_g:g,paper_date_h:h,paper_id:e.idnum||'',paper_guard_name:e.fullname||''};
+    const vals={paper_name:e.fullname||'',paper_project:project,paper_job:e.jobtitle||'',paper_date_g:g,paper_date_h:h,paper_guard_line_name:e.fullname||'',paper_id:e.idnum||'',paper_guard_name:e.fullname||''};
     Object.entries(vals).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v;});
     setPaperTypes(types);
     document.getElementById('commPaperStatus').textContent=c?'تمت تعبئة النموذج تلقائياً من بيانات الموظف والعقد':'الحارس بدون عقد — النموذج للمعاينة فقط';
@@ -3220,7 +3224,7 @@
     const d=document.getElementById('comm_startdate')?.value||'';
     const e=employees.find(x=>x.id===document.getElementById('comm_employee')?.value);
     const p=document.getElementById('comm_project')?.value||'';
-    const vals={paper_name:e?.fullname||'',paper_project:p,paper_job:e?.jobtitle||'',paper_date_g:formatGregorianArabic(d),paper_date_h:formatHijri(d),paper_id:e?.idnum||'',paper_guard_name:e?.fullname||''};
+    const vals={paper_name:e?.fullname||'',paper_project:p,paper_job:e?.jobtitle||'',paper_date_g:formatGregorianArabic(d),paper_date_h:formatHijri(d),paper_guard_line_name:e?.fullname||'',paper_id:e?.idnum||'',paper_guard_name:e?.fullname||''};
     Object.entries(vals).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v;});
   }
   function renderCommencementList(){
