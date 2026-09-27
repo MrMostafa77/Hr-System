@@ -677,7 +677,7 @@
 
 
   /* ===== Universal Excel / PDF / Word exports ===== */
-  const exportableViews=['dashboard','regions','projects','allprojects','employees','departments','add','projectpromotions','employeepromotions','attendance','actions','coverage','documents','contracts','allcontracts','commencements','projectaccounts','reports'];
+  const exportableViews=['dashboard','regions','projects','allprojects','employees','departments','add','projectpromotions','employeepromotions','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports'];
   function currentViewElement(){ return currentView ? document.getElementById('view-'+currentView) : null; }
   function exportFileBase(){
     const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
@@ -749,7 +749,7 @@
     const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(view);
     st.textContent=`@media print { @page { size: A4 ${isLandscape?'landscape':'portrait'} !important; margin: ${isLandscape?'8mm':'10mm'} !important; } }`;
     document.head.appendChild(st);
-    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','projectaccounts','reports'].forEach(v=>{
+    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports'].forEach(v=>{
       document.getElementById('view-'+v).style.display = (v===view)?'':'none';
     });
     document.querySelectorAll('.navlink[data-view]').forEach(a=>{
@@ -779,6 +779,7 @@
     if(view==='contracts') renderContracts();
     if(view==='allcontracts') renderAllContracts();
     if(view==='commencements') renderCommencements();
+    if(view==='commencement-list') renderCommencementList();
     if(view==='projectaccounts') renderProjectAccount();
     if(view==='reports') renderReports();
     if(view==='reports'){
@@ -793,7 +794,7 @@
   window.switchView = switchView;
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
-  const PJ_TITLES={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
+  const PJ_TITLES={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
   const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn']};
   const pjTabs={open:[],dirty:new Set()};
@@ -3125,64 +3126,139 @@
     const job=String(e?.jobtitle||'').trim().toLowerCase();
     return /حارس|حارسة|guard|security guard/.test(job);
   }
-  function contractedGuardsForProject(projectName){
-    const contractedIds=new Set(contracts.filter(c=>{
-      const emp=employees.find(e=>e.id===c.empId);
-      const cp=String(c.location||emp?.project||'').trim();
-      return cp===String(projectName||'').trim();
-    }).map(c=>c.empId));
-    return employees.filter(e=>contractedIds.has(e.id) && String(e.project||'').trim()===String(projectName||'').trim() && isGuardEmployee(e));
+  function guardsForProject(projectName){
+    const pn=String(projectName||'').trim();
+    return employees.filter(e=>String(e.project||'').trim()===pn && isGuardEmployee(e));
+  }
+  function contractForEmployeeProject(e, projectName){
+    const pn=String(projectName||e?.project||'').trim();
+    return contracts.filter(c=>c.empId===e?.id && String(c.location||e?.project||'').trim()===pn)
+      .sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''))[0] || null;
+  }
+  function formatGregorianArabic(dateStr){
+    if(!dateStr)return '';
+    const d=new Date(dateStr+'T00:00:00');
+    if(Number.isNaN(d.getTime()))return dateStr;
+    return `${String(d.getDate()).padStart(2,'0')} / ${String(d.getMonth()+1).padStart(2,'0')} / ${d.getFullYear()} م`;
+  }
+  function formatHijri(dateStr){
+    if(!dateStr)return '';
+    try{
+      const d=new Date(dateStr+'T00:00:00');
+      return new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura',{day:'2-digit',month:'2-digit',year:'numeric'}).format(d).replace(/[٠-٩]/g,m=>String('٠١٢٣٤٥٦٧٨٩'.indexOf(m)));
+    }catch(e){return '';}
   }
   function renderCommencementProjects(){
     const sel=document.getElementById('comm_project'); if(!sel)return;
     const cur=sel.value;
-    sel.innerHTML='<option value="">اختر المشروع</option>'+uniqueSorted(projects.map(p=>p.name)).map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
+    sel.innerHTML='<option value="">اختر الموقع</option>'+uniqueSorted(projects.map(p=>p.name)).map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
     if(projects.some(p=>p.name===cur))sel.value=cur;
   }
   function renderCommencementEmployees(){
     const p=document.getElementById('comm_project'), sel=document.getElementById('comm_employee'); if(!p||!sel)return;
-    const cur=sel.value, list=contractedGuardsForProject(p.value);
+    const cur=sel.value, list=guardsForProject(p.value);
     sel.disabled=!p.value;
-    sel.innerHTML='<option value="">'+(p.value?'اختر الحارس':'اختر المشروع أولاً')+'</option>'+list.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'')} — ${escapeHtml(e.empcode||'')}</option>`).join('');
+    sel.innerHTML='<option value="">'+(p.value?'اختر الحارس':'اختر الموقع أولاً')+'</option>'+list.map(e=>{
+      const c=contractForEmployeeProject(e,p.value);
+      return `<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'')} — ${escapeHtml(e.empcode||'')}${c?'':' — بدون عقد'}</option>`;
+    }).join('');
     if(list.some(e=>e.id===cur))sel.value=cur;
     else { sel.value=''; renderCommencementEmployee(); }
   }
-  function renderCommencementEmployee(){
-    const id=document.getElementById('comm_employee')?.value||'', box=document.getElementById('comm_employee_data');
-    const e=employees.find(x=>x.id===id); if(!box)return;
-    if(!e){box.style.display='none';return;}
-    const c=contracts.filter(x=>x.empId===e.id && String(x.location||e.project||'').trim()===String(e.project||'').trim()).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''))[0] || contracts.find(x=>x.empId===e.id) || {};
-    const vals={comm_fullname:e.fullname,comm_empcode:e.empcode,comm_idnum:e.idnum,comm_nationality:e.nationality,comm_gender:e.gender,comm_dob:e.dob,comm_phone:e.phone,comm_email:e.email,comm_dept:e.dept,comm_jobtitle:e.jobtitle,comm_region:e.region,comm_project_display:e.project,comm_basicsalary:fmt(e.basicsalary),comm_housing:fmt(e.housing),comm_transport:fmt(e.transport),comm_otherallow:fmt(e.otherallow),comm_lastwage:fmt(e.lastwage||netSalary(e)),comm_contractcode:c.contractCode,comm_contractstart:c.start,comm_contractend:c.end};
-    Object.entries(vals).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v||'';});
-    const existing=commencements.find(x=>x.empId===e.id && x.project===e.project);
-    const date=document.getElementById('comm_startdate'); if(date && !date.value) date.value=existing?.startDate||e.startdate||new Date().toISOString().slice(0,10);
-    document.getElementById('comm_notes').value=existing?.notes||'';
-    box.style.display='';
+  function selectedCommTypes(){
+    return [...document.querySelectorAll('.comm-type-check:checked')].map(x=>x.dataset.type).filter(Boolean);
   }
-  function renderCommencementTable(){
-    const body=document.getElementById('commencementTableBody'); if(!body)return;
-    const rows=[...commencements].sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));
-    body.innerHTML=rows.map(r=>`<tr><td class="mono">${escapeHtml(r.startDate||'—')}</td><td><b>${escapeHtml(r.employeeName||'—')}</b></td><td class="mono">${escapeHtml(r.empcode||'—')}</td><td>${escapeHtml(r.project||'—')}</td><td>${escapeHtml(r.jobtitle||'—')}</td><td class="mono">${escapeHtml(r.contractCode||'—')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty-note">لا توجد مباشرات محفوظة.</td></tr>';
+  function setPaperTypes(types){
+    const map={'تعيين جديد':'paper_new','إعادة تعيين':'paper_reassign','عودة من الإجازة':'paper_vacation','أخرى':'paper_other'};
+    Object.entries(map).forEach(([t,id])=>{const el=document.getElementById(id);if(el)el.checked=types.includes(t);});
+  }
+  function renderCommencementEmployee(){
+    const id=document.getElementById('comm_employee')?.value||'';
+    const project=document.getElementById('comm_project')?.value||'';
+    const e=employees.find(x=>x.id===id);
+    const alert=document.getElementById('comm_contract_alert');
+    if(alert){alert.style.display='none';alert.textContent='';alert.className='comm-alert';}
+    if(!e){
+      document.getElementById('comm_jobtitle').value='';
+      document.getElementById('commPaperStatus').textContent='اختر الموقع والحارس لتعبئة النموذج';
+      ['paper_name','paper_project','paper_job','paper_date_g','paper_date_h','paper_id','paper_guard_name'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+      setPaperTypes([]); return;
+    }
+    const c=contractForEmployeeProject(e,project);
+    if(!c && alert){alert.style.display='block';alert.className='comm-alert danger';alert.textContent='تنبيه: هذا الحارس مسجل على الموقع المختار ولكن لا يوجد له عقد محفوظ على هذا الموقع. لا يمكن حفظ المباشرة قبل إنشاء العقد.';}
+    document.getElementById('comm_jobtitle').value=e.jobtitle||'';
+    const existing=commencements.find(x=>x.empId===e.id && String(x.project||'').trim()===String(project).trim());
+    const date=document.getElementById('comm_startdate');
+    if(date && !date.value) date.value=existing?.startDate||e.startdate||new Date().toISOString().slice(0,10);
+    const types=existing?.types||[];
+    document.querySelectorAll('.comm-type-check').forEach(x=>x.checked=types.includes(x.dataset.type));
+    document.getElementById('comm_other_type').style.display=types.includes('أخرى')?'block':'none';
+    document.getElementById('comm_other_type').value=existing?.otherType||'';
+    const g=formatGregorianArabic(date?.value||'');
+    const h=formatHijri(date?.value||'');
+    const vals={paper_name:e.fullname||'',paper_project:project,paper_job:e.jobtitle||'',paper_date_g:g,paper_date_h:h,paper_id:e.idnum||'',paper_guard_name:e.fullname||''};
+    Object.entries(vals).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v;});
+    setPaperTypes(types);
+    document.getElementById('commPaperStatus').textContent=c?'تمت تعبئة النموذج تلقائياً من بيانات الموظف والعقد':'الحارس بدون عقد — النموذج للمعاينة فقط';
+  }
+  function renderCommencementPaper(){
+    const d=document.getElementById('comm_startdate')?.value||'';
+    const e=employees.find(x=>x.id===document.getElementById('comm_employee')?.value);
+    const p=document.getElementById('comm_project')?.value||'';
+    const vals={paper_name:e?.fullname||'',paper_project:p,paper_job:e?.jobtitle||'',paper_date_g:formatGregorianArabic(d),paper_date_h:formatHijri(d),paper_id:e?.idnum||'',paper_guard_name:e?.fullname||''};
+    Object.entries(vals).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v;});
+  }
+  function renderCommencementList(){
+    const search=(document.getElementById('commListSearch')?.value||'').trim().toLowerCase();
+    const project=document.getElementById('commListProject')?.value||'';
+    const ps=document.getElementById('commListProject');
+    if(ps){const cur=ps.value;ps.innerHTML='<option value="">كل المواقع</option>'+uniqueSorted(projects.map(p=>p.name)).map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');if(uniqueSorted(projects.map(p=>p.name)).includes(cur))ps.value=cur;}
+    const rows=[...commencements].filter(r=>{
+      const hay=[r.employeeName,r.empcode,r.project,r.jobtitle].join(' ').toLowerCase();
+      return (!search||hay.includes(search))&&(!project||String(r.project||'')===project);
+    }).sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));
+    const body=document.getElementById('commencementListBody');if(!body)return;
+    body.innerHTML=rows.map(r=>`<tr data-id="${escapeAttr(r.id)}"><td><b>${escapeHtml(r.employeeName||'—')}</b></td><td class="mono">${escapeHtml(r.empcode||'—')}</td><td>${escapeHtml(r.project||'—')}</td><td>${escapeHtml(r.jobtitle||'—')}</td><td class="mono">${escapeHtml(r.startDate||'—')}</td><td>${escapeHtml((r.types||[]).join(' / ')||'—')}</td><td><button type="button" class="btn btn-sm comm-list-preview" data-id="${escapeAttr(r.id)}">معاينة</button></td></tr>`).join('')||'<tr><td colspan="7" class="empty-note">لا توجد مباشرات مطابقة للبحث.</td></tr>';
   }
   function renderCommencements(){
     renderCommencementProjects();
     renderCommencementEmployees();
-    renderCommencementTable();
+    renderCommencementEmployee();
   }
-  document.getElementById('comm_project')?.addEventListener('change',()=>{document.getElementById('comm_startdate').value=new Date().toISOString().slice(0,10);document.getElementById('comm_notes').value='';renderCommencementEmployees();});
-  document.getElementById('comm_employee')?.addEventListener('change',()=>{document.getElementById('comm_startdate').value='';document.getElementById('comm_notes').value='';renderCommencementEmployee();});
-  document.getElementById('resetCommencementBtn')?.addEventListener('click',()=>{const p=document.getElementById('comm_project');if(p)p.value='';const e=document.getElementById('comm_employee');if(e){e.value='';e.disabled=true;e.innerHTML='<option value="">اختر المشروع أولاً</option>';}document.getElementById('comm_startdate').value=new Date().toISOString().slice(0,10);document.getElementById('comm_notes').value='';document.getElementById('comm_employee_data').style.display='none';});
+  function openCommencementForRecord(id){
+    const r=commencements.find(x=>x.id===id);if(!r)return;
+    expandParentGroup('commencements');switchView('commencements');
+    setTimeout(()=>{
+      const p=document.getElementById('comm_project'),e=document.getElementById('comm_employee');
+      p.value=r.project;renderCommencementEmployees();e.value=r.empId;document.getElementById('comm_startdate').value=r.startDate||'';renderCommencementEmployee();
+    },50);
+  }
+  document.getElementById('comm_project')?.addEventListener('change',()=>{document.getElementById('comm_startdate').value=new Date().toISOString().slice(0,10);renderCommencementEmployees();renderCommencementEmployee();});
+  document.getElementById('comm_employee')?.addEventListener('change',()=>{document.getElementById('comm_startdate').value='';renderCommencementEmployee();});
+  document.getElementById('comm_startdate')?.addEventListener('change',renderCommencementPaper);
+  document.querySelectorAll('.comm-type-check').forEach(ch=>ch.addEventListener('change',()=>{
+    if(ch.checked)document.querySelectorAll('.comm-type-check').forEach(x=>{if(x!==ch)x.checked=false;});
+    document.getElementById('comm_other_type').style.display=document.querySelector('.comm-type-check[data-type="أخرى"]')?.checked?'block':'none';
+    setPaperTypes(selectedCommTypes());
+  }));
+  document.getElementById('resetCommencementBtn')?.addEventListener('click',()=>{document.getElementById('comm_project').value='';const e=document.getElementById('comm_employee');e.value='';e.disabled=true;e.innerHTML='<option value="">اختر الموقع أولاً</option>';document.getElementById('comm_startdate').value='';document.querySelectorAll('.comm-type-check').forEach(x=>x.checked=false);document.getElementById('comm_other_type').value='';document.getElementById('comm_other_type').style.display='none';renderCommencementEmployee();});
   document.getElementById('saveCommencementBtn')?.addEventListener('click',()=>{
     const empId=document.getElementById('comm_employee')?.value||'', project=document.getElementById('comm_project')?.value||'', startDate=document.getElementById('comm_startdate')?.value||'';
-    const e=employees.find(x=>x.id===empId); if(!project||!e){showToast('اختر المشروع والحارس أولاً');return;}
-    const contract=contracts.find(c=>c.empId===e.id && String(c.location||e.project||'').trim()===String(project).trim());
-    if(!contract){showToast('هذا الموظف ليس لديه عقد محفوظ على المشروع المختار');return;}
+    const e=employees.find(x=>x.id===empId);if(!project||!e){showToast('اختر الموقع والحارس أولاً');return;}
+    const contract=contractForEmployeeProject(e,project);if(!contract){showToast('لا يمكن حفظ المباشرة: الحارس بدون عقد على الموقع المختار');return;}
     if(!startDate){showToast('اختر تاريخ المباشرة');return;}
-    const existingIndex=commencements.findIndex(x=>x.empId===e.id && x.project===project);
-    const rec={id:existingIndex>=0?commencements[existingIndex].id:'cm'+Date.now()+Math.random().toString(36).slice(2,7),empId:e.id,employeeName:e.fullname||'',empcode:e.empcode||'',project,region:e.region||'',dept:e.dept||'',jobtitle:e.jobtitle||'',contractId:contract.id||'',contractCode:contract.contractCode||'',startDate,notes:document.getElementById('comm_notes')?.value||'',updatedAt:new Date().toISOString()};
+    const types=selectedCommTypes();if(types.length!==1){showToast('اختر نوع المباشرة');return;}
+    const existingIndex=commencements.findIndex(x=>x.empId===e.id && String(x.project||'').trim()===String(project).trim());
+    const rec={id:existingIndex>=0?commencements[existingIndex].id:'cm'+Date.now()+Math.random().toString(36).slice(2,7),empId:e.id,employeeName:e.fullname||'',empcode:e.empcode||'',project,region:e.region||'',dept:e.dept||'',jobtitle:e.jobtitle||'',contractId:contract.id||'',contractCode:contract.contractCode||'',startDate,types,otherType:document.getElementById('comm_other_type')?.value||'',updatedAt:new Date().toISOString()};
     if(existingIndex>=0)commencements[existingIndex]=rec;else commencements.push(rec);
-    saveCommencements();renderCommencementTable();showToast(existingIndex>=0?'تم تحديث المباشرة':'تم حفظ المباشرة');
+    saveCommencements();renderCommencementList();showToast(existingIndex>=0?'تم تحديث المباشرة':'تم حفظ المباشرة');
   });
+  document.getElementById('openAllCommencementsBtn')?.addEventListener('click',()=>{expandParentGroup('commencements');switchView('commencement-list');});
+  document.getElementById('backToCommencementBtn')?.addEventListener('click',()=>{expandParentGroup('commencements');switchView('commencements');});
+  document.getElementById('commListSearch')?.addEventListener('input',renderCommencementList);
+  document.getElementById('commListProject')?.addEventListener('change',renderCommencementList);
+  document.getElementById('clearCommListFilters')?.addEventListener('click',()=>{document.getElementById('commListSearch').value='';document.getElementById('commListProject').value='';renderCommencementList();});
+  document.getElementById('commencementListBody')?.addEventListener('click',e=>{const b=e.target.closest('.comm-list-preview');if(b)openCommencementForRecord(b.dataset.id);});
 
   /* ===== documents ===== */
   function loadSettingsIntoForm(){

@@ -2047,3 +2047,42 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 .project-penalties-actions{display:flex;justify-content:flex-start;margin-top:12px}
 @media(max-width:700px){.project-penalties-table{min-width:680px}}
 .all-employees-table td,.all-employees-table th{vertical-align:middle;white-space:nowrap}.all-employees-table .row-actions{justify-content:center}.all-employee-row{cursor:pointer}.all-employee-row:hover{background:rgba(30,64,175,.04)}
+/* ===== New employee commencement form ===== */
+#view-commencements .commencement-workspace{display:grid;grid-template-columns:minmax(300px,390px) minmax(560px,1fr);gap:16px;align-items:start;direction:ltr}
+#view-commencements .commencement-form-panel,#view-commencements .commencement-paper-card{direction:rtl}
+#view-commencements .commencement-form-panel{padding:18px;position:sticky;top:18px}
+#view-commencements .commencement-input-grid{grid-template-columns:1fr;gap:10px}
+#view-commencements .comm-type-box{margin-top:14px;padding:13px;border:1px solid var(--border);border-radius:9px;background:var(--surface-2,var(--bg));display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:13px}
+#view-commencements .comm-type-title{grid-column:1/-1;font-weight:700;color:var(--ink);margin-bottom:2px}
+#view-commencements .comm-type-box label{display:flex;align-items:center;gap:7px;cursor:pointer}
+#view-commencements .comm-type-box input[type=checkbox]{accent-color:var(--teal);width:16px;height:16px}
+#view-commencements .comm-other-type{grid-column:1/-1;width:100%}
+#view-commencements .comm-alert{margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--teal-soft);color:var(--ink);font-size:12.5px}
+#view-commencements .comm-alert.danger{background:var(--red-soft);color:var(--red);border:1px solid rgba(179,69,47,.35)}
+#view-commencements .commencement-actions{margin-top:15px;justify-content:flex-start}
+#view-commencements .commencement-paper-card{overflow:hidden}
+#view-commencements .paper-toolbar{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;gap:10px}
+#view-commencements .paper-toolbar span:last-child{font-size:11px;color:var(--ink-soft);font-weight:400}
+#view-commencements .comm-paper-wrap{position:relative;width:100%;max-width:760px;margin:0 auto;line-height:1}
+#view-commencements .comm-paper-bg{display:block;width:100%;height:auto}
+#view-commencements .paper-field{position:absolute;border:0;background:transparent;color:#111;text-align:center;font-family:'JF Flat Regular','Segoe UI',sans-serif;font-weight:700;font-size:clamp(8px,1.1vw,15px);padding:1px 3px;outline:none;direction:rtl}
+#view-commencements .paper-name{top:18.1%;left:56.5%;width:34.5%}
+#view-commencements .paper-project{top:18.1%;left:34%;width:22.5%}
+#view-commencements .paper-job{top:18.1%;left:10.5%;width:23.5%}
+#view-commencements .paper-date-g{top:25.2%;left:19%;width:32%;font-size:clamp(7px,1vw,13px)}
+#view-commencements .paper-date-h{top:25.2%;left:51%;width:33%;font-size:clamp(7px,1vw,13px)}
+#view-commencements .paper-id{top:38.1%;left:25%;width:55%;text-align:center}
+#view-commencements .paper-guard-name{top:48%;left:48%;width:39%;text-align:right}
+#view-commencements .paper-check{position:absolute;width:5.5%;height:3.1%;display:block;cursor:default}
+#view-commencements .paper-check input{opacity:0;position:absolute;inset:0}
+#view-commencements .paper-check span{position:absolute;inset:0;border:1.5px solid #222;border-radius:4px;background:rgba(255,255,255,.18)}
+#view-commencements .paper-check input:checked+span:after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(12px,1.8vw,24px);font-weight:800;color:#111}
+#view-commencements .paper-new{top:30.1%;left:55.1%}
+#view-commencements .paper-reassign{top:30.1%;left:18.4%}
+#view-commencements .paper-vacation{top:33%;left:55.1%}
+#view-commencements .paper-other{top:33%;left:18.4%}
+#view-commencement-list .commencement-list-card{padding:16px}
+#view-commencement-list .comm-list-filters{display:grid;grid-template-columns:minmax(220px,1fr) 220px auto;gap:9px;margin-bottom:14px}
+#view-commencement-list .comm-list-table td,#view-commencement-list .comm-list-table th{white-space:nowrap}
+@media(max-width:1000px){#view-commencements .commencement-workspace{grid-template-columns:1fr;direction:rtl}#view-commencements .commencement-form-panel{position:static}#view-commencements .comm-paper-wrap{max-width:700px}}
+@media(max-width:650px){#view-commencement-list .comm-list-filters{grid-template-columns:1fr}#view-commencements .comm-type-box{grid-template-columns:1fr}}

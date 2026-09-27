@@ -649,47 +649,67 @@
     <!-- ===== EMPLOYEE COMMENCEMENTS ===== -->
     <section id="view-commencements" style="display:none">
       <div class="topbar">
-        <div class="pagetitle"><h1>مباشرات الموظفين</h1><p>اختيار المشروع ثم الموظف الذي تم إنشاء عقد له على نفس المشروع لإعداد المباشرة</p></div>
-        <div class="topbar-actions"></div>
+        <div class="pagetitle"><h1>مباشرات الموظفين</h1><p>إعداد مباشرة عمل على نموذج الشركة مع تعبئة البيانات تلقائياً من ملف الموظف والعقد</p></div>
+        <div class="topbar-actions"><button type="button" class="btn" id="openAllCommencementsBtn">كل المباشرات</button></div>
       </div>
-      <div class="card commencement-card">
-        <h3>اختيار المشروع والموظف</h3>
-        <div class="field-grid">
-          <div class="field"><label>المشروع</label><select id="comm_project"><option value="">اختر المشروع</option></select></div>
-          <div class="field"><label>الحارس صاحب العقد</label><select id="comm_employee" disabled><option value="">اختر المشروع أولاً</option></select></div>
-          <div class="field"><label>تاريخ المباشرة</label><input type="date" id="comm_startdate"></div>
+      <div class="commencement-workspace">
+        <div class="card commencement-form-panel">
+          <h3>بيانات المباشرة</h3>
+          <div class="field-grid commencement-input-grid">
+            <div class="field"><label>الموقع</label><select id="comm_project"><option value="">اختر الموقع</option></select></div>
+            <div class="field"><label>اسم الحارس</label><select id="comm_employee" disabled><option value="">اختر الموقع أولاً</option></select></div>
+            <div class="field"><label>المسمى الوظيفي</label><input id="comm_jobtitle" readonly></div>
+            <div class="field"><label>تاريخ المباشرة</label><input type="date" id="comm_startdate"></div>
+          </div>
+          <div class="comm-type-box">
+            <div class="comm-type-title">نوع المباشرة</div>
+            <label><input type="checkbox" class="comm-type-check" data-type="تعيين جديد"> تعيين جديد</label>
+            <label><input type="checkbox" class="comm-type-check" data-type="إعادة تعيين"> إعادة تعيين</label>
+            <label><input type="checkbox" class="comm-type-check" data-type="عودة من الإجازة"> عودة من الإجازة</label>
+            <label><input type="checkbox" class="comm-type-check" data-type="أخرى"> أخرى</label>
+            <input id="comm_other_type" class="comm-other-type" placeholder="اكتب نوع المباشرة الأخرى" style="display:none">
+          </div>
+          <div class="comm-alert" id="comm_contract_alert" style="display:none"></div>
+          <div class="action-row commencement-actions">
+            <button type="button" class="btn btn-primary" id="saveCommencementBtn">حفظ المباشرة</button>
+            <button type="button" class="btn" id="resetCommencementBtn">مباشرة جديدة</button>
+          </div>
+        </div>
+
+        <div class="card commencement-paper-card">
+          <div class="paper-toolbar"><span>نموذج مباشرة العمل</span><span id="commPaperStatus">اختر الموقع والحارس لتعبئة النموذج</span></div>
+          <div class="comm-paper-wrap" id="commPaperWrap">
+            <img src="assets/direct-work-form.jpg" class="comm-paper-bg" alt="نموذج مباشرة عمل">
+            <input class="paper-field paper-name" id="paper_name" readonly>
+            <input class="paper-field paper-project" id="paper_project" readonly>
+            <input class="paper-field paper-job" id="paper_job" readonly>
+            <input class="paper-field paper-date-g" id="paper_date_g" readonly>
+            <input class="paper-field paper-date-h" id="paper_date_h" readonly>
+            <input class="paper-field paper-id" id="paper_id" readonly>
+            <input class="paper-field paper-guard-name" id="paper_guard_name" readonly>
+            <label class="paper-check paper-new"><input type="checkbox" id="paper_new" disabled><span></span></label>
+            <label class="paper-check paper-reassign"><input type="checkbox" id="paper_reassign" disabled><span></span></label>
+            <label class="paper-check paper-vacation"><input type="checkbox" id="paper_vacation" disabled><span></span></label>
+            <label class="paper-check paper-other"><input type="checkbox" id="paper_other" disabled><span></span></label>
+          </div>
         </div>
       </div>
-      <div class="card commencement-card" id="comm_employee_data" style="display:none">
-        <h3>بيانات الموظف</h3>
-        <div class="field-grid commencement-data-grid">
-          <div class="field"><label>الاسم الكامل</label><input id="comm_fullname" readonly></div>
-          <div class="field"><label>الرقم الوظيفي</label><input id="comm_empcode" readonly></div>
-          <div class="field"><label>رقم الهوية / الإقامة</label><input id="comm_idnum" readonly></div>
-          <div class="field"><label>الجنسية</label><input id="comm_nationality" readonly></div>
-          <div class="field"><label>الجنس</label><input id="comm_gender" readonly></div>
-          <div class="field"><label>تاريخ الميلاد</label><input id="comm_dob" readonly></div>
-          <div class="field"><label>رقم الجوال</label><input id="comm_phone" readonly></div>
-          <div class="field"><label>البريد الإلكتروني</label><input id="comm_email" readonly></div>
-          <div class="field"><label>القسم / الإدارة</label><input id="comm_dept" readonly></div>
-          <div class="field"><label>المسمى الوظيفي</label><input id="comm_jobtitle" readonly></div>
-          <div class="field"><label>المنطقة / المدينة</label><input id="comm_region" readonly></div>
-          <div class="field"><label>المشروع</label><input id="comm_project_display" readonly></div>
-          <div class="field"><label>الراتب الأساسي</label><input id="comm_basicsalary" readonly></div>
-          <div class="field"><label>بدل السكن</label><input id="comm_housing" readonly></div>
-          <div class="field"><label>بدل المواصلات</label><input id="comm_transport" readonly></div>
-          <div class="field"><label>بدلات أخرى</label><input id="comm_otherallow" readonly></div>
-          <div class="field"><label>الأجر الأخير</label><input id="comm_lastwage" readonly></div>
-          <div class="field"><label>رقم العقد</label><input id="comm_contractcode" readonly></div>
-          <div class="field"><label>بداية العقد</label><input id="comm_contractstart" readonly></div>
-          <div class="field"><label>نهاية العقد</label><input id="comm_contractend" readonly></div>
-          <div class="field full"><label>ملاحظات المباشرة</label><textarea id="comm_notes" rows="3"></textarea></div>
-        </div>
-        <div class="action-row"><button type="button" class="btn btn-primary" id="saveCommencementBtn">حفظ المباشرة</button><button type="button" class="btn" id="resetCommencementBtn">إضافة مباشرة جديدة</button></div>
+    </section>
+
+    <section id="view-commencement-list" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle"><h1>كل المباشرات</h1><p>جميع مباشرات الموظفين المحفوظة مع البحث باسم الموظف أو الرقم الوظيفي أو الموقع</p></div>
+        <div class="topbar-actions"><button type="button" class="btn" id="backToCommencementBtn">مباشرة موظف جديدة</button></div>
       </div>
-      <div class="card commencement-card">
-        <h3>المباشرات المحفوظة</h3>
-        <div class="table-wrap"><table><thead><tr><th>التاريخ</th><th>الموظف</th><th>الرقم الوظيفي</th><th>المشروع</th><th>الوظيفة</th><th>رقم العقد</th></tr></thead><tbody id="commencementTableBody"></tbody></table></div>
+      <div class="card commencement-list-card">
+        <div class="comm-list-filters">
+          <input id="commListSearch" placeholder="بحث باسم الموظف أو الرقم الوظيفي أو الموقع">
+          <select id="commListProject"><option value="">كل المواقع</option></select>
+          <button type="button" class="btn" id="clearCommListFilters">مسح البحث</button>
+        </div>
+        <div class="table-wrap">
+          <table class="comm-list-table"><thead><tr><th>اسم الموظف</th><th>الرقم الوظيفي</th><th>الموقع</th><th>المسمى الوظيفي</th><th>تاريخ المباشرة</th><th>نوع المباشرة</th><th>الإجراءات</th></tr></thead><tbody id="commencementListBody"></tbody></table>
+        </div>
       </div>
     </section>
 
