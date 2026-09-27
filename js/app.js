@@ -2330,8 +2330,42 @@
     const [y,m] = ym.split('-').map(Number);
     return `${ATT_MONTHS[(m||1)-1]} ${y}`;
   }
+  // الحضور التلقائي الناتج عن المباشرة: يبدأ من تاريخ المباشرة،
+  // ويُملأ كـ «ح» في الأيام التي لا يوجد لها تعديل يدوي. لا نكتب
+  // هذه القيم تلقائياً داخل البيانات حتى تظل تعديلات المستخدم محفوظة كاستثناءات.
+  function commencementForEmployee(empId){
+    const e = employees.find(x=>x.id===empId);
+    const project = String(e?.project||'').trim();
+    const matches = commencements.filter(c=>String(c.empId||'')===String(empId) && (!project || !String(c.project||'').trim() || String(c.project||'').trim()===project) && c.startDate);
+    if(!matches.length) return null;
+    return matches.sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate)))[0];
+  }
+  function autoAttendanceCode(ym, empId, day){
+    const c = commencementForEmployee(empId);
+    if(!c?.startDate) return '';
+    const start = String(c.startDate);
+    const [y,m] = String(ym).split('-').map(Number);
+    const startDate = new Date(start+'T00:00:00');
+    if(Number.isNaN(startDate.getTime())) return '';
+    const startYm = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}`;
+    if(String(ym) < startYm) return '';
+    if(String(ym) === startYm && Number(day) < startDate.getDate()) return '';
+    return 'ح';
+  }
+  function effectiveAttendanceRecord(ym, empId){
+    const raw = (attendance[ym] && attendance[ym][empId]) || {};
+    const rec = {...raw};
+    const nDays = daysInMonth(ym);
+    for(let d=1; d<=nDays; d++){
+      if(!Object.prototype.hasOwnProperty.call(rec,d) || rec[d]==='') {
+        const auto = autoAttendanceCode(ym,empId,d);
+        if(auto) rec[d]=auto;
+      }
+    }
+    return rec;
+  }
   function attSummaryFor(ym, empId){
-    const rec = (attendance[ym] && attendance[ym][empId]) || {};
+    const rec = effectiveAttendanceRecord(ym, empId);
     const counts = {'ح':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0};
     Object.values(rec).forEach(code=>{ if(Object.prototype.hasOwnProperty.call(counts,code)) counts[code]++; });
     return counts;
@@ -2398,7 +2432,7 @@
     if(list.length===0){ body.innerHTML = '<tr><td colspan="60" class="empty-note">لا توجد نتائج مطابقة.</td></tr>'; return; }
     body.innerHTML = list.map(e=>{
       const sum = attSummaryFor(ym, e.id);
-      const rec = (attendance[ym] && attendance[ym][e.id]) || {};
+      const rec = effectiveAttendanceRecord(ym, e.id);
       let cells = `<td class="name-col">${escapeHtml(e.fullname)}</td>
         <td class="mono">${escapeHtml(e.empcode||'—')}</td>
         <td>${escapeHtml(e.region||'—')}</td>
@@ -2477,7 +2511,7 @@
   document.getElementById('attExportBtn')?.addEventListener('click', ()=>{
     const ym=document.getElementById('attMonth').value||currentMonthStr(), nDays=daysInMonth(ym);
     const headers=['الموظف','الكود','المنطقة','المشروع',...Array.from({length:nDays},(_,i)=>String(i+1)),'دوام','غياب','تغطية','جزاء','راحات','إضافي','انسحاب','جمع'];
-    const rows=employees.map(e=>{const s=attSummaryFor(ym,e.id),rec=(attendance[ym]&&attendance[ym][e.id])||{};return [e.fullname,e.empcode,e.region,e.project,...Array.from({length:nDays},(_,i)=>rec[i+1]||''),s['ح'],s['غ'],s['ط'],s['ج'],s['راحة'],s['ض'],s['س'],s['جمع']];});
+    const rows=employees.map(e=>{const s=attSummaryFor(ym,e.id),rec=effectiveAttendanceRecord(ym,e.id);return [e.fullname,e.empcode,e.region,e.project,...Array.from({length:nDays},(_,i)=>rec[i+1]||''),s['ح'],s['غ'],s['ط'],s['ج'],s['راحة'],s['ض'],s['س'],s['جمع']];});
     downloadCsv(`attendance_${ym}.csv`,headers,rows);
   });
 
@@ -3325,7 +3359,19 @@
     const existingIndex=commencements.findIndex(x=>x.empId===e.id && String(x.project||'').trim()===String(project).trim());
     const rec={id:existingIndex>=0?commencements[existingIndex].id:'cm'+Date.now()+Math.random().toString(36).slice(2,7),empId:e.id,employeeName:e.fullname||'',empcode:e.empcode||'',project,region:e.region||'',dept:e.dept||'',jobtitle:e.jobtitle||'',contractId:contract.id||'',contractCode:contract.contractCode||'',startDate,types,otherType:document.getElementById('comm_other_type')?.value||'',updatedAt:new Date().toISOString()};
     if(existingIndex>=0)commencements[existingIndex]=rec;else commencements.push(rec);
-    saveCommencements();renderCommencementList();showToast(existingIndex>=0?'تم تحديث المباشرة':'تم حفظ المباشرة');
+    saveCommencements();
+    // جهّز الحضور التلقائي للشهر الذي تبدأ فيه المباشرة، بدون الكتابة فوق أي تعديل يدوي سابق.
+    const startYm = startDate.slice(0,7);
+    attendance[startYm]=attendance[startYm]||{};
+    attendance[startYm][e.id]=attendance[startYm][e.id]||{};
+    const startDay = Number(startDate.slice(8,10));
+    const startDays = daysInMonth(startYm);
+    for(let day=startDay; day<=startDays; day++){
+      if(!attendance[startYm][e.id][day]) attendance[startYm][e.id][day]='ح';
+    }
+    saveAttendance();
+    renderCommencementList();
+    showToast(existingIndex>=0?'تم تحديث المباشرة والحضور التلقائي':'تم حفظ المباشرة والحضور التلقائي');
   });
   document.getElementById('openAllCommencementsBtn')?.addEventListener('click',()=>{expandParentGroup('commencements');switchView('commencement-list');});
   document.getElementById('backToCommencementBtn')?.addEventListener('click',()=>{expandParentGroup('commencements');switchView('commencements');});
