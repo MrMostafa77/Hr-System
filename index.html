@@ -677,7 +677,7 @@
         </div>
 
         <div class="card commencement-paper-card">
-          <div class="paper-toolbar"><span>نموذج مباشرة العمل</span><span id="commPaperStatus">اختر الموقع والحارس لتعبئة النموذج</span></div>
+          <div class="paper-toolbar"><span>نموذج مباشرة العمل</span><span id="commPaperStatus">اختر الموقع والحارس لتعبئة النموذج</span><div class="paper-toolbar-actions"><button type="button" class="btn btn-sm" id="printCommencementBtn">طباعة</button><button type="button" class="btn btn-primary btn-sm" id="pdfCommencementBtn">PDF</button></div></div>
           <div class="comm-paper-wrap" id="commPaperWrap">
             <img src="assets/direct-work-form.png" class="comm-paper-bg" alt="نموذج مباشرة عمل">
             <input class="paper-field paper-name" id="paper_name" readonly>
@@ -1016,6 +1016,7 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="js/firebase-init.js" type="module"></script>
 <script src="js/data.js" defer></script>

@@ -2073,24 +2073,26 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 #view-commencements .comm-alert.danger{background:var(--red-soft);color:var(--red);border:1px solid rgba(179,69,47,.35)}
 #view-commencements .commencement-actions{margin-top:15px;justify-content:flex-start}
 #view-commencements .commencement-paper-card{overflow:hidden}
-#view-commencements .paper-toolbar{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;gap:10px}
+#view-commencements .paper-toolbar{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;gap:10px;flex-wrap:wrap}
+#view-commencements .paper-toolbar-actions{display:flex;align-items:center;gap:6px;margin-inline-start:auto}
+#view-commencements .paper-toolbar-actions .btn{min-width:72px}
 #view-commencements .paper-toolbar span:last-child{font-size:11px;color:var(--ink-soft);font-weight:400}
 #view-commencements .comm-paper-wrap{position:relative;width:100%;max-width:760px;margin:0 auto;line-height:1;background:#fff}
 #view-commencements .comm-paper-bg{display:block;width:100%;height:auto}
 #view-commencements .paper-field{position:absolute;border:0;background:transparent;color:#111;text-align:center;font-family:'JF Flat Regular','Segoe UI',sans-serif;font-weight:700;font-size:clamp(9px,0.95vw,13px);padding:0 2px;outline:none;direction:rtl;white-space:nowrap;overflow:hidden;text-overflow:clip;line-height:1.05;box-sizing:border-box}
 #view-commencements .paper-field,#view-commencements .paper-field:read-only,#view-commencements .paper-field:focus{background:transparent !important;color:#111 !important;border-color:transparent !important;box-shadow:none !important;caret-color:transparent !important;opacity:1 !important}
 /* مواضع الخانات مطابقة لورقة الـPDF الأصلية */
-#view-commencements .paper-name{top:20.85%;left:57.2%;width:31.2%;height:2.45%}
-#view-commencements .paper-project{top:20.85%;left:34.2%;width:22.4%;height:2.45%}
-#view-commencements .paper-job{top:20.85%;left:10.8%;width:21.8%;height:2.45%}
+#view-commencements .paper-name{top:20.35%;left:57.2%;width:31.2%;height:2.45%}
+#view-commencements .paper-project{top:20.35%;left:34.2%;width:22.4%;height:2.45%}
+#view-commencements .paper-job{top:20.35%;left:10.8%;width:21.8%;height:2.45%}
 /* التاريخ والموافق: نغطي مساحة الأرقام فقط حتى لا تتداخل مع النص المطبوع */
-#view-commencements .paper-date-h{top:30.15%;left:60.0%;width:17.5%;height:2.0%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
-#view-commencements .paper-date-g{top:30.15%;left:18.2%;width:20.2%;height:2.0%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
+#view-commencements .paper-date-h{top:29.65%;left:60.0%;width:17.5%;height:2.0%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
+#view-commencements .paper-date-g{top:29.65%;left:18.2%;width:20.2%;height:2.0%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
 /* اسم الحارس ورقم الهوية في سطر الإقرار */
-#view-commencements .paper-guard-line-name{top:46.65%;left:52.8%;width:25.0%;height:2.25%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
-#view-commencements .paper-id{top:46.65%;left:19.5%;width:21.5%;height:2.25%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
+#view-commencements .paper-guard-line-name{top:46.15%;left:52.8%;width:25.0%;height:2.25%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
+#view-commencements .paper-id{top:46.15%;left:19.5%;width:21.5%;height:2.25%;font-size:clamp(9px,0.95vw,13px);background:#fff !important;line-height:1.05;border-radius:2px}
 /* اسم الحارس في الخانة السفلية - أكبر بوضوح من اسم العنوان العلوي */
-#view-commencements .paper-guard-name{top:57.55%;left:53.8%;width:30.0%;height:2.35%;text-align:center;font-size:clamp(9px,0.95vw,13px);font-weight:700;background:#fff !important;line-height:1.05;border-radius:2px;padding:0 2px}
+#view-commencements .paper-guard-name{top:57.05%;left:53.8%;width:30.0%;height:2.35%;text-align:center;font-size:clamp(9px,0.95vw,13px);font-weight:700;background:#fff !important;line-height:1.05;border-radius:2px;padding:0 2px}
 /* المربعات موجودة أصلاً داخل الورقة؛ نضع علامة الاختيار فقط فوقها */
 #view-commencements .paper-check{position:absolute;width:7.0%;height:2.7%;display:block;cursor:default}
 #view-commencements .paper-check input{opacity:0;position:absolute;inset:0}
@@ -2105,3 +2107,20 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 #view-commencement-list .comm-list-table td,#view-commencement-list .comm-list-table th{white-space:nowrap}
 @media(max-width:1000px){#view-commencements .commencement-workspace{grid-template-columns:1fr;direction:rtl}#view-commencements .commencement-form-panel{position:static}#view-commencements .comm-paper-wrap{max-width:700px}}
 @media(max-width:650px){#view-commencement-list .comm-list-filters{grid-template-columns:1fr}#view-commencements .comm-type-box{grid-template-columns:1fr}}
+
+
+/* ===== Commencement print / PDF ===== */
+@media print{
+  body *{visibility:hidden !important;}
+  #view-commencements, #view-commencements *{visibility:visible !important;}
+  #view-commencements{display:block !important;position:absolute;inset:0;width:100%;padding:0 !important;margin:0 !important;background:#fff !important;}
+  #view-commencements .topbar,
+  #view-commencements .commencement-form-panel,
+  #view-commencements .paper-toolbar,
+  #view-commencements .no-print{display:none !important;}
+  #view-commencements .commencement-workspace{display:block !important;margin:0 !important;padding:0 !important;}
+  #view-commencements .commencement-paper-card{display:block !important;border:0 !important;box-shadow:none !important;padding:0 !important;margin:0 !important;}
+  #view-commencements .comm-paper-wrap{width:210mm !important;max-width:210mm !important;margin:0 auto !important;}
+  #view-commencements .comm-paper-bg{width:100% !important;height:auto !important;}
+  @page{size:A4 portrait;margin:0;}
+}

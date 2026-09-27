@@ -3279,6 +3279,37 @@
   document.getElementById('clearCommListFilters')?.addEventListener('click',()=>{document.getElementById('commListSearch').value='';document.getElementById('commListProject').value='';renderCommencementList();});
   document.getElementById('commencementListBody')?.addEventListener('click',e=>{const b=e.target.closest('.comm-list-preview');if(b)openCommencementForRecord(b.dataset.id);});
 
+  function printCurrentCommencement(){
+    const e=employees.find(x=>x.id===document.getElementById('comm_employee')?.value);
+    if(!e){showToast('اختر الحارس أولاً قبل الطباعة.');return;}
+    renderCommencementPaper();
+    setTimeout(()=>window.print(),50);
+  }
+  async function exportCurrentCommencementPdf(){
+    const e=employees.find(x=>x.id===document.getElementById('comm_employee')?.value);
+    if(!e){showToast('اختر الحارس أولاً قبل إنشاء PDF.');return;}
+    if(!window.html2canvas || !window.jspdf?.jsPDF){showToast('تعذر تجهيز PDF. أعد تحميل الصفحة وحاول مرة أخرى.');return;}
+    renderCommencementPaper();
+    const wrap=document.getElementById('commPaperWrap');
+    if(!wrap)return;
+    const btn=document.getElementById('pdfCommencementBtn');
+    const old=btn?.textContent; if(btn){btn.disabled=true;btn.textContent='جارٍ التجهيز...';}
+    try{
+      const canvas=await window.html2canvas(wrap,{scale:2,useCORS:true,backgroundColor:'#fff',logging:false});
+      const data=canvas.toDataURL('image/png',1);
+      const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+      const pw=pdf.internal.pageSize.getWidth(), ph=pdf.internal.pageSize.getHeight();
+      const ratio=Math.min(pw/canvas.width,ph/canvas.height);
+      const w=canvas.width*ratio, h=canvas.height*ratio;
+      pdf.addImage(data,'PNG',(pw-w)/2,(ph-h)/2,w,h,'COMMENCEMENT','FAST');
+      const safe=(e.fullname||'موظف').replace(/[\\/:*?"<>|]+/g,' ').trim();
+      pdf.save(`مباشرة-${safe||'موظف'}.pdf`);
+    }catch(err){console.error(err);showToast('تعذر إنشاء ملف PDF. حاول مرة أخرى.');}
+    finally{if(btn){btn.disabled=false;btn.textContent=old||'PDF';}}
+  }
+  document.getElementById('printCommencementBtn')?.addEventListener('click',printCurrentCommencement);
+  document.getElementById('pdfCommencementBtn')?.addEventListener('click',exportCurrentCommencementPdf);
+
   /* ===== documents ===== */
   function loadSettingsIntoForm(){
     document.getElementById('s_company').value = settings.company||'';
