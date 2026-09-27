@@ -2046,3 +2046,4 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 .pp-fixed-wrap{justify-content:center;white-space:nowrap}
 .project-penalties-actions{display:flex;justify-content:flex-start;margin-top:12px}
 @media(max-width:700px){.project-penalties-table{min-width:680px}}
+.all-employees-table td,.all-employees-table th{vertical-align:middle;white-space:nowrap}.all-employees-table .row-actions{justify-content:center}.all-employee-row{cursor:pointer}.all-employee-row:hover{background:rgba(30,64,175,.04)}

@@ -37,6 +37,7 @@
         <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17.5" cy="8.5" r="2.5"/><path d="M15.5 14.2c2.6.4 4.5 2.6 4.5 5.3"/></svg>الموظفين</span><b>⌄</b></button>
         <div class="nav-submenu">
           <a class="navlink nav-child" data-view="add"><span>إضافة موظف</span></a>
+          <a class="navlink nav-child" data-view="all-employees"><span>كل الموظفين</span></a>
           <a class="navlink nav-child" data-view="contracts"><span>عقود الموظفين</span></a>
           <a class="navlink nav-child" data-view="allcontracts"><span>كل العقود</span></a>
           <a class="navlink nav-child" data-view="commencements"><span>مباشرات الموظفين</span></a>
@@ -342,6 +343,30 @@
         </table>
       </div>
       <p class="empty-note" id="empEmptyNote" style="display:none">لا توجد نتائج مطابقة.</p>
+    </section>
+
+    <!-- ===== ALL EMPLOYEES ===== -->
+    <section id="view-all-employees" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle"><h1>كل الموظفين</h1><p id="allEmpCount">0 موظف</p></div>
+        <div class="topbar-actions"><button class="btn btn-primary" data-view="add">+ إضافة موظف</button></div>
+      </div>
+      <div class="filters">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>
+          <input type="search" id="allEmployeesSearch" placeholder="ابحث باسم الموظف، الرقم الوظيفي، الوظيفة أو المشروع...">
+        </div>
+        <select id="allEmployeesProjectFilter"><option value="">كل المشاريع</option></select>
+      </div>
+      <div class="card section-card full-page-card">
+        <div class="table-wrap">
+          <table class="all-employees-table">
+            <thead><tr><th>اسم الموظف</th><th>الرقم الوظيفي</th><th>الوظيفة</th><th>المشروع</th><th>حالة العقد</th><th>حالة المباشرة</th><th>الأجر الأخير</th><th>الإجراءات</th></tr></thead>
+            <tbody id="allEmployeesTableBody"></tbody>
+          </table>
+        </div>
+        <p class="empty-note" id="allEmployeesEmpty" style="display:none">لا توجد موظفين مطابقين.</p>
+      </div>
     </section>
 
     <!-- ===== DEPARTMENTS ===== -->
