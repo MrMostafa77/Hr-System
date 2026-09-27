@@ -1053,18 +1053,17 @@
       const info=employeeContractInfo(e.id), contract=info.contract;
       const hasDirect=employeeHasDirectWork(e);
       const lastWage=Number(e.lastwage)||((Number(e.basicsalary)||0)+(Number(e.housing)||0)+(Number(e.transport)||0)+(Number(e.otherallow)||0));
-      const contractNumber=contract ? (contract.contractCode||contract.contractNo||contract.number||'—') : 'بدون عقد';
+      const contractNumber=contract ? (contract.contractCode||contract.contractNo||contract.number||'—') : '';
       return `<tr data-id="${escapeAttr(e.id)}">
         <td><div class="emp-name-cell"><div class="avatar">${escapeHtml(initials(e.fullname))}</div><div class="emp-name"><b>${escapeHtml(e.fullname||'—')}</b><span>${escapeHtml(e.idnum||'')}</span></div></div></td>
         <td class="mono">${escapeHtml(e.empcode||'—')}</td>
         <td>${escapeHtml(e.dept||'—')}</td>
         <td>${escapeHtml(e.jobtitle||'—')}</td>
         <td>${escapeHtml(e.project||'—')}</td>
-        <td>${hasDirect?'<span class="status-badge status-active">تم عمل مباشرة</span>':'<span class="status-badge status-pending">لم تتم المباشرة</span>'}</td>
+        <td>${hasDirect?'<span class="status-badge status-active">تم عمل مباشرة</span>':`<button class="btn btn-sm btn-primary" data-act="directwork">عمل مباشرة</button>`}</td>
         <td class="mono">${money(lastWage)}</td>
-        <td>${escapeHtml(contractNumber)}</td>
+        <td>${contract?escapeHtml(contractNumber):'<button class="btn btn-sm btn-primary" data-act="contract">عمل عقد</button>'}</td>
         <td><div class="row-actions">
-          ${!hasDirect?`<button class="btn btn-sm btn-primary" data-act="directwork">عمل مباشرة</button>`:''}
           <button class="btn icon-btn btn-ghost" data-act="view" title="عرض" aria-label="عرض"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
           <button class="btn icon-btn btn-ghost" data-act="edit" title="تعديل" aria-label="تعديل"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg></button>
         </div></td>
@@ -1075,9 +1074,46 @@
         const id=tr.dataset.id, act=ev.target.closest('[data-act]')?.dataset.act;
         if(act==='edit'){ loadIntoForm(id); switchView('add'); }
         else if(act==='directwork'){ openDirectWorkForEmployee(id); }
+        else if(act==='contract'){ openContractForEmployee(id); }
         else if(act==='view'){ openProfile(id); }
       });
+      tr.addEventListener('dblclick', (ev)=>{
+        if(ev.target.closest('button,a,input,select,textarea')) return;
+        toggleEmployeeDetails(tr.dataset.id, tr);
+      });
     });
+  }
+  function openContractForEmployee(id){
+    currentContractId=null;
+    newContractMode=true;
+    switchView('contracts');
+    const select=document.getElementById('contract_emp');
+    if(select){ select.value=id; select.dispatchEvent(new Event('change')); }
+    document.getElementById('contract_emp')?.scrollIntoView({behavior:'smooth',block:'start'});
+  }
+  function toggleEmployeeDetails(id, row){
+    const body=document.getElementById('empTableBody');
+    const existing=body.querySelector(`tr.employee-details-row[data-for="${CSS.escape(id)}"]`);
+    if(existing){ existing.remove(); return; }
+    body.querySelectorAll('.employee-details-row').forEach(r=>r.remove());
+    const e=employees.find(x=>String(x.id)===String(id));
+    if(!e) return;
+    const ci=employeeContractInfo(e.id), c=ci.contract;
+    const net=netSalary(e);
+    const fields=[
+      ['الاسم الكامل',e.fullname],['الكود الوظيفي',e.empcode],['رقم الهوية / الإقامة',e.idnum],['الجنسية',e.nationality],
+      ['رقم الهاتف',e.phone],['البريد الإلكتروني',e.email],['العنوان',e.address],['القسم',e.dept],
+      ['المسمى الوظيفي',e.jobtitle],['المشروع',e.project],['المنطقة',e.region],['تاريخ المباشرة',e.startdate||e.directWorkDate],
+      ['حالة المباشرة',employeeHasDirectWork(e)?'تم عمل مباشرة':'لم تتم المباشرة'],['رقم العقد',c?(c.contractCode||c.contractNo||c.number):'بدون عقد'],
+      ['نوع العقد',c?.type],['بداية العقد',c?.start],['نهاية العقد',c?.end],['الأجر الأساسي',fmt(e.basicsalary)],
+      ['بدل السكن',fmt(e.housing)],['بدل المواصلات',fmt(e.transport)],['بدلات أخرى',fmt(e.otherallow)],
+      ['التأمينات الاجتماعية',fmt(e.gosi)],['الاستقطاعات',fmt(e.otherded)],['الأجر الصافي',fmt(net)+' ﷼'],
+      ['اسم البنك',e.bankname],['رقم الآيبان',e.iban],['تاريخ الميلاد',e.dob],['مكان إصدار الهوية',e.idplace]
+    ];
+    const detail=document.createElement('tr');
+    detail.className='employee-details-row'; detail.dataset.for=id;
+    detail.innerHTML=`<td colspan="9"><div class="employee-inline-details"><div class="employee-inline-details-head"><strong>البيانات الكاملة للموظف: ${escapeHtml(e.fullname||'')}</strong><span>اضغط مرتين على الموظف لإغلاق التفاصيل</span></div><div class="employee-inline-details-grid">${fields.map(([k,v])=>`<div class="employee-inline-detail"><span>${escapeHtml(k)}</span><b>${v!==undefined&&v!==null&&String(v)!==''?escapeHtml(String(v)):'—'}</b></div>`).join('')}</div></div></td>`;
+    row.insertAdjacentElement('afterend',detail);
   }
   function openDirectWorkForEmployee(id){
     switchView('documents');
