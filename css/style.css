@@ -34,7 +34,7 @@
     --teal:#4C98E8; --teal-soft:#1C3557; --gold:#AEB8C7; --gold-soft:#293447;
     --red:#E08268; --red-soft:#3A241D;
   }
-  html,body{height:100%; overflow-x:hidden;}
+  html,body{height:100%;}
   body{
     margin:0; background:var(--bg); color:var(--ink);
     font-family:'JF Flat Regular','JF Flat','Segoe UI',Tahoma,sans-serif;
@@ -109,11 +109,10 @@
 
   /* cards */
   .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); }
-  .stat-grid{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:18px; align-items:stretch;}
-  .stat-card{padding:11px 12px; min-width:0; min-height:104px; display:flex; flex-direction:column; justify-content:center; gap:4px; overflow:hidden;}
-  .stat-card .n{font-size:23px; font-weight:700; font-family:'JF Flat Regular'; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
-  .stat-card .l{font-size:11.5px; line-height:1.35; color:var(--ink-soft); white-space:normal;}
-  .stat-no-contracts{grid-column:auto; grid-row:auto;}
+  .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px;}
+  .stat-card{padding:16px 16px; display:flex; flex-direction:column; gap:6px;}
+  .stat-card .n{font-size:26px; font-weight:700; font-family:'JF Flat Regular';}
+  .stat-card .l{font-size:12.5px; color:var(--ink-soft);}
   .stat-card.accent{border-color:var(--teal); background:var(--teal-soft);}
   .stat-card.gold{border-color:var(--gold); background:var(--gold-soft);}
   .stat-card.warn{border-color:var(--red); background:var(--red-soft);}
@@ -264,11 +263,8 @@
   .view-toggle{display:flex; gap:6px;}
   .theme-toggle{font-size:11.5px; color:#AEB8C7; cursor:pointer; text-decoration:underline; background:none; border:none; padding:0; font-family:inherit;}
 
-  @media (max-width: 1100px){
-    .stat-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
-  }
   @media (max-width: 880px){
-    .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+    .stat-grid{grid-template-columns:repeat(2,1fr);}
     .grid-2{grid-template-columns:1fr;}
     .field-grid, .info-grid{grid-template-columns:1fr;}
   }
@@ -2130,3 +2126,44 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
   #view-commencements .paper-check input:checked+span:after{font-size:20px !important;}
   @page{size:A4 portrait;margin:0;}
 }
+
+/* ===== الحضور والانصراف — تنسيق الكشف الجديد ===== */
+.attendance-filters{display:grid;grid-template-columns:1.05fr 1.15fr 1fr 1.35fr;align-items:end;gap:8px;margin-bottom:8px;}
+.att-filter-field{min-width:0;display:flex;flex-direction:column;gap:4px;}
+.att-filter-field label{font-size:11.5px;color:var(--ink-soft);font-weight:700;}
+.att-filter-field input,.att-filter-field select{width:100%;min-width:0;height:38px;padding:7px 9px;}
+.att-month-hidden{display:none!important;}
+.att-search-row{margin:0 0 9px;}
+.att-search-row input{width:100%;height:38px;padding:7px 10px;background:var(--surface);}
+.att-legend{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:9px;align-items:center;}
+.att-legend span{font-size:11px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;}
+.att-legend i{width:10px;height:10px;border-radius:3px;display:inline-block;border:1px solid rgba(0,0,0,.12);}
+.legend-h{background:#D9F2E6}.legend-gh{background:#FFD9D5}.legend-sh{background:#B72D2D}.legend-j{background:#FFF0A8}.legend-r{background:#BFE3FF}.legend-t{background:#C7CCD2}.legend-d{background:#BFEBCB}.legend-s{background:#222}.legend-g{background:#B9F0A8}.legend-e{background:#F6B6D5}
+.att-table{min-width:0!important;width:100%;table-layout:fixed;}
+.att-table th,.att-table td{padding:4px 5px!important;font-size:11px;}
+.att-table th.name-col,.att-table td.name-col{min-width:135px;width:135px;}
+.att-table th:nth-child(2),.att-table td:nth-child(2){width:70px;}
+.att-table th:nth-child(3),.att-table td:nth-child(3){width:90px;}
+.att-table th:nth-child(4),.att-table td:nth-child(4){width:110px;}
+.att-table .att-select{width:100%;min-width:30px;height:28px;padding:1px 2px;text-align:center;font-size:11px;font-weight:700;}
+.att-table .sum-col{width:40px;min-width:40px;}
+.att-actions{position:relative;display:flex;gap:4px;justify-content:center;align-items:center;white-space:nowrap;}
+.att-edit-wrap{position:relative;display:inline-flex;}
+.att-edit-btn,.att-save-btn{width:30px!important;height:30px!important;padding:0!important;justify-content:center;border-radius:7px!important;}
+.att-edit-btn svg,.att-save-btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.att-edit-menu{display:none;position:absolute;z-index:20;top:34px;right:0;min-width:145px;padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:0 10px 25px rgba(0,0,0,.16);}
+.att-edit-menu.open{display:block;}
+.att-menu-item{display:block;width:100%;border:0;background:transparent;color:var(--ink);padding:8px 9px;text-align:right;border-radius:6px;font-family:inherit;font-size:11.5px;cursor:pointer;}
+.att-menu-item:hover{background:var(--border-soft);color:var(--teal);}
+/* code colors — light and dark friendly */
+.att-select.code-ح{background:#D9F2E6!important;color:#16714B!important;border-color:#7CC8A5!important;}
+.att-select.code-غ{background:#FFD9D5!important;color:#A52B20!important;border-color:#E68A82!important;}
+.att-select.code-ش{background:#B72D2D!important;color:#fff!important;border-color:#8E1D1D!important;}
+.att-select.code-ج{background:#FFF0A8!important;color:#7A6200!important;border-color:#E1C83D!important;}
+.att-select.code-راحة{background:#BFE3FF!important;color:#155B91!important;border-color:#7DBBE5!important;}
+.att-select.code-ط{background:#C7CCD2!important;color:#303844!important;border-color:#9EA5AE!important;}
+.att-select.code-ض{background:#BFEBCB!important;color:#166B35!important;border-color:#7CC58D!important;}
+.att-select.code-س{background:#222!important;color:#fff!important;border-color:#111!important;}
+.att-select.code-جمع{background:#B9F0A8!important;color:#245E19!important;border-color:#82CF6F!important;}
+.att-select.code-عيد{background:#F6B6D5!important;color:#7A2452!important;border-color:#DE7EAD!important;}
+@media(max-width:900px){.attendance-filters{grid-template-columns:1fr 1fr;}.att-search-row{margin-top:2px;}}
