@@ -304,6 +304,65 @@
     });
   }
   function selectedKeys(mode){return [...document.querySelectorAll(`[data-project-${mode}-toggle]:checked`)].map(x=>x.dataset[`project${mode[0].toUpperCase()+mode.slice(1)}Toggle`]);}
+  /* ===== لائحة الجزاءات والخصومات الخاصة بالمشروع ===== */
+  const DEFAULT_PROJECT_PENALTIES = [
+    {name:'يوم الغياب بدون عذر', days:2, fixed:false, amount:0, custom:false},
+    {name:'يوم غياب بعذر', days:1, fixed:false, amount:0, custom:false},
+    {name:'الانسحاب من الموقع', days:3, fixed:false, amount:0, custom:false},
+    {name:'مخالفة الزي الرسمي', days:1, fixed:false, amount:0, custom:false},
+    {name:'النوم في الموقع', days:1, fixed:false, amount:0, custom:false},
+    {name:'مخالفة اوامر المدير المباشر', days:1, fixed:false, amount:0, custom:false},
+    {name:'مخالفة شرب السجائر', days:1, fixed:false, amount:0, custom:false}
+  ];
+  function projectPenaltyDefaults(){ return DEFAULT_PROJECT_PENALTIES.map(x=>({...x})); }
+  function projectPenaltyRow(item={}, index=0){
+    const fixed=!!item.fixed, days=Math.min(10,Math.max(1,Number(item.days)||1));
+    const options=Array.from({length:10},(_,i)=>`<option value="${i+1}" ${days===i+1?'selected':''}>${i+1}</option>`).join('');
+    return `<tr class="project-penalty-row" data-index="${index}">
+      <td><input class="pp-name" value="${escapeAttr(item.name||'')}" ${item.custom?'':'readonly'}></td>
+      <td><select class="pp-days" ${fixed?'disabled':''}>${options}</select></td>
+      <td><label class="project-check pp-fixed-wrap"><input type="checkbox" class="pp-fixed" ${fixed?'checked':''}><span>مبلغ مقطوع</span></label></td>
+      <td><input class="pp-amount" type="number" min="0" step="0.01" placeholder="اكتب المبلغ" value="${fixed?escapeAttr(item.amount||''):''}" ${fixed?'':'disabled'}></td>
+      <td>${item.custom?'<button type="button" class="small-btn danger pp-remove">×</button>':'<span class="muted">افتراضي</span>'}</td>
+    </tr>`;
+  }
+  function renderProjectPenalties(items){
+    const body=document.getElementById('projectPenaltiesBody'); if(!body)return;
+    const list=Array.isArray(items)&&items.length?items:projectPenaltyDefaults();
+    body.innerHTML=list.map((x,i)=>projectPenaltyRow(x,i)).join('');
+  }
+  function getProjectPenalties(){
+    return [...document.querySelectorAll('#projectPenaltiesBody .project-penalty-row')].map(row=>({
+      name:row.querySelector('.pp-name')?.value.trim()||'مخالفة أخرى',
+      days:Math.min(10,Math.max(1,Number(row.querySelector('.pp-days')?.value)||1)),
+      fixed:!!row.querySelector('.pp-fixed')?.checked,
+      amount:Number(row.querySelector('.pp-amount')?.value)||0,
+      custom:!row.querySelector('.pp-name')?.readOnly
+    })).filter(x=>x.name);
+  }
+  function bindProjectPenalties(){
+    const body=document.getElementById('projectPenaltiesBody'); if(!body)return;
+    body.onchange=e=>{
+      const row=e.target.closest('.project-penalty-row'); if(!row)return;
+      if(e.target.classList.contains('pp-fixed')){
+        const fixed=e.target.checked;
+        const days=row.querySelector('.pp-days'), amount=row.querySelector('.pp-amount');
+        if(days)days.disabled=fixed;
+        if(amount)amount.disabled=!fixed;
+        if(!fixed && amount)amount.value='';
+      }
+    };
+    body.onclick=e=>{
+      const b=e.target.closest('.pp-remove'); if(!b)return;
+      b.closest('.project-penalty-row')?.remove();
+    };
+    document.getElementById('addProjectPenaltyBtn')?.addEventListener('click',()=>{
+      const index=body.querySelectorAll('.project-penalty-row').length;
+      body.insertAdjacentHTML('beforeend',projectPenaltyRow({name:'مخالفة أخرى',days:1,fixed:false,amount:0,custom:true},index));
+    });
+  }
+  renderProjectPenalties();
+  bindProjectPenalties();
   function updateProjectTotals(){
     let detailRevenue=0, detailCost=0;
     ['revenue','cost'].forEach(mode=>{
@@ -465,12 +524,14 @@
     renderDynamicDetails('revenue',{});renderDynamicDetails('cost',{});
     refreshRegionSelects();
     document.getElementById('projectRegion').value='';setMulti('phone',[]);setMulti('email',[]);
+    const penB=document.getElementById('projectDefaultPenaltiesToggle'); if(penB) penB.checked=false;
+    renderProjectPenalties();
     updateProjectTotals();toggleProjectConfig();
   }
   function resetProjectSection(section){
     if(section==='basic'){
       ['projectName','projectCR','projectVatNo','projectAddress','projectRepId','projectRepName'].forEach(id=>document.getElementById(id).value='');
-      document.getElementById('projectVat').value='15'; const siB=document.getElementById('projectSiToggle'); if(siB) siB.checked=false; const medB=document.getElementById('projectMedToggle'); if(medB) medB.checked=false; setMulti('phone',[]);setMulti('email',[]);
+      document.getElementById('projectVat').value='15'; const siB=document.getElementById('projectSiToggle'); if(siB) siB.checked=false; const medB=document.getElementById('projectMedToggle'); if(medB) medB.checked=false; const penB=document.getElementById('projectDefaultPenaltiesToggle'); if(penB) penB.checked=false; setMulti('phone',[]);setMulti('email',[]);
       refreshRegionSelects();
       document.getElementById('projectRegion').value='';
     }else if(section==='revenue'){
@@ -495,7 +556,8 @@
       const rev=p.revenueItems||{}, cost=p.costItems||{};
       document.querySelectorAll('[data-project-revenue-toggle]').forEach(c=>c.checked=c.dataset.projectRevenueToggle==='guards' || Array.isArray(rev[c.dataset.projectRevenueToggle]));
       document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards' || Array.isArray(cost[c.dataset.projectCostToggle]));
-      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled;
+      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled; const penEdit=document.getElementById('projectDefaultPenaltiesToggle'); if(penEdit) penEdit.checked=!!p.defaultPenaltiesEnabled;
+      renderProjectPenalties(p.penaltiesPolicy);
       renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();window.scrollTo({top:0,behavior:'smooth'});
     });
     body.querySelectorAll('[data-project-view]').forEach(b=>b.onclick=()=>{const p=projects.find(x=>x.id===b.dataset.projectView); if(p)showProjectView(p);});
@@ -540,7 +602,7 @@
     const guardRevenue=unitFrom(revenueItems,'guards');
     const data={
       id:document.getElementById('projectId').value||'p'+Date.now(), name:document.getElementById('projectName').value.trim(), region:document.getElementById('projectRegion').value,
-      cr:document.getElementById('projectCR').value.trim(), vatNo:document.getElementById('projectVatNo').value.trim(), address:document.getElementById('projectAddress').value.trim(), phones:getMulti('phone'), emails:getMulti('email'), repId:document.getElementById('projectRepId').value.trim(), repName:document.getElementById('projectRepName').value.trim(), vatRate:vatRate(), medEnabled:!!document.getElementById('projectMedToggle')?.checked,
+      cr:document.getElementById('projectCR').value.trim(), vatNo:document.getElementById('projectVatNo').value.trim(), address:document.getElementById('projectAddress').value.trim(), phones:getMulti('phone'), emails:getMulti('email'), repId:document.getElementById('projectRepId').value.trim(), repName:document.getElementById('projectRepName').value.trim(), vatRate:vatRate(), medEnabled:!!document.getElementById('projectMedToggle')?.checked, defaultPenaltiesEnabled:!!document.getElementById('projectDefaultPenaltiesToggle')?.checked, penaltiesPolicy:getProjectPenalties(),
       guards, guardsFemale, supervisors:supervisorQty, managers:managerQty, patrols:patrolQty, devices:deviceQty, uniforms:uniformQty, cones:extraQty,
       revenueGuard:guardRevenue, costGuard:guardSalary, revenueTotal:guards*guardRevenue, costTotal:costGuards*guardSalary,
       revenueItems, costItems, guardBasic:guardSalary, guardHousing:0, guardTransport:0, guardOther:0,

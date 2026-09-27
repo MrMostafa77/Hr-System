@@ -230,6 +230,7 @@
             <div class="field pj-vat"><label>ضريبة القيمة المضافة %</label><input type="number" id="projectVat" value="15" min="0" step="0.01"></div>
             <label class="project-check project-check-si"><input type="checkbox" id="projectSiToggle" data-project-si-toggle><span>التأمينات الاجتماعية</span></label>
             <label class="project-check project-check-si"><input type="checkbox" id="projectMedToggle"><span>التأمين الطبي</span></label>
+            <label class="project-check project-check-si"><input type="checkbox" id="projectDefaultPenaltiesToggle"><span>لائحة مخالفات افتراضية</span></label>
           </div></div>
           <div id="projectSiComplianceAlert" hidden></div>
         </div></div>
@@ -239,6 +240,7 @@
           <div class="project-subtabs" role="tablist">
             <button type="button" class="project-subtab active" data-project-tab="revenue">الإيرادات</button>
             <button type="button" class="project-subtab" data-project-tab="cost">التكاليف</button>
+            <button type="button" class="project-subtab" data-project-tab="penalties">لائحة الجزاءات والخصومات</button>
           </div>
           <div class="project-subpanel active" data-project-panel="revenue">
             <div class="project-options-title">العناصر المتوفرة في المشروع</div>
@@ -268,6 +270,18 @@
               <label class="project-check"><input type="checkbox" data-project-cost-toggle="extras"><span>اقماع وملحقات</span></label>
               <label class="project-check"><input type="checkbox" data-project-cost-toggle="adminEmployees"><span>موظفين اداريين</span></label>
               <label class="project-check"><input type="checkbox" data-project-cost-toggle="other"><span>اخرى</span></label>
+            </div>
+          </div>
+          <div class="project-subpanel" data-project-panel="penalties">
+            <div class="project-options-title">لائحة الجزاءات والخصومات</div>
+            <div class="table-wrap project-penalties-table-wrap">
+              <table class="payroll-table project-penalties-table">
+                <thead><tr><th>المخالفة</th><th>عدد الأيام</th><th>مبلغ مقطوع</th><th>المبلغ</th><th>الإجراء</th></tr></thead>
+                <tbody id="projectPenaltiesBody"></tbody>
+              </table>
+            </div>
+            <div class="project-penalties-actions">
+              <button type="button" class="btn btn-sm" id="addProjectPenaltyBtn">+ إضافة مخالفة أخرى</button>
             </div>
           </div>
         </div>

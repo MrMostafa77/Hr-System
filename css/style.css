@@ -2033,3 +2033,16 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
   .floating-action{width:44px;height:44px}
   .floating-action::after{display:none}
 }
+
+/* ===== لائحة الجزاءات والخصومات للمشروع ===== */
+.project-penalties-table-wrap{overflow-x:auto;margin-top:4px}
+.project-penalties-table{width:100%;min-width:760px}
+.project-penalties-table th,.project-penalties-table td{vertical-align:middle}
+.project-penalties-table .pp-name{width:100%;min-width:220px}
+.project-penalties-table .pp-days{width:100%;min-width:90px}
+.project-penalties-table .pp-amount{width:100%;min-width:150px}
+.project-penalties-table input,.project-penalties-table select{box-sizing:border-box}
+.project-penalties-table input:disabled,.project-penalties-table select:disabled{opacity:.58;cursor:not-allowed;background:var(--surface-2,var(--surface))}
+.pp-fixed-wrap{justify-content:center;white-space:nowrap}
+.project-penalties-actions{display:flex;justify-content:flex-start;margin-top:12px}
+@media(max-width:700px){.project-penalties-table{min-width:680px}}
