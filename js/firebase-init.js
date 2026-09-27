@@ -2,8 +2,7 @@
 // No npm/build step is required; this project is static and GitHub/Firebase Hosting ready.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
-import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
+import { getFirestore, doc, getDoc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyCnUTSCdtYjQg-OIH8D9GwdKjcow_LTK-k',
@@ -17,44 +16,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const firestore = getFirestore(app);
-const storage = getStorage(app);
 const stateRef = doc(firestore, 'hr_system', 'main');
 
 window.FB = {
-  app, auth, firestore, storage,
-  // ملفات الموظفين تُخزَّن الآن كـ base64 داخل مستند Firestore خاص بكل ملف
-  // (مستقل عن مستند حالة النظام الرئيسي)، بدل رفعها لـ Cloud Storage —
-  // لأن Storage يتطلب ترقية الحساب لخطة Blaze، بينما Firestore يعمل مجاناً.
-  saveEmployeeFileData: async (employeeId, fileKey, payload) => {
-    if(!auth.currentUser) throw new Error('AUTH_REQUIRED');
-    const ref = doc(firestore, 'hr_system', 'main', 'employee_files', employeeId+'__'+fileKey);
-    await setDoc(ref, { ...payload, updatedAt: new Date().toISOString() });
-    return { name: payload.name, type: payload.type || '', size: payload.size || 0, key: fileKey, uploadedAt: new Date().toISOString() };
-  },
-  getEmployeeFileData: async (employeeId, fileKey) => {
-    const ref = doc(firestore, 'hr_system', 'main', 'employee_files', employeeId+'__'+fileKey);
-    const snap = await getDoc(ref);
-    return snap.exists() ? snap.data() : null;
-  },
-  deleteEmployeeFileData: async (employeeId, fileKey) => {
-    const ref = doc(firestore, 'hr_system', 'main', 'employee_files', employeeId+'__'+fileKey);
-    await deleteDoc(ref);
-  },
-  // الدوال التالية (Storage) لا تزال موجودة للتوافق مع أي ملفات قديمة رُفعت
-  // بالطريقة السابقة قبل هذا التعديل فقط.
-  uploadEmployeeFile: async (employeeId, fileKey, file) => {
-    if(!auth.currentUser) throw new Error('AUTH_REQUIRED');
-    const safeName = String(file.name || 'file').replace(/[^a-zA-Z0-9._-]+/g,'_').slice(0,120);
-    const path = `employee-files/${auth.currentUser.uid}/${employeeId}/${fileKey}/${Date.now()}_${safeName}`;
-    const storageRef = ref(storage, path);
-    await uploadBytes(storageRef, file, {contentType:file.type || 'application/octet-stream', customMetadata:{employeeId, fileKey}});
-    const url = await getDownloadURL(storageRef);
-    return {path, url, name:file.name, type:file.type || '', size:file.size || 0, uploadedAt:new Date().toISOString()};
-  },
-  deleteEmployeeFile: async (path) => {
-    if(!path) return;
-    await deleteObject(ref(storage, path));
-  },
+  app, auth, firestore,
   hydrateState: async (fallbackState) => {
     const snap = await getDoc(stateRef);
     if (snap.exists()) return snap.data();

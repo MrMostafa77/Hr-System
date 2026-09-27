@@ -10,7 +10,6 @@
   const PROJECT_KEY = 'hr_projects_v1';
   const DEPT_KEY = 'hr_departments_v1';
   const CONTRACT_KEY = 'hr_contracts_v1';
-  const COMMENCEMENT_KEY = 'hr_commencements_v1';
   const PROJECT_ACCOUNT_KEY = 'hr_project_accounts_v1';
   const ATT_CODES = ['','ح','غ','ج','ط','راحة','اضافي','انسحاب','عيد'];
   let employees = [];
@@ -22,7 +21,6 @@
   let projects = [];
   let departments = [];
   let contracts = [];
-  let commencements = [];
   let projectAccounts = [];
   let currentView = 'dashboard';
   let currentProfileId = null;
@@ -30,18 +28,6 @@
   let currentDocType = 'contract';
   let currentContractId = null;
   let newContractMode = false;
-  let pendingEmployeeFiles = {};
-  const EMPLOYEE_FILE_TYPES = [
-    {key:'contractCopy', label:'تحميل نسخة العقد'},
-    {key:'idCopy', label:'تحميل صورة الهوية'},
-    {key:'nationalAddress', label:'تحميل العنوان الوطني'},
-    {key:'cv', label:'تحميل الـ CV'},
-    {key:'commencement', label:'تحميل مباشرة العمل'},
-    {key:'delegationMemo', label:'تحميل مذكرة التفويض'},
-    {key:'criminalRecord', label:'تحميل صحيفة السوابق'},
-    {key:'bankIban', label:'تحميل الايبان البنكي'},
-    {key:'guaranteeCertificate', label:'شهادة كفالة حضورية'}
-  ];
 
   function readLocal(key, fallback){
     try{
@@ -76,7 +62,6 @@
       projects,
       departments: readLocal(DEPT_KEY, []),
       contracts: readLocal(CONTRACT_KEY, []),
-      commencements: readLocal(COMMENCEMENT_KEY, []),
       projectAccounts: readLocal(PROJECT_ACCOUNT_KEY, [])
     };
   }
@@ -90,22 +75,20 @@
     projects = Array.isArray(state?.projects) ? state.projects : [];
     departments = Array.isArray(state?.departments) ? state.departments : [];
     contracts = Array.isArray(state?.contracts) ? state.contracts : [];
-    commencements = Array.isArray(state?.commencements) ? state.commencements : [];
     projectAccounts = Array.isArray(state?.projectAccounts) ? state.projectAccounts : [];
     if(!departments.length && employees.length){
       const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map);
     }
   }
   function currentState(){
-    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts};
+    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,projectAccounts};
   }
   let cloudSaveTimer = null;
   let cloudApplying = false;
-  let forceOperationalReset = false;
   function persistLocal(){
     writeLocal(STORAGE_KEY,employees); writeLocal(ATT_KEY,attendance);
     writeLocal(PEN_KEY,penalties); writeLocal(COV_KEY,coverage); writeLocal(SET_KEY,settings);
-    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts);
+    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts);
   }
   function persistCloud(message='تم حفظ التغييرات بنجاح'){
     persistLocal();
@@ -125,7 +108,7 @@
   function loadAux(){
     const state=localState();
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
-    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[];
+    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; projectAccounts=state.projectAccounts||[];
     if(!departments.length && employees.length){ const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map); }
     persistLocal();
   }
@@ -137,7 +120,6 @@
   function saveProjects(){ persistCloud(); }
   function saveDepartments(){ persistCloud(); }
   function saveContracts(){ persistCloud(); }
-  function saveCommencements(){ persistCloud(); }
   function saveProjectAccounts(){ persistCloud(); }
   
 
@@ -171,7 +153,7 @@
     el.querySelectorAll('[data-region-del]').forEach(b=>b.onclick=()=>{if(confirm('حذف المنطقة؟')){regions.splice(Number(b.dataset.regionDel),1);saveRegions();renderRegions();refreshRegionSelects();renderProjects();}});
   }
   const projectKinds={
-    managers:'مدير مشروع', supervisors:'مشرفين امن', guards:'حارس امن', guardsFemale:'حارسات امن', patrols:'سيارات ( دوريات )', devices:'اجهزة اتصالات', uniforms:'بدل امن', extras:'اقماع وملحقات', adminEmployees:'موظفين اداريين', other:'اخرى'
+    guards:'حارس أمن', guardsFemale:'حارسات أمن', supervisors:'مشرفين', managers:'مدير أمن', patrols:'دوريات أمنية', devices:'أجهزة اتصالات', uniforms:'بدل أمن', extras:'ملحقات مشروع'
   };
   const roleCapacityLabels={guards:'حراس الأمن',guardsFemale:'حارسات الأمن',supervisors:'المشرفين',managers:'مدراء المشاريع',patrols:'الدوريات'};
   function money(v){return `${fmt(Number(v)||0)} ريال`;}
@@ -179,34 +161,9 @@
   /* ===== التأمينات الاجتماعية (في تكاليف المشروع) ===== */
   const SI_GUARD_RATE=10.75, SI_COMPANY_RATE=12.75;   // نسبة حصة الحارس / حصة الشركة (%)
   const siRoles=['guards','guardsFemale','supervisors','managers'];
-  const SI_MIN_SALARY=4000;
-  function socialInsuranceComplianceIssues(costItems, enabled=true){
-    if(!enabled) return [];
-    const issues=[];
-    siRoles.forEach(key=>{
-      (costItems?.[key]||[]).forEach((r,i)=>{
-        const qty=Number(r.quantity)||0;
-        const unit=Number(r.unit)||0;
-        if(qty>0 && unit>0 && unit<SI_MIN_SALARY) issues.push({key,index:i,name:projectKinds[key],qty,unit});
-      });
-    });
-    return issues;
-  }
-  function socialInsuranceComplianceHtml(costItems, enabled=true){
-    const issues=socialInsuranceComplianceIssues(costItems,enabled);
-    if(!issues.length) return '';
-    const names=[...new Set(issues.map(x=>x.name))].join('، ');
-    return `<div class="pj-si-warning"><b>⚠ مخالفة محتملة للتأمينات الاجتماعية</b><div>يوجد ${escapeHtml(names)} بتكلفة للفرد أقل من ${money(SI_MIN_SALARY)}. الحد الأدنى للراتب المضاف عند تفعيل التأمينات الاجتماعية هو ${money(SI_MIN_SALARY)}.</div>${issues.map(x=>`<div class="pj-si-warning-row"><span>${escapeHtml(x.name)}${x.qty>1?` × ${fmt(x.qty)}`:''}</span><b>${money(x.unit)} للفرد</b></div>`).join('')}</div>`;
-  }
-  function renderSocialInsuranceCompliance(){
-    const box=document.getElementById('projectSiComplianceAlert'); if(!box)return;
-    const on=!!document.getElementById('projectSiToggle')?.checked;
-    box.innerHTML=socialInsuranceComplianceHtml(getDetailData('cost'),on);
-    box.hidden=!box.innerHTML;
-  }
   function socialInsuranceCalc(){
     const data=getDetailData('cost'); const rows=[];
-    siRoles.forEach(key=>(data[key]||[]).forEach(r=>rows.push({key,name:projectKinds[key],salary:Number(r.unit)||0,qty:Number(r.quantity)||0})));
+    siRoles.forEach(key=>(data[key]||[]).forEach(r=>rows.push({key,name:projectKinds[key],salary:(r.basic!=null?(Number(r.basic)||0)*(1+(Number(r.hPct)||0)/100):Number(r.unit)||0),qty:Number(r.quantity)||0})));
     const sum=rate=>rows.reduce((a,r)=>a+r.salary*rate/100*r.qty,0);
     return {rows,guardTotal:sum(SI_GUARD_RATE),companyTotal:sum(SI_COMPANY_RATE)};
   }
@@ -230,39 +187,46 @@
   }
   const ampBoxes=a=>`<div class="pd-amt-boxes"><div class="project-calc-box"><span>للفرد</span><b class="${a}">0 ريال</b></div><div class="project-calc-box"><span>للعدد</span><b class="${a}-n">0 ريال</b></div></div>`;
   function detailCard(mode,key,title,data={}){
-    const isRevenue=mode==='revenue';
-    const isType=key==='devices'||key==='uniforms'||key==='other';
-    const qty=Number(data.quantity||data.count||0)||0;
-    const unit=Number(data.unit||data.price||data.salary||0)||0;
+    const isType=key==='devices'||key==='uniforms', sal=mode==='cost'&&siRoles.includes(key);
+    const qty=Number(data.quantity||data.count||0)||0; let unit=Number(data.unit||data.price||data.salary||0)||0;
     const type=data.type||'';
+    const hP=data.hPct??25, tP=data.tPct??38.5, oth=Number(data.other)||0;
+    let basic=data.basic; if(sal&&basic==null) basic=unit?Math.round(unit/(1+(hP+tP)/100)*100)/100:0;
+    if(sal) unit=(Number(basic)||0)*(1+(Number(hP)+Number(tP))/100)+oth;
+    const numA=(c,l,v,a)=>`<div class="field"><label>${l}</label><input type="number" class="${c}" min="0" step="0.01" value="${v}">${ampBoxes(a)}</div>`;
     const num=(c,l,v,st='0.01')=>`<div class="field"><label>${l}</label><input type="number" class="${c}" min="0" step="${st}" value="${v}"></div>`;
-    const typeField=isType?`<div class="field"><label>النوع / البيان</label><input class="pd-type" value="${escapeAttr(type)}" placeholder="اكتب النوع أو البيان"></div>`:'';
-    if(isRevenue){
-      const before=qty*unit, vat=before*(vatRate()/100), after=before+vat;
-      return `<div class="project-detail-card" data-project-detail="revenue-${key}" data-key="${key}">
-        <div class="project-detail-head"><h4>${title}</h4>${isType?`<button type="button" class="small-btn danger project-remove-detail">×</button>`:''}</div>
-        <div class="field-grid project-detail-fields project-revenue-fields">
-          ${typeField}${num('pd-qty','العدد',qty,'1')}${num('pd-unit','الإيراد / للفرد',unit)}
-          <div class="project-calc-box"><span>الإجمالي قبل الضريبة</span><b class="pd-before">${money(before)}</b></div>
-          <div class="project-calc-box"><span>الضريبة</span><b class="pd-vat">${money(vat)}</b></div>
-          <div class="project-calc-box"><span>الإجمالي بعد الضريبة</span><b class="pd-after">${money(after)}</b></div>
-        </div>
-      </div>`;
-    }
-    return `<div class="project-detail-card" data-project-detail="cost-${key}" data-key="${key}">
+    return `<div class="project-detail-card" data-project-detail="${mode}-${key}" data-key="${key}">
       <div class="project-detail-head"><h4>${title}</h4>${isType?`<button type="button" class="small-btn danger project-remove-detail">×</button>`:''}</div>
-      <div class="field-grid project-detail-fields project-cost-fields">
-        ${typeField}${num('pd-qty','العدد',qty,'1')}${num('pd-unit','التكلفة / للفرد',unit)}
-        <div class="project-calc-box"><span>الإجمالي</span><b class="pd-total">${money(qty*unit)}</b></div>
+      ${isType?`<div class="field"><label>النوع</label><input class="pd-type" value="${escapeAttr(type)}" placeholder="اكتب النوع"></div>`:''}
+      <div class="field-grid project-detail-fields ${sal?'pd-cols-7':'pd-cols-4'}">
+        ${num('pd-qty','العدد',qty,'1')}
+        ${sal?num('pd-basic','الأساسي',basic)+numA('pd-hpct','سكن %',hP,'pd-hamt')+numA('pd-tpct','مواصلات %',tP,'pd-tamt')+`<div class="field"><label>بدلات أخرى (ريال)</label><input type="number" class="pd-other" min="0" step="0.01" value="${oth}">${ampBoxes('pd-oamt')}</div>`
+          +`<input type="hidden" class="pd-unit" value="${unit.toFixed(2)}">`
+          :num('pd-unit',mode==='revenue'?'الإيراد / القطعة':'الراتب / القطعة',unit)}
+        <div class="project-calc-box"><span>الإجمالي للقطعة</span><b class="pd-unit-total">${money(unit)}</b></div>
+        <div class="project-calc-box"><span>الإجمالي للعدد</span><b class="pd-total">${money(qty*unit)}</b></div>
       </div>
+      ${sal?'<div class="pd-si project-si" hidden></div>':''}
+      ${sal?`<div class="pd-med project-si" hidden><div class="project-si-title">التأمين الطبي <small>الشهري = التكلفة السنوية ÷ 12</small></div><div class="pd-med-fields"><div class="field"><label>التكلفة السنوية للفرد (ريال)</label><input type="number" class="pd-med-annual" min="0" step="0.01" value="${Number(data.medAnnual)||0}"></div><div class="project-calc-box"><span>شهريًا للفرد</span><b class="pd-med-m">0 ريال</b></div><div class="project-calc-box"><span>شهريًا للعدد</span><b class="pd-med-mn">0 ريال</b></div></div></div>`:''}
     </div>`;
   }
-  function refreshSalaryCard(card){ return; }
+  function refreshSalaryCard(card){
+    if(!card.querySelector('.pd-basic'))return;
+    const g=c=>Number(card.querySelector(c).value)||0, basic=g('.pd-basic'), h=basic*g('.pd-hpct')/100, t=basic*g('.pd-tpct')/100, q=g('.pd-qty');
+    const o=g('.pd-other'), put=(c,v)=>{card.querySelector('.'+c).textContent=money(v);card.querySelector('.'+c+'-n').textContent=money(v*q);};
+    put('pd-hamt',h);put('pd-tamt',t);put('pd-oamt',o);
+    const medBox=card.querySelector('.pd-med'), medOn=!!document.getElementById('projectMedToggle')?.checked; medBox.hidden=!medOn;
+    if(medOn){const a=g('.pd-med-annual'); card.querySelector('.pd-med-m').textContent=money(a/12); card.querySelector('.pd-med-mn').textContent=money(a/12*q);}
+    const box=card.querySelector('.pd-si'), on=!!document.getElementById('projectSiToggle')?.checked;
+    box.hidden=!on; if(!on){box.innerHTML='';return;}
+    const base=basic+h, part=(cls,title,rate)=>`<div class="project-si-box ${cls}"><div class="si-head"><h4>${title}</h4><span class="si-rate">${rate}%</span></div><div class="pd-si-row"><span>للفرد</span><b>${money(base*rate/100)}</b></div><div class="pd-si-row"><span>للعدد (${fmt(q)})</span><b>${money(base*rate/100*q)}</b></div></div>`;
+    box.innerHTML=`<div class="project-si-title">التأمينات الاجتماعية <small>محسوبة على الأساسي + السكن (${money(base)})</small></div><div class="project-si-grid">${part('si-guard','حصة الموظف',SI_GUARD_RATE)}${part('si-company','حصة الشركة',SI_COMPANY_RATE)}</div>`;
+  }
   function getDetailData(mode){
     const out={};
     document.querySelectorAll(`#project${mode==='revenue'?'Revenue':'Cost'}Details .project-detail-card`).forEach(card=>{
       const key=card.dataset.key; if(!out[key])out[key]=[];
-      out[key].push({type:card.querySelector('.pd-type')?.value||'',quantity:Number(card.querySelector('.pd-qty')?.value)||0,unit:Number(card.querySelector('.pd-unit')?.value)||0});
+      out[key].push({type:card.querySelector('.pd-type')?.value||'',quantity:Number(card.querySelector('.pd-qty')?.value)||0,unit:Number(card.querySelector('.pd-unit')?.value)||0,...(card.querySelector('.pd-basic')?{basic:Number(card.querySelector('.pd-basic').value)||0,hPct:Number(card.querySelector('.pd-hpct').value)||0,tPct:Number(card.querySelector('.pd-tpct').value)||0,other:Number(card.querySelector('.pd-other').value)||0,medAnnual:Number(card.querySelector('.pd-med-annual')?.value)||0}:{})});
     });
     return out;
   }
@@ -277,25 +241,18 @@
         const title=(key==='devices'||key==='uniforms') ? `${projectKinds[key]} — نوع ${i+1}` : projectKinds[key];
         out.push(detailCard(mode,key,title,row));
       });
-      if(key==='devices'||key==='uniforms'||key==='other') out.push(`<button type="button" class="small-btn add-type project-add-detail" data-add-detail="${mode}-${key}">+ إضافة نوع ${projectKinds[key]}</button>`);
+      if(key==='devices'||key==='uniforms') out.push(`<button type="button" class="small-btn add-type project-add-detail" data-add-detail="${mode}-${key}">+ إضافة نوع ${projectKinds[key]}</button>`);
     });
     container.innerHTML=out.join('');
     bindProjectDetailInputs();
   }
   function bindProjectDetailInputs(){
     document.querySelectorAll('#projectRevenueDetails .project-detail-card,#projectCostDetails .project-detail-card').forEach(card=>{
-      const recalc=()=>{
-        const q=Number(card.querySelector('.pd-qty')?.value)||0,u=Number(card.querySelector('.pd-unit')?.value)||0;
-        const before=q*u, vat=before*(vatRate()/100);
-        if(card.querySelector('.pd-total')) card.querySelector('.pd-total').textContent=money(before);
-        if(card.querySelector('.pd-before')) card.querySelector('.pd-before').textContent=money(before);
-        if(card.querySelector('.pd-vat')) card.querySelector('.pd-vat').textContent=money(vat);
-        if(card.querySelector('.pd-after')) card.querySelector('.pd-after').textContent=money(before+vat);
-        updateProjectTotals();
-      };
+      const recalc=()=>{const bE=card.querySelector('.pd-basic'); if(bE){const g=c=>Number(card.querySelector(c).value)||0; card.querySelector('.pd-unit').value=(g('.pd-basic')*(1+(g('.pd-hpct')+g('.pd-tpct'))/100)+g('.pd-other')).toFixed(2);} const q=Number(card.querySelector('.pd-qty')?.value)||0,u=Number(card.querySelector('.pd-unit')?.value)||0;card.querySelector('.pd-unit-total').textContent=money(u);card.querySelector('.pd-total').textContent=money(q*u);updateProjectTotals();};
       card.querySelectorAll('input').forEach(i=>i.addEventListener('input',recalc));
       card.querySelector('.project-remove-detail')?.addEventListener('click',()=>{card.remove();updateProjectTotals();});
     });
+    document.querySelectorAll('#projectCostDetails .project-detail-card').forEach(refreshSalaryCard);
     document.querySelectorAll('.project-add-detail').forEach(btn=>btn.onclick=()=>{
       const [mode,key]=btn.dataset.addDetail.split('-');
       const box=document.getElementById(mode==='revenue'?'projectRevenueDetails':'projectCostDetails');
@@ -326,10 +283,8 @@
     set('projectSummaryRevenuePerson',totalRevenue/divisor); set('projectSummaryRevenueTotal',totalRevenue);
     set('projectSummaryCostPerson',totalCost/divisor); set('projectSummaryCostTotal',totalCost);
     set('projectSummaryProfitPerson',profit/divisor); set('projectSummaryProfitTotal',profit);
-    document.querySelectorAll('#projectRevenueDetails .project-detail-card').forEach(card=>{const q=Number(card.querySelector('.pd-qty')?.value)||0,u=Number(card.querySelector('.pd-unit')?.value)||0,b=q*u,v=b*vatRate()/100; if(card.querySelector('.pd-before'))card.querySelector('.pd-before').textContent=money(b); if(card.querySelector('.pd-vat'))card.querySelector('.pd-vat').textContent=money(v); if(card.querySelector('.pd-after'))card.querySelector('.pd-after').textContent=money(b+v);});
     document.querySelectorAll('#projectCostDetails .project-detail-card').forEach(refreshSalaryCard);
     renderBreakdowns(); renderProjectCapacity();
-     renderSocialInsuranceCompliance();
   }
 
 
@@ -410,31 +365,23 @@
     }));
     const counts=projectEmployeeCounts(p.name,null), caps=Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]));
     const capRows=Object.keys(roleCapacityLabels).filter(k=>caps[k]>0).map(k=>{const over=(counts[k]||0)-caps[k];return `<tr class="${over>0?'pj-over-row':''}"><td>${roleCapacityLabels[k]}</td><td class="mono">${fmt(caps[k])}</td><td class="mono">${fmt(counts[k]||0)}</td><td class="mono">${over>0?'زيادة '+fmt(over):fmt(caps[k]-(counts[k]||0))}</td></tr>`;});
-    const projectEmployees=employees.filter(e=>sameProjectName(e.project,p.name));
-    const today=new Date(); today.setHours(0,0,0,0);
-    const alertRows=[];
-    projectEmployees.forEach(e=>{
-      const problems=[];
-      if(e.iddate_expiry){const d=new Date(e.iddate_expiry+'T00:00:00'); if(!Number.isNaN(d.getTime()) && d<=today) problems.push('الإقامة منتهية');}
-      const ci=employeeContractInfo(e.id); if(!ci.contract) problems.push('لا يوجد عقد');
-      const hasComm=commencements.some(c=>c.empId===e.id && sameProjectName(c.project,p.name) && c.startDate);
-      if(!hasComm) problems.push('لا توجد مباشرة عمل');
-      if(problems.length) alertRows.push(`<tr><td><b>${escapeHtml(e.fullname||'—')}</b></td><td>${escapeHtml(e.empcode||'—')}</td><td>${escapeHtml(e.jobtitle||'—')}</td><td>${problems.map(x=>`<span class="project-employee-alert">⚠ ${x}</span>`).join(' ')}</td></tr>`);
-    });
-    const alerts=[...projectOverList(p.name,caps).map(o=>`<div class="pj-over">⚠ تنبيه: عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`), ...((alertRows.length?[]:[]))].join('');
-    const employeeAlerts=`<div class="project-alert-panel"><div class="project-alert-head"><h3>شاشة التنبيهات</h3><span class="pill ${alertRows.length?'pill-danger':'pill-gray'}">${alertRows.length?`${alertRows.length} موظف يحتاج مراجعة`:'لا توجد تنبيهات'}</span></div>${alertRows.length?`<div class="table-wrap project-alert-table-wrap"><table class="payroll-table project-alert-table"><thead><tr><th>الموظف</th><th>الرقم الوظيفي</th><th>الوظيفة</th><th>التنبيهات</th></tr></thead><tbody>${alertRows.join('')}</tbody></table></div>`:`<div class="project-alert-ok">✓ لا توجد تنبيهات على موظفي المشروع بخصوص الإقامة أو العقد أو المباشرة.</div>`}</div>`;
+    const alerts=projectOverList(p.name,caps).map(o=>`<div class="pj-over">⚠ تنبيه: عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('');
     const tr=sumRows(rev), tc=sumRows(cost);
     const el=document.createElement('div'); el.id='pjViewModal'; el.className='pj-modal';
     el.innerHTML=`<div class="pj-modal-box" role="dialog" aria-modal="true"><div class="pj-modal-head"><h3>${escapeHtml(p.name||'')}</h3><div><button class="btn btn-sm" data-pv-edit>تعديل</button> <button class="btn btn-sm" data-pv-close>إغلاق ✕</button></div></div>
       <div class="pj-modal-body">
         <div class="pj-bd-title">البيانات الأساسية</div>
         <div class="pv-grid">${kv('المنطقة',p.region)}${kv('السجل التجاري',p.cr)}${kv('الرقم الضريبي',p.vatNo)}${kv('العنوان',p.address)}${kv('أرقام التواصل',(p.phones||[]).join(' ، '))}${kv('إيميلات التواصل',(p.emails||[]).join(' ، '))}${kv('اسم ممثل الشركة',p.repName)}${kv('هوية ممثل الشركة',p.repId)}${kv('نسبة الضريبة',vat+'%')}${kv('التأمينات الاجتماعية',p.siEnabled?'مفعّلة':'غير مفعّلة')}${kv('التأمين الطبي',p.medEnabled?'مفعّل':'غير مفعّل')}</div>
-        ${socialInsuranceComplianceHtml(p.costItems||{},!!p.siEnabled)}
         ${bdTable('الإيرادات الشهرية',rev,false,true)}
         ${sal.length?`<div class="pj-bd-title">رواتب المشروع</div><div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>الفئة</th><th>العدد</th><th>الأساسي</th><th>السكن</th><th>المواصلات</th><th>بدلات أخرى</th><th>إجمالي الراتب / فرد</th><th>الإجمالي للعدد</th></tr></thead><tbody>${sal.join('')}</tbody></table></div>`:''}
+        ${bdTable('التكاليف الشهرية (التكلفة الحقيقية)',cost,true,false,true)}
+        <div class="project-summary-grid pj-view-sum">
+          <div class="project-summary-box"><div class="project-summary-label">الإيرادات</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tr.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tr.inc)}</b></div></div>
+          <div class="project-summary-box"><div class="project-summary-label">التكاليف</div><div class="project-summary-row"><span>الإجمالي (بدون ضريبة)</span><b>${money(tc.ex)}</b></div></div>
+          <div class="project-summary-box"><div class="project-summary-label">هامش الربح</div><div class="project-summary-row"><span>بدون ضريبة</span><b>${money(tr.ex-tc.ex)}</b></div><div class="project-summary-row"><span>بالضريبة</span><b>${money(tr.inc-tc.inc)}</b></div></div>
+        </div>
         <div class="pj-bd-title">سعة المشروع</div>${alerts}
         <div class="table-wrap"><table class="payroll-table pj-bd"><thead><tr><th>البند</th><th>السعة</th><th>المضاف فعليًا</th><th>المتبقي</th></tr></thead><tbody>${capRows.join('')||'<tr><td colspan="4" class="empty-note">لا توجد سعة محددة.</td></tr>'}</tbody></table></div>
-        ${employeeAlerts}
       </div></div>`;
     document.body.appendChild(el);
     el.addEventListener('click',e=>{ if(e.target===el||e.target.closest('[data-pv-close]')) closeProjectView(); if(e.target.closest('[data-pv-edit]')){closeProjectView();document.querySelector(`[data-project-edit="${p.id}"]`)?.click();} });
@@ -470,7 +417,7 @@
   function resetProjectSection(section){
     if(section==='basic'){
       ['projectName','projectCR','projectVatNo','projectAddress','projectRepId','projectRepName'].forEach(id=>document.getElementById(id).value='');
-      document.getElementById('projectVat').value='15'; const siB=document.getElementById('projectSiToggle'); if(siB) siB.checked=false; const medB=document.getElementById('projectMedToggle'); if(medB) medB.checked=false; const sid=document.getElementById('projectSiDefault'); if(sid) sid.checked=false; const md=document.getElementById('projectMedDefault'); if(md) md.checked=false; setMulti('phone',[]);setMulti('email',[]);
+      document.getElementById('projectVat').value='15'; const siB=document.getElementById('projectSiToggle'); if(siB) siB.checked=false; const medB=document.getElementById('projectMedToggle'); if(medB) medB.checked=false; const sid=document.getElementById('projectSiDefault'); if(sid) sid.checked=false; setMulti('phone',[]);setMulti('email',[]);
       refreshRegionSelects();
       document.getElementById('projectRegion').value='';
     }else if(section==='revenue'){
@@ -487,7 +434,7 @@
     const list=projects.filter(p=>!q||[p.name,p.region].some(v=>String(v||'').toLowerCase().includes(q)));
     document.getElementById('projectCount').textContent=`${list.length} مشروع`;
     const body=document.getElementById('projectsTableBody');
-    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b>${projectOverList(p.name,Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]))).map(o=>`<div class="pj-over">⚠ عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('')}${socialInsuranceComplianceHtml(p.costItems||{},!!p.siEnabled)}</td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-view="${p.id}">عرض</button><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
+    body.innerHTML=list.map(p=>`<tr><td><b>${escapeHtml(p.name||'—')}</b>${projectOverList(p.name,Object.fromEntries(Object.keys(roleCapacityLabels).map(k=>[k,projectRoleCapacity(p,k)]))).map(o=>`<div class="pj-over">⚠ عدد ${o.label} زيادة بمقدار ${fmt(o.over)}</div>`).join('')}</td><td>${escapeHtml(p.region||'—')}</td><td class="mono">${Number(p.guards)||0}</td><td class="mono">${money(Number(p.revenueGuard)||0)}</td><td class="mono">${money(Number(p.costGuard)||0)}</td><td class="mono"><b>${money(p.revenueTotal)}</b></td><td class="mono"><b>${money(p.costTotal)}</b></td><td><div class="row-actions"><button class="btn btn-sm" data-project-view="${p.id}">عرض</button><button class="btn btn-sm" data-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-project-del="${p.id}">حذف</button></div></td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
     body.querySelectorAll('[data-project-edit]').forEach(b=>b.onclick=()=>{
       const p=projects.find(x=>x.id===b.dataset.projectEdit);if(!p)return;
       document.getElementById('projectId').value=p.id;document.getElementById('projectName').value=p.name||'';document.getElementById('projectRegion').value=p.region||'';
@@ -495,7 +442,7 @@
       const rev=p.revenueItems||{}, cost=p.costItems||{};
       document.querySelectorAll('[data-project-revenue-toggle]').forEach(c=>c.checked=c.dataset.projectRevenueToggle==='guards' || Array.isArray(rev[c.dataset.projectRevenueToggle]));
       document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards' || Array.isArray(cost[c.dataset.projectCostToggle]));
-      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled; const sid=document.getElementById('projectSiDefault'); if(sid) sid.checked=!!p.siDefault; const md=document.getElementById('projectMedDefault'); if(md) md.checked=!!p.medDefault;
+      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled; const sid=document.getElementById('projectSiDefault'); if(sid) sid.checked=!!(p.siDefault||p.medDefault);
       renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();window.scrollTo({top:0,behavior:'smooth'});
     });
     body.querySelectorAll('[data-project-view]').forEach(b=>b.onclick=()=>{const p=projects.find(x=>x.id===b.dataset.projectView); if(p)showProjectView(p);});
@@ -540,13 +487,13 @@
     const guardRevenue=unitFrom(revenueItems,'guards');
     const data={
       id:document.getElementById('projectId').value||'p'+Date.now(), name:document.getElementById('projectName').value.trim(), region:document.getElementById('projectRegion').value,
-      cr:document.getElementById('projectCR').value.trim(), vatNo:document.getElementById('projectVatNo').value.trim(), address:document.getElementById('projectAddress').value.trim(), phones:getMulti('phone'), emails:getMulti('email'), repId:document.getElementById('projectRepId').value.trim(), repName:document.getElementById('projectRepName').value.trim(), vatRate:vatRate(), medEnabled:!!document.getElementById('projectMedToggle')?.checked, siDefault:!!document.getElementById('projectSiDefault')?.checked, medDefault:!!document.getElementById('projectMedDefault')?.checked,
+      cr:document.getElementById('projectCR').value.trim(), vatNo:document.getElementById('projectVatNo').value.trim(), address:document.getElementById('projectAddress').value.trim(), phones:getMulti('phone'), emails:getMulti('email'), repId:document.getElementById('projectRepId').value.trim(), repName:document.getElementById('projectRepName').value.trim(), vatRate:vatRate(), medEnabled:!!document.getElementById('projectMedToggle')?.checked, siDefault:!!document.getElementById('projectSiDefault')?.checked, medDefault:!!document.getElementById('projectSiDefault')?.checked,
       guards, guardsFemale, supervisors:supervisorQty, managers:managerQty, patrols:patrolQty, devices:deviceQty, uniforms:uniformQty, cones:extraQty,
       revenueGuard:guardRevenue, costGuard:guardSalary, revenueTotal:guards*guardRevenue, costTotal:costGuards*guardSalary,
       revenueItems, costItems, guardBasic:guardSalary, guardHousing:0, guardTransport:0, guardOther:0,
       supervisorBasic:unitFrom(costItems,'supervisors'), supervisorHousing:0, supervisorTransport:0, supervisorOther:0,
       managerBasic:unitFrom(costItems,'managers'), managerHousing:0, managerTransport:0, managerOther:0,
-      projectCostGuards:costGuards, includeBreaks:false, socialInsurance:false, socialInsuranceRate:0, siEnabled:!!document.getElementById('projectSiToggle')?.checked, siDefault:!!document.getElementById('projectSiDefault')?.checked, medDefault:!!document.getElementById('projectMedDefault')?.checked, siGuardRate:SI_GUARD_RATE, siCompanyRate:SI_COMPANY_RATE, siGuardTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().guardTotal:0, siCompanyTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0, patrolBilling:''
+      projectCostGuards:costGuards, includeBreaks:false, socialInsurance:false, socialInsuranceRate:0, siEnabled:!!document.getElementById('projectSiToggle')?.checked, siDefault:!!document.getElementById('projectSiDefault')?.checked, medDefault:!!document.getElementById('projectSiDefault')?.checked, siGuardRate:SI_GUARD_RATE, siCompanyRate:SI_COMPANY_RATE, siGuardTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().guardTotal:0, siCompanyTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0, patrolBilling:''
     };
     const allCostCards=[...document.querySelectorAll('#projectCostDetails .project-detail-card')];
     data.costTotal=allCostCards.reduce((a,c)=>a+(Number(c.querySelector('.pd-qty')?.value)||0)*(Number(c.querySelector('.pd-unit')?.value)||0),0);
@@ -558,72 +505,20 @@
     const capacityError=validateProjectCapacities(existing?existing.name:data.name,null,data);
     if(capacityError){showToast(capacityError);}
     const idx=projects.findIndex(x=>x.id===data.id);if(idx>=0)projects[idx]=data;else projects.push(data);
-    saveProjects();refreshEmployeeProjectSelect();refreshDepartmentJobSelects();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
+    saveProjects();refreshEmployeeProjectSelect();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
-  function projectEmployeeTotal(projectName){
-    return employees.filter(e=>sameProjectName(e.project,projectName)).length;
-  }
-  function projectCapacityTotal(p){
-    return Object.keys(roleCapacityLabels).reduce((sum,k)=>sum+projectRoleCapacity(p,k),0);
-  }
-  function renderAllProjectsPage(){
-    const q=(document.getElementById('allProjectsSearch')?.value||'').trim().toLowerCase();
-    const list=projects.filter(p=>!q||[p.name,p.region].some(v=>String(v||'').toLowerCase().includes(q)));
-    const body=document.getElementById('allProjectsTableBody');
-    const count=document.getElementById('allProjectsCount');
-    if(!body)return;
-    if(count) count.textContent=`${list.length} مشروع`;
-    body.innerHTML=list.map(p=>{
-      const cap=projectCapacityTotal(p), emp=projectEmployeeTotal(p.name), over=emp>cap && cap>0;
-      return `<tr class="all-project-row" data-all-project-row="${p.id}" title="دبل كليك لعرض المشروع">
-        <td class="project-name-cell"><b>${escapeHtml(p.name||'—')}</b>${socialInsuranceComplianceHtml(p.costItems||{},!!p.siEnabled)}</td>
-        <td>${escapeHtml(p.region||'—')}</td>
-        <td class="mono">${fmt(cap)}</td>
-        <td class="mono">${fmt(emp)}${over?`<span class="table-alert-dot" title="عدد الموظفين أكبر من سعة المشروع">⚠</span>`:''}</td>
-        <td class="mono money-cell">${money(Number(p.revenueTotal)||0)}</td>
-        <td class="mono money-cell">${money(Number(p.costTotal)||0)}</td>
-        <td class="mono money-cell">${money((Number(p.revenueTotal)||0)-(Number(p.costTotal)||0))}</td>
-        <td><div class="row-actions"><button class="btn btn-sm" data-all-project-view="${p.id}">عرض</button><button class="btn btn-sm" data-all-project-edit="${p.id}">تعديل</button><button class="btn btn-sm btn-danger" data-all-project-del="${p.id}">حذف</button></div></td>
-      </tr>`;
-    }).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مضافة.</td></tr>';
-    body.querySelectorAll('[data-all-project-view]').forEach(b=>b.onclick=()=>{const p=projects.find(x=>x.id===b.dataset.allProjectView);if(p)showProjectView(p);});
-    body.querySelectorAll('[data-all-project-row]').forEach(row=>row.ondblclick=()=>{const p=projects.find(x=>x.id===row.dataset.allProjectRow);if(p)showProjectView(p);});
-    body.querySelectorAll('[data-all-project-edit]').forEach(b=>b.onclick=()=>{const p=projects.find(x=>x.id===b.dataset.allProjectEdit);if(p){switchView('projects');setTimeout(()=>{document.querySelector(`[data-project-edit="${p.id}"]`)?.click();},0);}});
-    body.querySelectorAll('[data-all-project-del]').forEach(b=>b.onclick=()=>{if(confirm('حذف المشروع؟')){projects=projects.filter(x=>x.id!==b.dataset.allProjectDel);saveProjects();renderProjects();refreshEmployeeProjectSelect();renderAllProjectsPage();}});
-  }
-  document.getElementById('allProjectsBtn')?.addEventListener('click',()=>{switchView('allprojects');});
-  document.getElementById('backToProjectsBtn')?.addEventListener('click',()=>{switchView('projects');});
-  document.getElementById('allProjectsSearch')?.addEventListener('input',renderAllProjectsPage);
   document.getElementById('projectSearch').addEventListener('input',renderProjects);
-  ['projectSiToggle','projectMedToggle','projectSiDefault','projectMedDefault'].forEach(id=>{
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('change', () => {
-      updateProjectTotals();
-      if (id === 'projectSiToggle' && el.checked && socialInsuranceComplianceIssues(getDetailData('cost'), true).length) {
-        showToast('⚠ يوجد راتب أقل من 4000 ريال ومخالف لحد التأمينات المحدد.');
-      }
-    });
-  });
+  ['projectSiToggle','projectMedToggle','projectSiDefault'].forEach(id=>document.getElementById(id)?.addEventListener('change',updateProjectTotals));
   ['projectVat','projectName'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateProjectTotals));
-  document.querySelectorAll('[data-project-tab]').forEach(btn=>btn.addEventListener('click',()=>{
-    const tab=btn.dataset.projectTab;
-    document.querySelectorAll('[data-project-tab]').forEach(b=>b.classList.toggle('active',b===btn));
-    document.querySelectorAll('[data-project-panel]').forEach(p=>p.classList.toggle('active',p.dataset.projectPanel===tab));
-    const rev=document.getElementById('projectRevenueDetails'), cost=document.getElementById('projectCostDetails');
-    if(rev) rev.style.display=tab==='revenue'?'grid':'none';
-    if(cost) cost.style.display=tab==='cost'?'grid':'none';
-  }));
-  document.querySelectorAll('[data-project-tab]').forEach(btn=>{ if(btn.dataset.projectTab==='basic') btn.style.display='none'; });
   renderDynamicDetails('revenue',{});renderDynamicDetails('cost',{});updateProjectTotals();  // عرض بطاقة الحارس فور فتح التبويب
   document.querySelectorAll('[data-project-revenue-toggle],[data-project-cost-toggle]').forEach(cb=>cb.addEventListener('change',()=>{const rv=getDetailData('revenue'),cv=getDetailData('cost');renderDynamicDetails('revenue',rv);renderDynamicDetails('cost',cv);updateProjectTotals();}));
 
 
   /* ===== Universal Excel / PDF / Word exports ===== */
-  const exportableViews=['dashboard','regions','projects','allprojects','employees','departments','add','projectpromotions','employeepromotions','attendance','actions','coverage','documents','contracts','allcontracts','commencements','projectaccounts','reports'];
+  const exportableViews=['dashboard','regions','projects','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','projectaccounts','reports'];
   function currentViewElement(){ return currentView ? document.getElementById('view-'+currentView) : null; }
   function exportFileBase(){
-    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
+    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
     return titles[currentView]||'تصدير';
   }
   function exportCurrentExcel(){
@@ -635,7 +530,7 @@
     const url=URL.createObjectURL(blob),a=document.createElement('a'); a.href=url; a.download=exportFileBase()+'.xls'; document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url); showToast('تم تصدير التبويب بصيغة Excel');
   }
   function printCurrentForExport(){
-    const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(currentView);
+    const isLandscape=['projects','allcontracts','coverage'].includes(currentView);
     const id='exportPrintStyle'; document.getElementById(id)?.remove();
     const st=document.createElement('style'); st.id=id;
     st.textContent=`@media print{ @page{size:A4 ${isLandscape?'landscape':'portrait'} !important;margin:${isLandscape?'8mm':'10mm'} !important;} body *{visibility:hidden!important} #view-${currentView},#view-${currentView} *{visibility:visible!important} #view-${currentView}{display:block!important;position:static!important;width:100%!important;max-width:none!important} .no-print,.export-toolbar,.sidebar,.topbar-actions{display:none!important} .table-wrap{overflow:visible!important} }`;
@@ -678,9 +573,8 @@
     document.querySelector('main')?.classList.toggle('wide-data-view', view==='attendance' || view==='reports' || view==='projectaccounts');
     // Printing orientation for wide data screens. Projects, All Contracts and Coverage
     // are intentionally landscape so their full tables/columns fit on the printed page.
-    document.body.classList.remove('print-landscape-projects','print-landscape-allprojects','print-landscape-allcontracts','print-landscape-coverage');
+    document.body.classList.remove('print-landscape-projects','print-landscape-allcontracts','print-landscape-coverage');
     if(view==='projects') document.body.classList.add('print-landscape-projects');
-    if(view==='allprojects') document.body.classList.add('print-landscape-allprojects');
     if(view==='allcontracts') document.body.classList.add('print-landscape-allcontracts');
     if(view==='coverage') document.body.classList.add('print-landscape-coverage');
     // @page cannot be scoped to a normal selector in all browsers, so inject the
@@ -689,10 +583,10 @@
     document.getElementById(printOrientationId)?.remove();
     const st=document.createElement('style');
     st.id=printOrientationId;
-    const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(view);
+    const isLandscape=['projects','allcontracts','coverage'].includes(view);
     st.textContent=`@media print { @page { size: A4 ${isLandscape?'landscape':'portrait'} !important; margin: ${isLandscape?'8mm':'10mm'} !important; } }`;
     document.head.appendChild(st);
-    ['dashboard','regions','projects','allprojects','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','projectaccounts','reports'].forEach(v=>{
+    ['dashboard','regions','projects','employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','projectaccounts','reports'].forEach(v=>{
       document.getElementById('view-'+v).style.display = (v===view)?'':'none';
     });
     document.querySelectorAll('.navlink[data-view]').forEach(a=>{
@@ -704,7 +598,6 @@
     if(view==='dashboard') renderDashboard();
     if(view==='regions'){renderRegions();refreshRegionSelects();}
     if(view==='projects'){renderProjects();refreshRegionSelects();}
-    if(view==='allprojects'){renderAllProjectsPage();}
     if(view==='employees') renderEmployeeTable();
     if(view==='departments') renderDepartments();
     if(view==='add'){
@@ -720,7 +613,6 @@
     if(view==='documents') renderDocuments();
     if(view==='contracts') renderContracts();
     if(view==='allcontracts') renderAllContracts();
-    if(view==='commencements') renderCommencements();
     if(view==='projectaccounts') renderProjectAccount();
     if(view==='reports') renderReports();
     if(view==='reports'){
@@ -735,9 +627,9 @@
   window.switchView = switchView;
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
-  const PJ_TITLES={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
+  const PJ_TITLES={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
-  const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn']};
+  const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],projectaccounts:['btn','saveProjectAccountBtn']};
   const pjTabs={open:[],dirty:new Set()};
   function pjTabOpen(v){return pjTabs.open.includes(v);}
   function pjTitle(v){return v==='reports'?(PJ_REPORTS[window.currentReport||'payroll']||PJ_TITLES.reports):(PJ_TITLES[v]||v);}
@@ -753,8 +645,7 @@
     setTimeout(()=>{ const el=document.getElementById(t[1]); if(!el)return; if(t[0]==='form') el.requestSubmit(); else el.click(); },60);
   }
   function pjResetView(v){
-    if(v==='allprojects'){ document.getElementById('allProjectsSearch')?.setAttribute('value',''); }
-    else if(v==='add') resetForm();
+    if(v==='add') resetForm();
     else if(v==='projects') document.getElementById('cancelProjectBtn')?.click();
     else document.querySelectorAll('#view-'+v+' form').forEach(f=>f.reset());
   }
@@ -860,73 +751,11 @@
     try{ t = localStorage.getItem(THEME_KEY); }catch(e){}
     document.documentElement.setAttribute('data-theme', t==='light' ? 'light' : 'dark');
   }
-  document.getElementById('themeToggle')?.addEventListener('click', ()=>{
+  document.getElementById('themeToggle').addEventListener('click', ()=>{
     const cur = document.documentElement.getAttribute('data-theme') || 'dark';
     const next = cur==='dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
-  });
-
-  /* ===== start a fresh data cycle ===== */
-  async function resetOperationalData(){
-    const ok = confirm('سيتم حذف بيانات التشغيل المدخلة فقط: الموظفين، المشاريع، العقود، الحضور والانصراف، الإجراءات، التغطيات، ومعلومات الحسابات المرتبطة بها.\n\nستبقى الأقسام والوظائف والمناطق وإعدادات النظام والمذكرات والمستندات كما هي.\n\nهل تريد المتابعة؟');
-    if(!ok) return;
-    const ok2 = confirm('تأكيد نهائي: هل تريد بالفعل بدء دورة بيانات جديدة؟ لا يمكن التراجع عن حذف البيانات التشغيلية.');
-    if(!ok2) return;
-    try{
-      cloudApplying = true;
-      forceOperationalReset = true;
-      clearTimeout(cloudSaveTimer);
-
-      // Remove uploaded employee files that belong to the employee records being cleared.
-      const oldEmployees = Array.isArray(employees) ? employees.slice() : [];
-      for(const emp of oldEmployees){
-        const files = emp?.files && typeof emp.files==='object' ? emp.files : {};
-        for(const entry of Object.values(files)){
-          if(entry?.path && window.FB?.deleteEmployeeFile){
-            try{ await window.FB.deleteEmployeeFile(entry.path); }catch(err){ console.warn('Could not delete employee file:',err); }
-          }
-        }
-      }
-
-      employees=[];
-      attendance={};
-      penalties=[];
-      coverage=[];
-      projects=[];
-      contracts=[];
-      commencements=[];
-      projectAccounts=[];
-
-      // Keep these system/setup data intact: settings, regions, departments/jobs.
-      persistLocal();
-      const freshState=currentState();
-      if(window.FB?.saveState) await window.FB.saveState(freshState);
-      applyState(freshState);
-      persistLocal();
-
-      renderRegions?.();
-      renderProjects?.();
-      renderDepartments?.();
-      renderEmployeeTable?.();
-      renderAttendanceAndPenalties?.();
-      renderEmployeeFiles?.();
-      switchView(currentView);
-      showToast('تم بدء دورة بيانات جديدة مع الاحتفاظ بإعدادات النظام.');
-    }catch(err){
-      console.error('Operational data reset failed:',err);
-      showToast('تعذر إكمال تصفير البيانات. تحقق من الاتصال ثم حاول مرة أخرى.');
-    }finally{
-      forceOperationalReset = false;
-      cloudApplying = false;
-    }
-  }
-  document.getElementById('resetDataBtn')?.addEventListener('click', resetOperationalData);
-  document.getElementById('floatingLogoutBtn')?.addEventListener('click', async ()=>{
-    if(!window.firebaseSignOut) return;
-    if(confirm('هل تريد تسجيل الخروج من البرنامج؟')){
-      try{ await window.firebaseSignOut(); }catch(err){ console.error('Logout failed:',err); showToast('تعذر تسجيل الخروج.'); }
-    }
   });
 
   /* ===== dashboard ===== */
@@ -1020,7 +849,7 @@
       const d=departments.find(x=>normalizeDepartmentName(x.name)===normalizeDepartmentName(b.dataset.jobDel)); if(!d)return;
       if(confirm(`حذف الوظيفة "${b.dataset.job}" من قسم "${d.name}"؟`)){
         d.jobs=(d.jobs||[]).filter(j=>normalizeJobName(j)!==normalizeJobName(b.dataset.job));
-        saveDepartments(); renderDepartments(); refreshDepartmentJobSelects(); refreshEmployeeProjectSelect(document.getElementById('f_region')?.value||'');
+        saveDepartments(); renderDepartments(); refreshDepartmentJobSelects();
       }
     });
     body?.querySelectorAll('[data-job-edit]').forEach(b=>b.onclick=()=>{
@@ -1035,15 +864,9 @@
       document.getElementById('departmentOldJob').value=b.dataset.job||'';
       document.getElementById('departmentName').value=d.name||'';
       document.getElementById('departmentJob').value=b.dataset.job||'';
-      document.getElementById('departmentNameField').style.display='none';
-      document.getElementById('jobDepartmentField').style.display='';
+      document.getElementById('departmentNameField').style.display='';
+      document.getElementById('jobDepartmentField').style.display='none';
       document.getElementById('departmentJobField').style.display='';
-      // نعبّئ قائمة الأقسام ونحدد قسم هذه الوظيفة الحالي، وإلا يظهر الحقل
-      // فارغاً ويطلب اختيار القسم رغم أنه معروف بالفعل (تعديل وظيفة).
-      const deptSelect=document.getElementById('jobDepartmentSelect');
-      const depts=uniqueDepts();
-      deptSelect.innerHTML='<option value="">اختر القسم</option>'+depts.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join('');
-      deptSelect.value=depts.find(x=>normalizeDepartmentName(x)===normalizeDepartmentName(d.name))||'';
     });
     body?.querySelectorAll('[data-dept-edit]').forEach(b=>b.onclick=()=>{
       const d=departments.find(x=>normalizeDepartmentName(x.name)===normalizeDepartmentName(b.dataset.deptEdit)); if(!d)return;
@@ -1066,7 +889,7 @@
       const d=departments[i];
       if(confirm(`حذف القسم "${d.name}" وجميع وظائفه؟`)){
         departments.splice(i,1);
-        saveDepartments(); renderDepartments(); refreshDepartmentJobSelects(); refreshEmployeeProjectSelect(document.getElementById('f_region')?.value||'');
+        saveDepartments(); renderDepartments(); refreshDepartmentJobSelects();
       }
     });
   }
@@ -1140,7 +963,7 @@
       if(normalizedOld)d.jobs=d.jobs.filter(j=>normalizeJobName(j)!==normalizedOld);
       if(d.jobs.some(j=>normalizeJobName(j)===normalizeJobName(job))){showToast('هذه الوظيفة موجودة بالفعل في القسم');return;}
       d.jobs.push(job);
-      saveDepartments(); renderDepartments(); refreshDepartmentJobSelects(); refreshEmployeeProjectSelect(document.getElementById('f_region')?.value||'');
+      saveDepartments(); renderDepartments(); refreshDepartmentJobSelects();
       form.reset(); form.removeAttribute('data-edit-mode'); document.getElementById('departmentEditor').style.display='none';
       showToast(oldJob?'تم تعديل الوظيفة':'تمت إضافة الوظيفة');
       return;
@@ -1155,7 +978,7 @@
       d.name=name; d.jobs=d.jobs||[];
     }
     if(job && !d.jobs.some(j=>normalizeJobName(j)===normalizeJobName(job)))d.jobs.push(job);
-    saveDepartments(); renderDepartments(); refreshDepartmentJobSelects(); refreshEmployeeProjectSelect(document.getElementById('f_region')?.value||'');
+    saveDepartments(); renderDepartments(); refreshDepartmentJobSelects();
     const returnToAdd=form.getAttribute('data-return-to');
     form.removeAttribute('data-return-to'); form.removeAttribute('data-edit-mode');
     form.reset(); document.getElementById('departmentEditor').style.display='none';
@@ -1207,7 +1030,8 @@
   }
   function refreshDeptFilterOptions(){ const sel=document.getElementById('filterDept'); if(!sel)return; const cur=sel.value; sel.innerHTML='<option value="">كل الأقسام</option>'+uniqueDepts().map(d=>`<option>${escapeHtml(d)}</option>`).join(''); sel.value=cur; }
 
-  /* ===== employees table ===== */
+  /* ===== all employees table ===== */
+  function employeeHasDirectWork(e){ return !!(e && (e.directworkDone || e.startdate || e.directWorkDate)); }
   function renderEmployeeTable(){
     refreshDeptFilterOptions();
     const q = (document.getElementById('searchInput').value||'').trim().toLowerCase();
@@ -1217,7 +1041,7 @@
       if(fd && e.dept!==fd) return false;
       if(fs && employeeContractStatus(e)!==fs) return false;
       if(q){
-        const hay = [e.fullname,e.idnum,e.empcode,e.jobtitle].join(' ').toLowerCase();
+        const hay = [e.fullname,e.idnum,e.empcode,e.jobtitle,e.project,e.dept].join(' ').toLowerCase();
         if(!hay.includes(q)) return false;
       }
       return true;
@@ -1226,33 +1050,41 @@
     const body = document.getElementById('empTableBody');
     document.getElementById('empEmptyNote').style.display = list.length ? 'none' : '';
     body.innerHTML = list.map(e=>{
-      const contractStatus=employeeContractStatus(e); const statusClass = 'status-' + contractStatus.replace(/\s+/g,'_');
-      return `<tr data-id="${e.id}">
+      const info=employeeContractInfo(e.id), contract=info.contract;
+      const hasDirect=employeeHasDirectWork(e);
+      const lastWage=Number(e.lastwage)||((Number(e.basicsalary)||0)+(Number(e.housing)||0)+(Number(e.transport)||0)+(Number(e.otherallow)||0));
+      const contractNumber=contract ? (contract.contractCode||contract.contractNo||contract.number||'—') : 'بدون عقد';
+      return `<tr data-id="${escapeAttr(e.id)}">
         <td><div class="emp-name-cell"><div class="avatar">${escapeHtml(initials(e.fullname))}</div><div class="emp-name"><b>${escapeHtml(e.fullname||'—')}</b><span>${escapeHtml(e.idnum||'')}</span></div></div></td>
+        <td class="mono">${escapeHtml(e.empcode||'—')}</td>
         <td>${escapeHtml(e.dept||'—')}</td>
         <td>${escapeHtml(e.jobtitle||'—')}</td>
-        <td><span class="status-badge ${statusClass}">${escapeHtml(contractStatus)}</span></td>
-        <td class="mono">${fmt(e.basicsalary)}</td>
+        <td>${escapeHtml(e.project||'—')}</td>
+        <td>${hasDirect?'<span class="status-badge status-active">تم عمل مباشرة</span>':'<span class="status-badge status-pending">لم تتم المباشرة</span>'}</td>
+        <td class="mono">${money(lastWage)}</td>
+        <td>${escapeHtml(contractNumber)}</td>
         <td><div class="row-actions">
-          <button class="btn icon-btn btn-ghost" data-act="view" title="عرض">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
-          </button>
-          <button class="btn icon-btn btn-ghost" data-act="edit" title="تعديل">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg>
-          </button>
-          ${contractStatus==='بدون عقد'?`<button class="btn btn-sm btn-primary add-contract-employee" data-act="add-contract" title="إضافة عقد">إضافة عقد</button>`:''}
+          ${!hasDirect?`<button class="btn btn-sm btn-primary" data-act="directwork">عمل مباشرة</button>`:''}
+          <button class="btn icon-btn btn-ghost" data-act="view" title="عرض" aria-label="عرض"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          <button class="btn icon-btn btn-ghost" data-act="edit" title="تعديل" aria-label="تعديل"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg></button>
         </div></td>
       </tr>`;
     }).join('');
     body.querySelectorAll('tr').forEach(tr=>{
       tr.addEventListener('click', (ev)=>{
-        const id = tr.dataset.id;
-        const act = ev.target.closest('[data-act]')?.dataset.act;
+        const id=tr.dataset.id, act=ev.target.closest('[data-act]')?.dataset.act;
         if(act==='edit'){ loadIntoForm(id); switchView('add'); }
-        else if(act==='add-contract'){ switchView('contracts'); setTimeout(()=>{ const sel=document.getElementById('contract_emp'); if(sel){sel.value=id; sel.dispatchEvent(new Event('change'));} },80); }
-        else{ openProfile(id); }
+        else if(act==='directwork'){ openDirectWorkForEmployee(id); }
+        else if(act==='view'){ openProfile(id); }
       });
     });
+  }
+  function openDirectWorkForEmployee(id){
+    switchView('documents');
+    const select=document.getElementById('doc_emp');
+    if(select){ select.value=id; select.dispatchEvent(new Event('change')); }
+    const btn=document.querySelector('.doc-type-btn[data-doc="directwork"]');
+    if(btn){ document.querySelectorAll('.doc-type-btn').forEach(b=>b.classList.toggle('active',b===btn)); currentDocType='directwork'; renderDocSheet(); }
   }
   ['searchInput','filterDept','filterStatus'].forEach(id=>{
     document.getElementById(id).addEventListener('input', renderEmployeeTable);
@@ -1497,10 +1329,7 @@
   const AUTO_HOUSING_PCT=25, AUTO_TRANSPORT_PCT=38.5, AUTO_OTHER_PCT=0;   // نسب التوزيع على الراتب الأساسي
   function projectRoleSalary(project,key){
     if(!project||!key) return 0;
-    const costRows=Array.isArray(project.costItems?.[key])?project.costItems[key]:[];
-    const revenueRows=Array.isArray(project.revenueItems?.[key])?project.revenueItems[key]:[];
-    // استخدم التكاليف أولاً، وإن لم يوجد سعر استخدم سعر الإيراد كاحتياط حتى تصل بيانات المشروع للموظف.
-    const rows=costRows.length?costRows:revenueRows;
+    const rows=Array.isArray(project.costItems?.[key])?project.costItems[key]:[];
     const row=rows.find(x=>Number(x?.unit)>0)||rows[0];
     const legacy={guards:project.costGuard??project.guardBasic, supervisors:project.supervisorBasic, managers:project.managerBasic}[key];
     return Number(row?.unit)||Number(legacy)||0;
@@ -1585,211 +1414,8 @@
       document.querySelector(`.tabpanel[data-panel="${tab.dataset.tab}"]`).classList.add('active');
     });
   });
-  document.getElementById('employeeFilesRefreshBtn')?.addEventListener('click',renderEmployeeFiles);
-
-  function currentFormEmployeeId(){ return document.getElementById('f_id')?.value || ''; }
-  function employeeFileMap(e){ return (e && e.files && typeof e.files==='object') ? e.files : {}; }
-  function fileEntryFor(e,key){ return employeeFileMap(e)[key] || null; }
-  function renderEmployeeFiles(){
-    const list=document.getElementById('employeeFilesList');
-    if(!list) return;
-    const id=currentFormEmployeeId();
-    const e=employees.find(x=>x.id===id);
-    const saved=employeeFileMap(e);
-    list.innerHTML=EMPLOYEE_FILE_TYPES.map(item=>{
-      const pending=pendingEmployeeFiles[item.key];
-      const entry=pending || saved[item.key];
-      const has=!!entry;
-      const name=entry?.name || '';
-      return `<div class="employee-file-row" data-file-key="${item.key}">
-        <div class="employee-file-title"><span class="employee-file-dot ${has?'has-file':''}"></span><div><strong>${escapeHtml(item.label)}</strong><small>${has?escapeHtml(name):'لم يتم تحميل ملف بعد'}</small></div></div>
-        <div class="employee-file-actions">
-          <input type="file" class="employee-file-input" data-file-key="${item.key}" accept=".pdf,.jpg,.jpeg,.png" hidden>
-          <button type="button" class="btn btn-sm employee-upload-btn" data-file-key="${item.key}">تحميل من الجهاز</button>
-          <button type="button" class="btn btn-sm employee-download-btn" data-file-key="${item.key}">تنزيل الملف PDF</button>
-          <button type="button" class="btn btn-sm btn-danger employee-remove-file-btn" data-file-key="${item.key}">إزالة الملف</button>
-        </div>
-      </div>`;
-    }).join('') + `<div class="employee-file-row employee-files-all-row"><div class="employee-file-title"><span class="employee-file-dot ${(pendingEmployeeFiles.__all || EMPLOYEE_FILE_TYPES.some(x=>pendingEmployeeFiles[x.key]||saved[x.key]))?'has-file':''}"></span><div><strong>تحميل الكل</strong><small>الملف الكامل للموظف مرة واحدة</small></div></div><div class="employee-file-actions"><input type="file" class="employee-file-all-input" id="employeeFileAllInput" accept="*/*" hidden><button type="button" class="btn btn-sm employee-file-all-upload-btn" id="employeeUploadAllBtn">تحميل من الجهاز</button><button type="button" class="btn btn-sm employee-file-all-download-btn" id="employeeDownloadAllBtn">تنزيل الملف PDF</button><button type="button" class="btn btn-sm btn-danger employee-file-all-remove-btn" id="employeeRemoveAllBtn">إزالة الملف</button></div></div>`;
-
-    list.querySelectorAll('.employee-upload-btn').forEach(btn=>btn.addEventListener('click',()=>list.querySelector(`.employee-file-input[data-file-key="${btn.dataset.fileKey}"]`)?.click()));
-    list.querySelectorAll('.employee-file-input').forEach(input=>input.addEventListener('change',()=>{
-      const file=input.files?.[0]; if(!file) return;
-      if(!/^(application\/pdf|image\/(jpeg|png))$/i.test(file.type) && !/\.(pdf|jpe?g|png)$/i.test(file.name)){ showToast('يرجى اختيار ملف PDF أو صورة JPG/PNG.'); input.value=''; return; }
-      if(file.size>MAX_EMPLOYEE_FILE_BYTES){ showToast(`حجم الملف يجب ألا يتجاوز ${Math.round(MAX_EMPLOYEE_FILE_BYTES/1024)} كيلوبايت تقريباً (${(MAX_EMPLOYEE_FILE_BYTES/1024/1024).toFixed(2)} ميجا). جرّب ضغط الملف أو تصغير الصورة.`); input.value=''; return; }
-      pendingEmployeeFiles[input.dataset.fileKey]=file;
-      renderEmployeeFiles();
-      showToast(`تم اختيار ملف «${file.name}» وسيتم حفظه مع الموظف.`);
-    }));
-    list.querySelectorAll('.employee-download-btn').forEach(btn=>btn.addEventListener('click',()=>downloadEmployeeFile(btn.dataset.fileKey)));
-    list.querySelectorAll('.employee-remove-file-btn').forEach(btn=>btn.addEventListener('click',()=>removeEmployeeFile(btn.dataset.fileKey)));
-    document.getElementById('employeeDownloadAllBtn')?.addEventListener('click',downloadAllEmployeeFiles);
-    document.getElementById('employeeUploadAllBtn')?.addEventListener('click',()=>document.getElementById('employeeFileAllInput')?.click());
-    document.getElementById('employeeFileAllInput')?.addEventListener('change',handleUploadAllEmployeeFiles);
-    document.getElementById('employeeRemoveAllBtn')?.addEventListener('click',removeAllEmployeeFiles);
-  }
-  async function resolveEmployeeFileBlob(entry, employeeId, key){
-    // ملفات قديمة (رُفعت سابقاً عبر Cloud Storage) عندها entry.url — نجيبها بنفس الطريقة القديمة.
-    if(entry.url){ const res=await fetch(entry.url); return await res.blob(); }
-    // ملفات جديدة: نجيب المحتوى (base64) من مستند Firestore الخاص بالملف.
-    if(!window.FB?.getEmployeeFileData) throw new Error('FILE_STORAGE_NOT_READY');
-    const doc=await withTimeout(window.FB.getEmployeeFileData(employeeId,key), 15000, 'download:'+key);
-    if(!doc?.dataUrl) throw new Error('FILE_NOT_FOUND');
-    const res=await fetch(doc.dataUrl); return await res.blob();
-  }
-  async function downloadEmployeeFile(key){
-    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e){showToast('اختر موظفاً أولاً.');return;}
-    const pending=pendingEmployeeFiles[key];
-    const entry=pending || fileEntryFor(e,key);
-    if(!entry){showToast('لا يوجد ملف محفوظ لهذا المستند بعد.');return;}
-    if(pending){
-      await downloadBlobAsPdf(pending,pending.name);
-      return;
-    }
-    try{
-      const blob=await resolveEmployeeFileBlob(entry,id,key);
-      await downloadBlobAsPdf(blob,entry.name||'employee-file');
-    }catch(err){ console.error(err); showToast('تعذر جلب الملف. حاول مرة أخرى.'); }
-  }
-  async function downloadBlobAsPdf(blob,name){
-    if(blob.type==='application/pdf' || /\.pdf$/i.test(name||'')){
-      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=name||'employee-file.pdf'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); return;
-    }
-    if(!window.jspdf?.jsPDF){ showToast('تعذر إنشاء PDF. أعد تحميل الصفحة وحاول مرة أخرى.'); return; }
-    const dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=reject;r.readAsDataURL(blob);});
-    const img=await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=dataUrl;});
-    const pdf=new window.jspdf.jsPDF({orientation:img.width>=img.height?'landscape':'portrait',unit:'pt',format:'a4'});
-    const margin=24, maxW=pdf.internal.pageSize.getWidth()-margin*2, maxH=pdf.internal.pageSize.getHeight()-margin*2;
-    const scale=Math.min(maxW/img.width,maxH/img.height); const w=img.width*scale,h=img.height*scale;
-    pdf.addImage(dataUrl, /\.png$/i.test(name||'') ? 'PNG' : 'JPEG', (pdf.internal.pageSize.getWidth()-w)/2, (pdf.internal.pageSize.getHeight()-h)/2, w,h);
-    pdf.save((name||'employee-file').replace(/\.[^.]+$/,'')+'.pdf');
-  }
-  async function downloadAllEmployeeFiles(){
-    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e)return;
-    if(pendingEmployeeFiles.__all){
-      const file=pendingEmployeeFiles.__all; const url=URL.createObjectURL(file); const a=document.createElement('a'); a.href=url; a.download=file.name || `ملف-الموظف-${id||'employee'}`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); return;
-    }
-    const savedAll=e.files?.__all;
-    if(savedAll){
-      try{ const blob=await resolveEmployeeFileBlob(savedAll,id,'__all'); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=savedAll.name || `ملف-الموظف-${id||'employee'}`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000); return; }catch(err){ console.error(err); }
-    }
-    const entries=EMPLOYEE_FILE_TYPES.map(x=>({key:x.key,entry:pendingEmployeeFiles[x.key]||fileEntryFor(e,x.key)})).filter(x=>x.entry);
-    if(!entries.length){showToast('لا توجد ملفات لتحميلها.');return;}
-    if(!window.JSZip){showToast('تعذر تجهيز الملف الكامل. أعد تحميل الصفحة وحاول مرة أخرى.');return;}
-    const zip=new window.JSZip();
-    for(const x of entries){
-      try{
-        let blob=x.entry instanceof File ? x.entry : null;
-        if(!blob){ blob=await resolveEmployeeFileBlob(x.entry,id,x.key); }
-        zip.file(x.entry.name || `${x.key}.pdf`,blob);
-      }catch(err){ console.error('employee bundle fetch failed',x.key,err); }
-    }
-    const out=await zip.generateAsync({type:'blob'});
-    const url=URL.createObjectURL(out); const a=document.createElement('a'); a.href=url; a.download=`ملف-الموظف-${id||'employee'}.zip`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1000);
-  }
-  async function handleUploadAllEmployeeFiles(ev){
-    const file=ev.target.files?.[0]; ev.target.value=''; if(!file)return;
-    // يقبل سطر تحميل الكل أي صيغة ملف. ملفات ZIP يتم فكها وتوزيعها على مستندات الموظف،
-    // وأي صيغة أخرى تُحفظ كملف كامل مستقل كما هي بدون تغيير الامتداد أو المحتوى.
-    if(!/\.zip$/i.test(file.name)){
-      if(file.size>MAX_EMPLOYEE_FILE_BYTES){ showToast(`حجم الملف الكامل يجب ألا يتجاوز ${Math.round(MAX_EMPLOYEE_FILE_BYTES/1024)} كيلوبايت تقريباً (${(MAX_EMPLOYEE_FILE_BYTES/1024/1024).toFixed(2)} ميجا) لأنه يُحفظ داخل قاعدة البيانات مباشرة. جرّب ضغط الملف.`); return; }
-      pendingEmployeeFiles.__all = file;
-      renderEmployeeFiles();
-      showToast('تم اختيار الملف الكامل وسيتم حفظه كما هو.');
-      return;
-    }
-    if(!window.JSZip){showToast('تعذر قراءة ملف ZIP. أعد تحميل الصفحة وحاول مرة أخرى.');return;}
-    try{
-      const zip=await window.JSZip.loadAsync(file);
-      const byBase=new Map(EMPLOYEE_FILE_TYPES.map(x=>[x.key.toLowerCase(),x]));
-      const nameMap=new Map(EMPLOYEE_FILE_TYPES.map(x=>[x.label.toLowerCase(),x]));
-      let count=0, skippedLarge=0;
-      for(const [path,entry] of Object.entries(zip.files)){
-        if(entry.dir)continue;
-        const base=path.split('/').pop().replace(/\.[^.]+$/,'').trim().toLowerCase();
-        const item=byBase.get(base)||nameMap.get(base);
-        if(!item)continue;
-        const blob=await entry.async('blob');
-        if(blob.size>MAX_EMPLOYEE_FILE_BYTES){ skippedLarge++; continue; }
-        const ext=(path.match(/\.[^.]+$/)||['.pdf'])[0].toLowerCase();
-        const mime=ext==='.pdf'?'application/pdf':(ext==='.png'?'image/png':'image/jpeg');
-        pendingEmployeeFiles[item.key]=new File([blob],path.split('/').pop(),{type:mime});
-        count++;
-      }
-      if(!count && !skippedLarge){showToast('لم يتم العثور داخل الملف الكامل على أسماء ملفات مطابقة لملفات الموظف.');return;}
-      renderEmployeeFiles();
-      let msg=`تم اختيار ${count} ملف/ملفات وسيتم حفظها مع الموظف.`;
-      if(skippedLarge) msg+=` تم تجاهل ${skippedLarge} ملف/ملفات تجاوز حجمها ${Math.round(MAX_EMPLOYEE_FILE_BYTES/1024)} كيلوبايت.`;
-      showToast(msg);
-    }catch(err){console.error(err);showToast('تعذر قراءة الملف الكامل.');}
-  }
-  async function removeAllEmployeeFiles(){
-    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e)return;
-    const keys=EMPLOYEE_FILE_TYPES.filter(x=>pendingEmployeeFiles[x.key]||fileEntryFor(e,x.key)).map(x=>x.key);
-    const hasAll=!!(pendingEmployeeFiles.__all || e.files?.__all);
-    if(!keys.length && !hasAll)return;
-    if(!confirm('هل تريد إزالة جميع ملفات الموظف نهائياً؟'))return;
-    try{
-      if(pendingEmployeeFiles.__all){ delete pendingEmployeeFiles.__all; }
-      else if(e.files?.__all){
-        const entry=e.files.__all;
-        if(entry.path && window.FB?.deleteEmployeeFile) await window.FB.deleteEmployeeFile(entry.path);
-        else if(window.FB?.deleteEmployeeFileData) await window.FB.deleteEmployeeFileData(id,'__all');
-        if(e.files) delete e.files.__all;
-      }
-      for(const key of keys){
-        if(pendingEmployeeFiles[key]){delete pendingEmployeeFiles[key];continue;}
-        const entry=fileEntryFor(e,key);
-        if(entry?.path && window.FB?.deleteEmployeeFile) await window.FB.deleteEmployeeFile(entry.path);
-        else if(entry && window.FB?.deleteEmployeeFileData) await window.FB.deleteEmployeeFileData(id,key);
-        if(e.files) delete e.files[key];
-      }
-      saveEmployees(); renderEmployeeFiles(); showToast('تمت إزالة جميع ملفات الموظف.');
-    }catch(err){console.error(err);showToast('تعذر إزالة ملف أو أكثر.');}
-  }
-  async function removeEmployeeFile(key){
-    const id=currentFormEmployeeId(); const e=employees.find(x=>x.id===id); if(!e){showToast('اختر موظفاً أولاً.');return;}
-    if(pendingEmployeeFiles[key]){ delete pendingEmployeeFiles[key]; renderEmployeeFiles(); showToast('تم إلغاء الملف المختار.'); return; }
-    const entry=fileEntryFor(e,key); if(!entry){showToast('لا يوجد ملف محفوظ لهذا المستند بعد.');return;}
-    if(!confirm('هل تريد إزالة هذا الملف نهائياً؟')) return;
-    try{
-      if(entry.path && window.FB?.deleteEmployeeFile) await window.FB.deleteEmployeeFile(entry.path);
-      else if(window.FB?.deleteEmployeeFileData) await window.FB.deleteEmployeeFileData(id,key);
-      e.files={...employeeFileMap(e)}; delete e.files[key];
-      saveEmployees(); renderEmployeeFiles(); showToast('تمت إزالة الملف.');
-    }catch(err){ console.error(err); showToast('تعذر إزالة الملف.'); }
-  }
-  function withTimeout(promise, ms, label){
-    return Promise.race([
-      promise,
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('TIMEOUT:'+label)), ms))
-    ]);
-  }
-  const MAX_EMPLOYEE_FILE_BYTES = 650*1024; // حد آمن لحفظ الملف كـ base64 داخل مستند Firestore (بدون Storage/Blaze)
-  function readFileAsDataUrl(file){
-    return new Promise((resolve,reject)=>{ const r=new FileReader(); r.onload=()=>resolve(r.result); r.onerror=reject; r.readAsDataURL(file); });
-  }
-  async function savePendingEmployeeFiles(employeeId, data){
-    const keys=Object.keys(pendingEmployeeFiles); if(!keys.length)return data;
-    data.files={...employeeFileMap(data)};
-    for(const key of keys){
-      const file=pendingEmployeeFiles[key];
-      if(!file)continue;
-      if(!window.FB?.saveEmployeeFileData) throw new Error('FILE_STORAGE_NOT_READY');
-      const dataUrl=await readFileAsDataUrl(file);
-      // مهلة 20 ثانية: لو تعطّل الاتصال، لا يتجمّد الحفظ إلى الأبد — نكمل حفظ
-      // بيانات الموظف بدون الملف ونبلّغ المستخدم.
-      data.files[key]=await withTimeout(
-        window.FB.saveEmployeeFileData(employeeId,key,{name:file.name,type:file.type||'',size:file.size||0,dataUrl}),
-        20000, 'upload:'+key
-      );
-    }
-    pendingEmployeeFiles={};
-    return data;
-  }
 
   function resetForm(){
-    pendingEmployeeFiles={};
     document.getElementById('f_id').value = '';
     formFields.forEach(f=>{ const el = document.getElementById('f_'+f); if(el) el.value = ''; });
     const statusEl=document.getElementById('f_contractstatus_display'); if(statusEl) statusEl.value='بدون عقد';
@@ -1799,7 +1425,7 @@
     document.getElementById('formTitle').textContent = 'إضافة موظف جديد';
     syncStartDateAction();
     fillNationalityAndIssueRegion(); refreshDepartmentJobSelects(); refreshEmployeeProjectSelect(''); composeFullName(); updateBankFromIBAN(); syncAllowancePercentagesFromData(); clearValidation();
-    document.querySelectorAll('.tab')[0].click(); renderEmployeeFiles();
+    document.querySelectorAll('.tab')[0].click();
   }
   function loadIntoForm(id){
     const e = employees.find(x=>x.id===id);
@@ -1817,8 +1443,7 @@
     document.getElementById('formTitle').textContent = 'تعديل بيانات: ' + (e.fullname||'');
     refreshDepartmentJobSelects(e.dept||'', e.jobtitle||''); fillNationalityAndIssueRegion(); refreshEmployeeProjectSelect(e.region||''); const projectEl=document.getElementById('f_project'); if(projectEl) projectEl.value=e.project||''; composeFullName(); updateBankFromIBAN();
     syncStartDateAction();
-    pendingEmployeeFiles={};
-    document.querySelectorAll('.tab')[0].click(); clearValidation(); renderEmployeeFiles();
+    document.querySelectorAll('.tab')[0].click(); clearValidation();
   }
   function cancelEmployeeForm(){
     const editor=document.getElementById('departmentEditor');
@@ -1840,17 +1465,6 @@
   }
   // Use both direct and delegated handlers so Cancel still works if another
   // initialization step failed before the direct binding was reached.
-  // تأكيد تشغيل زر الحفظ حتى لو حدث تعارض مع أي handler آخر على النموذج.
-  // نمنع الإرسال الافتراضي ونطلق submit واحداً بشكل صريح.
-  document.querySelector('#empForm button[type=submit]')?.addEventListener('click', (ev)=>{
-    ev.preventDefault();
-    const form=document.getElementById('empForm');
-    if(form){
-      if(typeof form.requestSubmit==='function') form.requestSubmit();
-      else form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));
-    }
-  });
-
   document.getElementById('cancelFormBtn')?.addEventListener('click', (ev)=>{
     ev.preventDefault();
     ev.stopImmediatePropagation();
@@ -1947,53 +1561,15 @@
     if(!project) return null;
     const counts=projectEmployeeCounts(data.project, employeeId);
     const limit=projectRoleCapacity(project,k);
-    // إذا لم يتم تعريف سعة الوظيفة في المشروع، لا نطلب تأكيداً.
+    // إذا لم يتم تعريف سعة الوظيفة في المشروع، لا نمنع الإضافة. أما إذا كانت السعة معرفة، فنطبقها على نفس الوظيفة فقط.
     if(limit<=0) return null;
-    if(counts[k]>=limit) return {project:project.name, role:roleCapacityLabels[k], limit, current:counts[k]};
+    if(counts[k]>=limit) return `تنبيه: سعة ${roleCapacityLabels[k]} في مشروع «${project.name}» هي ${limit} فقط، والموجود حالياً ${counts[k]}.`;
     return null;
   }
 
-  function validateEmployeeSocialInsurance(data){
-    if(!data.project) return null;
-    const project=projects.find(p=>sameProjectName(p.name,data.project));
-    if(!project || !project.siEnabled) return null;
-    const gross=Number(data.lastwage)||0;
-    if(gross < SI_MIN_SALARY) return {project:project.name,gross,min:SI_MIN_SALARY};
-    return null;
-  }
-
-  function confirmProjectEmployeeWarnings(warnings){
-    if(!warnings.length) return Promise.resolve(true);
-    const overlay=document.getElementById('projectEmployeeWarningOverlay');
-    const text=document.getElementById('projectEmployeeWarningText');
-    const yes=document.getElementById('projectEmployeeWarningYes');
-    const no=document.getElementById('projectEmployeeWarningNo');
-    if(!overlay||!text||!yes||!no) return Promise.resolve(confirm(warnings.map(w=>w.text).join('\n\n')+'\n\nهل تريد المتابعة؟'));
-    text.innerHTML=warnings.map(w=>`<div class="project-warning-item"><span class="warn-title">${escapeHtml(w.title)}</span>${w.html}</div>`).join('');
-    overlay.classList.add('open');
-    return new Promise(resolve=>{
-      const close=(answer)=>{
-        overlay.classList.remove('open');
-        yes.onclick=no.onclick=null;
-        resolve(answer);
-      };
-      yes.onclick=()=>close(true);
-      no.onclick=()=>close(false);
-    });
-  }
-
-  document.getElementById('empForm').addEventListener('submit', async (ev)=>{
+  document.getElementById('empForm').addEventListener('submit', (ev)=>{
     ev.preventDefault();
-    // نعطّل الزر ونظهر حالة "جارٍ الحفظ" حتى لا يبدو الزر متجمداً وقت
-    // انتظار رفع الملفات أو مزامنة Firestore، ونضمن إعادته بأي حال (finally).
-    const saveBtn=document.getElementById('empSaveBtn');
-    const saveBtnLabel=document.getElementById('empSaveBtnLabel');
-    const prevLabel=saveBtnLabel?.textContent;
-    if(saveBtn) saveBtn.disabled=true;
-    if(saveBtnLabel) saveBtnLabel.textContent='جارٍ الحفظ...';
-    try{
-    try{
-      clearValidation(); composeFullName();
+    clearValidation(); composeFullName();
     const id = document.getElementById('f_id').value || ('e'+Date.now());
     const data = {id};
     formFields.forEach(f=>{ const el = document.getElementById('f_'+f); data[f] = el ? el.value : ''; });
@@ -2032,52 +1608,14 @@
     if(Object.keys(errors).length){ showFormError(errors,Object.keys(errors)[0]); return; }
     data.idnum=normalizeDigits(data.idnum); data.iban=data.iban.replace(/\s+/g,'').toUpperCase();
     if(id && employees.find(x=>x.id===id)?.empcode) data.empcode=employees.find(x=>x.id===id).empcode; else data.empcode=nextEmployeeCode(data.region,'');
-    const capacityWarning=validateEmployeeCapacity(data,id);
-    const siWarning=validateEmployeeSocialInsurance(data);
-    const warnings=[];
-    if(capacityWarning){
-      warnings.push({
-        title:'تجاوز سعة المشروع',
-        html:`العدد المضاف سوف يكون أكبر من سعة المشروع <b>(${fmt(capacityWarning.limit)})</b> لفئة <b>${escapeHtml(capacityWarning.role)}</b> في مشروع <b>${escapeHtml(capacityWarning.project)}</b>. هل تريد المتابعة؟`
-      });
-    }
-    if(siWarning){
-      warnings.push({
-        title:'مخالفة قوانين التأمينات الاجتماعية',
-        html:`الموظف المضاف الآن راتبه الإجمالي <b>${money(siWarning.gross)}</b> مخالف لقوانين التأمينات الاجتماعية لأن راتبه الإجمالي أقل من <b>(${money(siWarning.min)})</b>. هل تريد المتابعة؟`
-      });
-    }
-    if(warnings.length){
-      const proceed=await confirmProjectEmployeeWarnings(warnings);
-      if(!proceed){ showToast('لم يتم حفظ الموظف.'); return; }
-    }
+    const capacityError=validateEmployeeCapacity(data,id);
+    if(capacityError){ showToast(capacityError); }
     const idx = employees.findIndex(x=>x.id===id);
-    if(idx>=0) data.files={...employeeFileMap(employees[idx]), ...employeeFileMap(data)};
-    try{
-      if(Object.keys(pendingEmployeeFiles).length) await savePendingEmployeeFiles(id,data);
-    }catch(err){
-      console.error('Employee file upload failed:',err);
-      showToast('تم حفظ بيانات الموظف، لكن تعذر رفع ملف أو أكثر. يمكنك رفعها من تبويب «ملفات الموظف» لاحقاً.');
-    }
     if(idx>=0) employees[idx] = data; else employees.push(data);
-    // احفظ محلياً فوراً، ثم انتظر حفظ Firestore قبل إغلاق النموذج حتى لا يعيد
-    // الـ realtime snapshot القديم البيانات مرة أخرى.
-    persistLocal();
-    if(window.FB?.saveState){
-      await withTimeout(window.FB.saveState(currentState()), 20000, 'saveState');
-    }
-    try{ renderProjectCapacity(); renderProjects(); }catch(e){}
-    showToast('تم حفظ بيانات الموظف بنجاح');
+    saveEmployees();
+    showToast('تم حفظ البيانات بنجاح');
     resetForm();
     switchView('employees');
-    }catch(err){
-      console.error('Employee save failed:',err);
-      showToast('تعذر حفظ بيانات الموظف. راجع الحقول المطلوبة أو حاول مرة أخرى.');
-    }
-    }finally{
-      if(saveBtn) saveBtn.disabled=false;
-      if(saveBtnLabel) saveBtnLabel.textContent=prevLabel||'حفظ بيانات الموظف';
-    }
   });
 
   /* ===== payroll statement ===== */
@@ -2102,38 +1640,46 @@
     return {ym,day,allowances,overtime,gross,deduction,absence,penalty,withdrawal,other,net,gosi,insuranceBase};
   }
   function renderReports(){
-    const projectMode=window.currentReport==='projects';
-    const payrollCard=document.querySelector('#view-reports .full-page-data-card');
-    const projectPanel=document.getElementById('projectReportsPanel');
-    if(payrollCard) payrollCard.style.display=projectMode?'none':'';
-    if(projectPanel) projectPanel.style.display=projectMode?'':'none';
-    if(projectMode){
-      renderProjects();
-      renderProjectCapacity();
-      return;
-    }
     const body = document.getElementById('reportTableBody');
-    if(!body)return;
     const q = (document.getElementById('payrollSearch')?.value || '').trim().toLowerCase();
     const list = employees.filter(e=>!q || [e.fullname,e.empcode,e.region,e.project,e.jobtitle].some(v=>String(v||'').toLowerCase().includes(q)));
     document.getElementById('payrollCount').textContent = `${list.length} موظف`;
     body.innerHTML = list.map((e,i)=>{
       const p=payrollStatementFor(e);
       return `<tr data-pay-row="${e.id}">
-        <td class="mono">${i+1}</td><td><b>${escapeHtml(e.fullname||'—')}</b></td><td>${escapeHtml(e.project||e.region||'—')}</td><td>${escapeHtml(e.jobtitle||'—')}</td>
-        <td class="mono">${fmt(p.day)}</td><td class="mono">${fmt(e.basicsalary)}</td><td class="mono">${fmt(p.allowances)}</td><td class="mono">${fmt(p.overtime)}</td><td class="mono">${fmt(p.gross)}</td>
-        <td class="mono" title="التأمينات الاجتماعية من الأساسي + السكن">${fmt(p.gosi)}</td><td class="mono">${fmt(p.absence)}</td><td class="mono">${fmt(p.penalty)}</td><td class="mono">0</td><td class="mono">0</td><td class="mono">${fmt(p.withdrawal)}</td><td class="mono">${fmt(p.other)}</td><td class="mono">${fmt(p.deduction)}</td>
-        <td class="mono" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td><td>${escapeHtml(e.bankname||'—')}</td><td>${escapeHtml(employeeContractStatus(e))}</td><td><button class="btn btn-sm payroll-edit-btn" data-emp="${e.id}">تعديل</button></td>
+        <td class="mono">${i+1}</td>
+        <td><b>${escapeHtml(e.fullname||'—')}</b></td>
+        <td>${escapeHtml(e.project||e.region||'—')}</td>
+        <td>${escapeHtml(e.jobtitle||'—')}</td>
+        <td class="mono">${fmt(p.day)}</td>
+        <td class="mono">${fmt(e.basicsalary)}</td>
+        <td class="mono">${fmt(p.allowances)}</td>
+        <td class="mono">${fmt(p.overtime)}</td>
+        <td class="mono">${fmt(p.gross)}</td>
+        <td class="mono" title="التأمينات الاجتماعية من الأساسي + السكن">${fmt(p.gosi)}</td>
+        <td class="mono">${fmt(p.absence)}</td>
+        <td class="mono">${fmt(p.penalty)}</td>
+        <td class="mono">0</td>
+        <td class="mono">0</td>
+        <td class="mono">${fmt(p.withdrawal)}</td>
+        <td class="mono">${fmt(p.other)}</td>
+        <td class="mono">${fmt(p.deduction)}</td>
+        <td class="mono" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
+        <td>${escapeHtml(e.bankname||'—')}</td>
+        <td>${escapeHtml(employeeContractStatus(e))}</td>
+        <td><button class="btn btn-sm payroll-edit-btn" data-emp="${e.id}">تعديل</button></td>
       </tr>`;
     }).join('') || '<tr><td colspan="21" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     body.querySelectorAll('.payroll-edit-btn').forEach(btn=>btn.addEventListener('click',()=>loadIntoForm(btn.dataset.emp)));
   }
+  function sumForPayroll(e,code){ return attSummaryFor(document.getElementById('attMonth')?.value || currentMonthStr(),e.id)[code]||0; }
+
   const payrollMonth=document.getElementById('payrollMonth'); if(payrollMonth){ payrollMonth.value=currentMonthStr(); payrollMonth.addEventListener('change', renderReports); }
   document.getElementById('payrollSearch').addEventListener('input', renderReports);
   document.getElementById('printReportBtn').addEventListener('click', ()=>window.print());
 
   /* ===== export / import ===== */
-  document.getElementById('exportBtn')?.addEventListener('click', ()=>{
+  document.getElementById('exportBtn').addEventListener('click', ()=>{
     const headers = ['الرقم الوظيفي','الاسم الكامل','رقم الهوية','القسم','المسمى الوظيفي','حالة العقد','الراتب الأساسي','بدل السكن','بدل المواصلات','بدلات أخرى','الخصومات','صافي الراتب','رقم الآيبان','البنك','الهاتف','البريد الإلكتروني'];
     const rows = employees.map(e=>[e.empcode,e.fullname,e.idnum,e.dept,e.jobtitle,employeeContractStatus(e),e.basicsalary,e.housing,e.transport,e.otherallow,(Number(e.otherded)||0),netSalary(e),e.iban,e.bankname,e.phone,e.email]);
     let csv = '\uFEFF' + headers.join(',') + '\n' + rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -2145,8 +1691,8 @@
     URL.revokeObjectURL(url);
     showToast('تم تصدير الملف بصيغة CSV');
   });
-  document.getElementById('importBtnNav')?.addEventListener('click', ()=>document.getElementById('importFile')?.click());
-  document.getElementById('importFile')?.addEventListener('change', (ev)=>{
+  document.getElementById('importBtnNav').addEventListener('click', ()=>document.getElementById('importFile').click());
+  document.getElementById('importFile').addEventListener('change', (ev)=>{
     const file = ev.target.files[0];
     if(!file) return;
     const reader = new FileReader();
@@ -3000,70 +2546,6 @@
     document.getElementById(id)?.addEventListener('change',renderAllContracts);
   });
 
-  /* ===== employee commencements ===== */
-  function isGuardEmployee(e){
-    const job=String(e?.jobtitle||'').trim().toLowerCase();
-    return /حارس|حارسة|guard|security guard/.test(job);
-  }
-  function contractedGuardsForProject(projectName){
-    const contractedIds=new Set(contracts.filter(c=>{
-      const emp=employees.find(e=>e.id===c.empId);
-      const cp=String(c.location||emp?.project||'').trim();
-      return cp===String(projectName||'').trim();
-    }).map(c=>c.empId));
-    return employees.filter(e=>contractedIds.has(e.id) && String(e.project||'').trim()===String(projectName||'').trim() && isGuardEmployee(e));
-  }
-  function renderCommencementProjects(){
-    const sel=document.getElementById('comm_project'); if(!sel)return;
-    const cur=sel.value;
-    sel.innerHTML='<option value="">اختر المشروع</option>'+uniqueSorted(projects.map(p=>p.name)).map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
-    if(projects.some(p=>p.name===cur))sel.value=cur;
-  }
-  function renderCommencementEmployees(){
-    const p=document.getElementById('comm_project'), sel=document.getElementById('comm_employee'); if(!p||!sel)return;
-    const cur=sel.value, list=contractedGuardsForProject(p.value);
-    sel.disabled=!p.value;
-    sel.innerHTML='<option value="">'+(p.value?'اختر الحارس':'اختر المشروع أولاً')+'</option>'+list.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'')} — ${escapeHtml(e.empcode||'')}</option>`).join('');
-    if(list.some(e=>e.id===cur))sel.value=cur;
-    else { sel.value=''; renderCommencementEmployee(); }
-  }
-  function renderCommencementEmployee(){
-    const id=document.getElementById('comm_employee')?.value||'', box=document.getElementById('comm_employee_data');
-    const e=employees.find(x=>x.id===id); if(!box)return;
-    if(!e){box.style.display='none';return;}
-    const c=contracts.filter(x=>x.empId===e.id && String(x.location||e.project||'').trim()===String(e.project||'').trim()).sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''))[0] || contracts.find(x=>x.empId===e.id) || {};
-    const vals={comm_fullname:e.fullname,comm_empcode:e.empcode,comm_idnum:e.idnum,comm_nationality:e.nationality,comm_gender:e.gender,comm_dob:e.dob,comm_phone:e.phone,comm_email:e.email,comm_dept:e.dept,comm_jobtitle:e.jobtitle,comm_region:e.region,comm_project_display:e.project,comm_basicsalary:fmt(e.basicsalary),comm_housing:fmt(e.housing),comm_transport:fmt(e.transport),comm_otherallow:fmt(e.otherallow),comm_lastwage:fmt(e.lastwage||netSalary(e)),comm_contractcode:c.contractCode,comm_contractstart:c.start,comm_contractend:c.end};
-    Object.entries(vals).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v||'';});
-    const existing=commencements.find(x=>x.empId===e.id && x.project===e.project);
-    const date=document.getElementById('comm_startdate'); if(date && !date.value) date.value=existing?.startDate||e.startdate||new Date().toISOString().slice(0,10);
-    document.getElementById('comm_notes').value=existing?.notes||'';
-    box.style.display='';
-  }
-  function renderCommencementTable(){
-    const body=document.getElementById('commencementTableBody'); if(!body)return;
-    const rows=[...commencements].sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''));
-    body.innerHTML=rows.map(r=>`<tr><td class="mono">${escapeHtml(r.startDate||'—')}</td><td><b>${escapeHtml(r.employeeName||'—')}</b></td><td class="mono">${escapeHtml(r.empcode||'—')}</td><td>${escapeHtml(r.project||'—')}</td><td>${escapeHtml(r.jobtitle||'—')}</td><td class="mono">${escapeHtml(r.contractCode||'—')}</td></tr>`).join('')||'<tr><td colspan="6" class="empty-note">لا توجد مباشرات محفوظة.</td></tr>';
-  }
-  function renderCommencements(){
-    renderCommencementProjects();
-    renderCommencementEmployees();
-    renderCommencementTable();
-  }
-  document.getElementById('comm_project')?.addEventListener('change',()=>{document.getElementById('comm_startdate').value=new Date().toISOString().slice(0,10);document.getElementById('comm_notes').value='';renderCommencementEmployees();});
-  document.getElementById('comm_employee')?.addEventListener('change',()=>{document.getElementById('comm_startdate').value='';document.getElementById('comm_notes').value='';renderCommencementEmployee();});
-  document.getElementById('resetCommencementBtn')?.addEventListener('click',()=>{const p=document.getElementById('comm_project');if(p)p.value='';const e=document.getElementById('comm_employee');if(e){e.value='';e.disabled=true;e.innerHTML='<option value="">اختر المشروع أولاً</option>';}document.getElementById('comm_startdate').value=new Date().toISOString().slice(0,10);document.getElementById('comm_notes').value='';document.getElementById('comm_employee_data').style.display='none';});
-  document.getElementById('saveCommencementBtn')?.addEventListener('click',()=>{
-    const empId=document.getElementById('comm_employee')?.value||'', project=document.getElementById('comm_project')?.value||'', startDate=document.getElementById('comm_startdate')?.value||'';
-    const e=employees.find(x=>x.id===empId); if(!project||!e){showToast('اختر المشروع والحارس أولاً');return;}
-    const contract=contracts.find(c=>c.empId===e.id && String(c.location||e.project||'').trim()===String(project).trim());
-    if(!contract){showToast('هذا الموظف ليس لديه عقد محفوظ على المشروع المختار');return;}
-    if(!startDate){showToast('اختر تاريخ المباشرة');return;}
-    const existingIndex=commencements.findIndex(x=>x.empId===e.id && x.project===project);
-    const rec={id:existingIndex>=0?commencements[existingIndex].id:'cm'+Date.now()+Math.random().toString(36).slice(2,7),empId:e.id,employeeName:e.fullname||'',empcode:e.empcode||'',project,region:e.region||'',dept:e.dept||'',jobtitle:e.jobtitle||'',contractId:contract.id||'',contractCode:contract.contractCode||'',startDate,notes:document.getElementById('comm_notes')?.value||'',updatedAt:new Date().toISOString()};
-    if(existingIndex>=0)commencements[existingIndex]=rec;else commencements.push(rec);
-    saveCommencements();renderCommencementTable();showToast(existingIndex>=0?'تم تحديث المباشرة':'تم حفظ المباشرة');
-  });
-
   /* ===== documents ===== */
   function loadSettingsIntoForm(){
     document.getElementById('s_company').value = settings.company||'';
@@ -3092,7 +2574,7 @@
     });
   });
   document.getElementById('doc_emp').addEventListener('change', renderDocSheet);
-  document.getElementById('printDocBtn').addEventListener('click', ()=>window.print());
+  document.getElementById('printDocBtn').addEventListener('click', ()=>{ if(currentDocType==='directwork'){ const id=document.getElementById('doc_emp').value; const emp=employees.find(e=>e.id===id); if(emp){ emp.directworkDone=true; emp.directWorkDate=new Date().toISOString().slice(0,10); saveEmployees(); } } window.print(); });
   function blank(v){ return v ? escapeHtml(v) : '<span class="blank">.......................</span>'; }
   function renderDocuments(){
     refreshEmpSelect(document.getElementById('doc_emp'), '— اختر الموظف —');
@@ -3183,18 +2665,6 @@
     sheet.innerHTML = html;
   }
 
-  function refreshEmployeeDependencies(){
-    try{
-      refreshRegionSelects();
-      refreshEmployeeProjectSelect(document.getElementById('f_region')?.value||'');
-      const dept=document.getElementById('f_dept')?.value||'';
-      const job=document.getElementById('f_jobtitle')?.value||'';
-      refreshDepartmentJobSelects(dept,job);
-      renderDepartments?.();
-      renderProjects?.();
-    }catch(err){ console.error('Employee dependencies refresh failed:',err); }
-  }
-
   async function initCloud(){
     const deadline=Date.now()+12000;
     while((!window.firebaseUserReady || !window.FB) && Date.now()<deadline){
@@ -3213,34 +2683,28 @@
       if(hasCloudEmployees){
         applyState(cloudState);
         persistLocal();
-        refreshEmployeeDependencies();
       }else if(Array.isArray(localFallback.employees) && localFallback.employees.length > 0){
         applyState(localFallback);
         persistLocal();
-        refreshEmployeeDependencies();
         try{ await window.FB.saveState(currentState()); }catch(saveErr){ console.error('Initial employee restore failed:',saveErr); }
       }else{
         applyState(cloudState || localFallback);
         persistLocal();
-        refreshEmployeeDependencies();
       }
       window.FB.startRealtimeSync((state)=>{
         if(!state) return;
         cloudApplying=true;
         try{
-          // أثناء تنفيذ "بدء دورة بيانات جديدة" يجب قبول الحالة الفارغة
-          // القادمة من Firestore وعدم استرجاع البيانات القديمة من الذاكرة المحلية.
-          // في الحالات العادية فقط نحمي البيانات المحلية من snapshot فارغ قديم.
-          if(!forceOperationalReset && Array.isArray(state.employees) && state.employees.length===0 && employees.length>0){
+          // لا تسمح لقيمة employees الفارغة القادمة من السحابة بمسح
+          // الموظفين الموجودين بالفعل محليًا.
+          if(Array.isArray(state.employees) && state.employees.length===0 && employees.length>0){
             const keepState=currentState();
             persistLocal();
             window.FB.saveState(keepState).catch(err=>console.error('Employee restore sync failed:',err));
             applyState(keepState);
-            refreshEmployeeDependencies();
           }else{
             applyState(state);
             persistLocal();
-            refreshEmployeeDependencies();
           }
           switchView(currentView);
           if(currentView==='employees') renderEmployeeTable();
@@ -3258,13 +2722,6 @@
   applyTheme();
   loadEmployees();
   loadAux();
-  // نعبّئ القوائم (المناطق/المشاريع/الأقسام) فوراً من البيانات المحلية قبل
-  // انتظار Firebase، حتى لا تظهر قائمة "المنطقة" فارغة إذا كان الاتصال بطيئاً
-  // أو تأخر تسجيل الدخول، مما كان يمنع حفظ الموظف بصمت.
-  renderRegions();
-  renderProjects();
-  refreshRegionSelects();
-  refreshEmployeeProjectSelect();
   await initCloud();
   renderRegions();
   renderProjects();
