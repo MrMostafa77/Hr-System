@@ -417,7 +417,7 @@
   function resetProjectSection(section){
     if(section==='basic'){
       ['projectName','projectCR','projectVatNo','projectAddress','projectRepId','projectRepName'].forEach(id=>document.getElementById(id).value='');
-      document.getElementById('projectVat').value='15'; const siB=document.getElementById('projectSiToggle'); if(siB) siB.checked=false; const medB=document.getElementById('projectMedToggle'); if(medB) medB.checked=false; const sid=document.getElementById('projectSiDefault'); if(sid) sid.checked=false; setMulti('phone',[]);setMulti('email',[]);
+      document.getElementById('projectVat').value='15'; const siB=document.getElementById('projectSiToggle'); if(siB) siB.checked=false; const medB=document.getElementById('projectMedToggle'); if(medB) medB.checked=false; setMulti('phone',[]);setMulti('email',[]);
       refreshRegionSelects();
       document.getElementById('projectRegion').value='';
     }else if(section==='revenue'){
@@ -442,7 +442,7 @@
       const rev=p.revenueItems||{}, cost=p.costItems||{};
       document.querySelectorAll('[data-project-revenue-toggle]').forEach(c=>c.checked=c.dataset.projectRevenueToggle==='guards' || Array.isArray(rev[c.dataset.projectRevenueToggle]));
       document.querySelectorAll('[data-project-cost-toggle]').forEach(c=>c.checked=c.dataset.projectCostToggle==='guards' || Array.isArray(cost[c.dataset.projectCostToggle]));
-      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled; const sid=document.getElementById('projectSiDefault'); if(sid) sid.checked=!!(p.siDefault||p.medDefault);
+      const siEdit=document.getElementById('projectSiToggle'); if(siEdit) siEdit.checked=!!p.siEnabled; const medEdit=document.getElementById('projectMedToggle'); if(medEdit) medEdit.checked=!!p.medEnabled;
       renderDynamicDetails('revenue',rev);renderDynamicDetails('cost',cost);updateProjectTotals();window.scrollTo({top:0,behavior:'smooth'});
     });
     body.querySelectorAll('[data-project-view]').forEach(b=>b.onclick=()=>{const p=projects.find(x=>x.id===b.dataset.projectView); if(p)showProjectView(p);});
@@ -487,13 +487,13 @@
     const guardRevenue=unitFrom(revenueItems,'guards');
     const data={
       id:document.getElementById('projectId').value||'p'+Date.now(), name:document.getElementById('projectName').value.trim(), region:document.getElementById('projectRegion').value,
-      cr:document.getElementById('projectCR').value.trim(), vatNo:document.getElementById('projectVatNo').value.trim(), address:document.getElementById('projectAddress').value.trim(), phones:getMulti('phone'), emails:getMulti('email'), repId:document.getElementById('projectRepId').value.trim(), repName:document.getElementById('projectRepName').value.trim(), vatRate:vatRate(), medEnabled:!!document.getElementById('projectMedToggle')?.checked, siDefault:!!document.getElementById('projectSiDefault')?.checked, medDefault:!!document.getElementById('projectSiDefault')?.checked,
+      cr:document.getElementById('projectCR').value.trim(), vatNo:document.getElementById('projectVatNo').value.trim(), address:document.getElementById('projectAddress').value.trim(), phones:getMulti('phone'), emails:getMulti('email'), repId:document.getElementById('projectRepId').value.trim(), repName:document.getElementById('projectRepName').value.trim(), vatRate:vatRate(), medEnabled:!!document.getElementById('projectMedToggle')?.checked,
       guards, guardsFemale, supervisors:supervisorQty, managers:managerQty, patrols:patrolQty, devices:deviceQty, uniforms:uniformQty, cones:extraQty,
       revenueGuard:guardRevenue, costGuard:guardSalary, revenueTotal:guards*guardRevenue, costTotal:costGuards*guardSalary,
       revenueItems, costItems, guardBasic:guardSalary, guardHousing:0, guardTransport:0, guardOther:0,
       supervisorBasic:unitFrom(costItems,'supervisors'), supervisorHousing:0, supervisorTransport:0, supervisorOther:0,
       managerBasic:unitFrom(costItems,'managers'), managerHousing:0, managerTransport:0, managerOther:0,
-      projectCostGuards:costGuards, includeBreaks:false, socialInsurance:false, socialInsuranceRate:0, siEnabled:!!document.getElementById('projectSiToggle')?.checked, siDefault:!!document.getElementById('projectSiDefault')?.checked, medDefault:!!document.getElementById('projectSiDefault')?.checked, siGuardRate:SI_GUARD_RATE, siCompanyRate:SI_COMPANY_RATE, siGuardTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().guardTotal:0, siCompanyTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0, patrolBilling:''
+      projectCostGuards:costGuards, includeBreaks:false, socialInsurance:false, socialInsuranceRate:0, siEnabled:!!document.getElementById('projectSiToggle')?.checked, siGuardRate:SI_GUARD_RATE, siCompanyRate:SI_COMPANY_RATE, siGuardTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().guardTotal:0, siCompanyTotal:document.getElementById('projectSiToggle')?.checked?socialInsuranceCalc().companyTotal:0, patrolBilling:''
     };
     const allCostCards=[...document.querySelectorAll('#projectCostDetails .project-detail-card')];
     data.costTotal=allCostCards.reduce((a,c)=>a+(Number(c.querySelector('.pd-qty')?.value)||0)*(Number(c.querySelector('.pd-unit')?.value)||0),0);
@@ -508,7 +508,7 @@
     saveProjects();refreshEmployeeProjectSelect();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
   document.getElementById('projectSearch').addEventListener('input',renderProjects);
-  ['projectSiToggle','projectMedToggle','projectSiDefault'].forEach(id=>document.getElementById(id)?.addEventListener('change',updateProjectTotals));
+  ['projectSiToggle','projectMedToggle'].forEach(id=>document.getElementById(id)?.addEventListener('change',updateProjectTotals));
   ['projectVat','projectName'].forEach(id=>document.getElementById(id)?.addEventListener('input',updateProjectTotals));
   renderDynamicDetails('revenue',{});renderDynamicDetails('cost',{});updateProjectTotals();  // عرض بطاقة الحارس فور فتح التبويب
   document.querySelectorAll('[data-project-revenue-toggle],[data-project-cost-toggle]').forEach(cb=>cb.addEventListener('change',()=>{const rv=getDetailData('revenue'),cv=getDetailData('cost');renderDynamicDetails('revenue',rv);renderDynamicDetails('cost',cv);updateProjectTotals();}));
@@ -1030,8 +1030,7 @@
   }
   function refreshDeptFilterOptions(){ const sel=document.getElementById('filterDept'); if(!sel)return; const cur=sel.value; sel.innerHTML='<option value="">كل الأقسام</option>'+uniqueDepts().map(d=>`<option>${escapeHtml(d)}</option>`).join(''); sel.value=cur; }
 
-  /* ===== all employees table ===== */
-  function employeeHasDirectWork(e){ return !!(e && (e.directworkDone || e.startdate || e.directWorkDate)); }
+  /* ===== employees table ===== */
   function renderEmployeeTable(){
     refreshDeptFilterOptions();
     const q = (document.getElementById('searchInput').value||'').trim().toLowerCase();
@@ -1041,7 +1040,7 @@
       if(fd && e.dept!==fd) return false;
       if(fs && employeeContractStatus(e)!==fs) return false;
       if(q){
-        const hay = [e.fullname,e.idnum,e.empcode,e.jobtitle,e.project,e.dept].join(' ').toLowerCase();
+        const hay = [e.fullname,e.idnum,e.empcode,e.jobtitle].join(' ').toLowerCase();
         if(!hay.includes(q)) return false;
       }
       return true;
@@ -1050,77 +1049,33 @@
     const body = document.getElementById('empTableBody');
     document.getElementById('empEmptyNote').style.display = list.length ? 'none' : '';
     body.innerHTML = list.map(e=>{
-      const info=employeeContractInfo(e.id), contract=info.contract;
-      const hasDirect=employeeHasDirectWork(e);
-      const lastWage=Number(e.lastwage)||((Number(e.basicsalary)||0)+(Number(e.housing)||0)+(Number(e.transport)||0)+(Number(e.otherallow)||0));
-      const contractNumber=contract ? (contract.contractCode||contract.contractNo||contract.number||'—') : '';
-      return `<tr data-id="${escapeAttr(e.id)}">
+      const contractStatus=employeeContractStatus(e); const statusClass = 'status-' + contractStatus.replace(/\s+/g,'_');
+      return `<tr data-id="${e.id}">
         <td><div class="emp-name-cell"><div class="avatar">${escapeHtml(initials(e.fullname))}</div><div class="emp-name"><b>${escapeHtml(e.fullname||'—')}</b><span>${escapeHtml(e.idnum||'')}</span></div></div></td>
-        <td class="mono">${escapeHtml(e.empcode||'—')}</td>
         <td>${escapeHtml(e.dept||'—')}</td>
         <td>${escapeHtml(e.jobtitle||'—')}</td>
-        <td>${escapeHtml(e.project||'—')}</td>
-        <td>${hasDirect?'<span class="status-badge status-active">تم عمل مباشرة</span>':`<button class="btn btn-sm btn-primary" data-act="directwork">عمل مباشرة</button>`}</td>
-        <td class="mono">${money(lastWage)}</td>
-        <td>${contract?escapeHtml(contractNumber):'<button class="btn btn-sm btn-primary" data-act="contract">عمل عقد</button>'}</td>
+        <td><span class="status-badge ${statusClass}">${escapeHtml(contractStatus)}</span></td>
+        <td class="mono">${fmt(e.basicsalary)}</td>
         <td><div class="row-actions">
-          <button class="btn icon-btn btn-ghost" data-act="view" title="عرض" aria-label="عرض"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
-          <button class="btn icon-btn btn-ghost" data-act="edit" title="تعديل" aria-label="تعديل"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg></button>
+          <button class="btn icon-btn btn-ghost" data-act="view" title="عرض">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+          <button class="btn icon-btn btn-ghost" data-act="edit" title="تعديل">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 013 3L12 15l-4 1 1-4z"/></svg>
+          </button>
+          ${contractStatus==='بدون عقد'?`<button class="btn btn-sm btn-primary add-contract-employee" data-act="add-contract" title="إضافة عقد">إضافة عقد</button>`:''}
         </div></td>
       </tr>`;
     }).join('');
     body.querySelectorAll('tr').forEach(tr=>{
       tr.addEventListener('click', (ev)=>{
-        const id=tr.dataset.id, act=ev.target.closest('[data-act]')?.dataset.act;
+        const id = tr.dataset.id;
+        const act = ev.target.closest('[data-act]')?.dataset.act;
         if(act==='edit'){ loadIntoForm(id); switchView('add'); }
-        else if(act==='directwork'){ openDirectWorkForEmployee(id); }
-        else if(act==='contract'){ openContractForEmployee(id); }
-        else if(act==='view'){ openProfile(id); }
-      });
-      tr.addEventListener('dblclick', (ev)=>{
-        if(ev.target.closest('button,a,input,select,textarea')) return;
-        toggleEmployeeDetails(tr.dataset.id, tr);
+        else if(act==='add-contract'){ switchView('contracts'); setTimeout(()=>{ const sel=document.getElementById('contract_emp'); if(sel){sel.value=id; sel.dispatchEvent(new Event('change'));} },80); }
+        else{ openProfile(id); }
       });
     });
-  }
-  function openContractForEmployee(id){
-    currentContractId=null;
-    newContractMode=true;
-    switchView('contracts');
-    const select=document.getElementById('contract_emp');
-    if(select){ select.value=id; select.dispatchEvent(new Event('change')); }
-    document.getElementById('contract_emp')?.scrollIntoView({behavior:'smooth',block:'start'});
-  }
-  function toggleEmployeeDetails(id, row){
-    const body=document.getElementById('empTableBody');
-    const existing=body.querySelector(`tr.employee-details-row[data-for="${CSS.escape(id)}"]`);
-    if(existing){ existing.remove(); return; }
-    body.querySelectorAll('.employee-details-row').forEach(r=>r.remove());
-    const e=employees.find(x=>String(x.id)===String(id));
-    if(!e) return;
-    const ci=employeeContractInfo(e.id), c=ci.contract;
-    const net=netSalary(e);
-    const fields=[
-      ['الاسم الكامل',e.fullname],['الكود الوظيفي',e.empcode],['رقم الهوية / الإقامة',e.idnum],['الجنسية',e.nationality],
-      ['رقم الهاتف',e.phone],['البريد الإلكتروني',e.email],['العنوان',e.address],['القسم',e.dept],
-      ['المسمى الوظيفي',e.jobtitle],['المشروع',e.project],['المنطقة',e.region],['تاريخ المباشرة',e.startdate||e.directWorkDate],
-      ['حالة المباشرة',employeeHasDirectWork(e)?'تم عمل مباشرة':'لم تتم المباشرة'],['رقم العقد',c?(c.contractCode||c.contractNo||c.number):'بدون عقد'],
-      ['نوع العقد',c?.type],['بداية العقد',c?.start],['نهاية العقد',c?.end],['الأجر الأساسي',fmt(e.basicsalary)],
-      ['بدل السكن',fmt(e.housing)],['بدل المواصلات',fmt(e.transport)],['بدلات أخرى',fmt(e.otherallow)],
-      ['التأمينات الاجتماعية',fmt(e.gosi)],['الاستقطاعات',fmt(e.otherded)],['الأجر الصافي',fmt(net)+' ﷼'],
-      ['اسم البنك',e.bankname],['رقم الآيبان',e.iban],['تاريخ الميلاد',e.dob],['مكان إصدار الهوية',e.idplace]
-    ];
-    const detail=document.createElement('tr');
-    detail.className='employee-details-row'; detail.dataset.for=id;
-    detail.innerHTML=`<td colspan="9"><div class="employee-inline-details"><div class="employee-inline-details-head"><strong>البيانات الكاملة للموظف: ${escapeHtml(e.fullname||'')}</strong><span>اضغط مرتين على الموظف لإغلاق التفاصيل</span></div><div class="employee-inline-details-grid">${fields.map(([k,v])=>`<div class="employee-inline-detail"><span>${escapeHtml(k)}</span><b>${v!==undefined&&v!==null&&String(v)!==''?escapeHtml(String(v)):'—'}</b></div>`).join('')}</div></div></td>`;
-    row.insertAdjacentElement('afterend',detail);
-  }
-  function openDirectWorkForEmployee(id){
-    switchView('documents');
-    const select=document.getElementById('doc_emp');
-    if(select){ select.value=id; select.dispatchEvent(new Event('change')); }
-    const btn=document.querySelector('.doc-type-btn[data-doc="directwork"]');
-    if(btn){ document.querySelectorAll('.doc-type-btn').forEach(b=>b.classList.toggle('active',b===btn)); currentDocType='directwork'; renderDocSheet(); }
   }
   ['searchInput','filterDept','filterStatus'].forEach(id=>{
     document.getElementById(id).addEventListener('input', renderEmployeeTable);
@@ -2610,7 +2565,7 @@
     });
   });
   document.getElementById('doc_emp').addEventListener('change', renderDocSheet);
-  document.getElementById('printDocBtn').addEventListener('click', ()=>{ if(currentDocType==='directwork'){ const id=document.getElementById('doc_emp').value; const emp=employees.find(e=>e.id===id); if(emp){ emp.directworkDone=true; emp.directWorkDate=new Date().toISOString().slice(0,10); saveEmployees(); } } window.print(); });
+  document.getElementById('printDocBtn').addEventListener('click', ()=>window.print());
   function blank(v){ return v ? escapeHtml(v) : '<span class="blank">.......................</span>'; }
   function renderDocuments(){
     refreshEmpSelect(document.getElementById('doc_emp'), '— اختر الموظف —');
@@ -2639,17 +2594,12 @@
       <tr><td>5</td><td>النوم أثناء العمل أو عدم التقيد بالتعليمات أو الانشغال بالجوال والأجهزة الذكية</td><td>حسم ثلاثة أيام</td></tr>
       <tr><td>6</td><td>مخالفات أخرى لم تذكر أعلاه</td><td>وفق الحالة واللائحة المعتمدة</td></tr></tbody></table>`;
     }else if(currentDocType==='directwork'){
-      const safeName=escapeHtml(e.fullname||'');
-      const safeJob=escapeHtml(e.jobtitle||'');
-      const safeLocation=escapeHtml(e.project||e.region||'');
-      const safeId=escapeHtml(e.idnum||'');
-      html=`<div class="directwork-official-page" role="document" aria-label="نموذج مباشرة عمل الرسمي">
-        <img class="directwork-template" src="assets/directwork-official-template.jpg" alt="نموذج مباشرة العمل الرسمي بالشعار والعلامة المائية">
-        <span class="directwork-field directwork-name">${safeName}</span>
-        <span class="directwork-field directwork-location">${safeLocation}</span>
-        <span class="directwork-field directwork-job">${safeJob}</span>
-        <span class="directwork-field directwork-id">${safeId}</span>
-      </div>`;
+      html=`<h2>مباشرة عمل</h2><div class="doc-date">التاريخ: ${today}</div>
+      <table class="doc-mini-table"><tbody><tr><th>اسم الموظف</th><td>${blank(e.fullname)}</td></tr><tr><th>المسمى الوظيفي</th><td>${blank(e.jobtitle)}</td></tr><tr><th>القسم</th><td>${blank(e.dept)}</td></tr><tr><th>الموقع</th><td>${blank(e.project||e.region)}</td></tr></tbody></table>
+      <p>نفيدكم بأن الموظف المذكور أعلاه باشر العمل لدينا اعتباراً من:</p><p>التاريخ: <span class="blank">/ / 144هـ</span> الموافق: <span class="blank">/ / 202م</span></p>
+      <p>نوع المباشرة: ☐ تعيين جديد &nbsp;&nbsp; ☐ إعادة تعيين &nbsp;&nbsp; ☐ عودة من الإجازة &nbsp;&nbsp; ☐ أخرى</p>
+      <p>أقر أنا الموظف بأنني باشرت العمل لدى ${blank(co)} وألتزم بأنظمة الشركة وتعليماتها وفترة التجربة المحددة في عقد العمل.</p>
+      <div class="sign-row"><div>اسم الموظف<br>${blank(e.fullname)}<br>التوقيع: ....................</div><div>الموارد البشرية<br>...........................</div><div>رئيس العمليات<br>...........................</div></div>`;
     }else if(currentDocType==='fileundertaking'){
       html = `
         <h2>إقرار وتعهد بإكمال ملف التوظيف</h2>
