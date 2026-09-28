@@ -2554,11 +2554,20 @@
     const searchQ=(document.getElementById('attSearch')?.value||'').trim().toLowerCase();
     const regionQ=document.getElementById('attRegionFilter')?.value||'';
     const projectQ=document.getElementById('attProjectFilter')?.value||'';
+    const statusQ=document.getElementById('attStatusFilter')?.value||'';
+    const statusCols=statusQ?attColumns():null;
     return employees.filter(e=>{
       const name=String(e.fullname||'').toLowerCase(), code=String(e.empcode||'').toLowerCase();
-      return (!searchQ || name.includes(searchQ) || code.includes(searchQ)) &&
+      if(!((!searchQ || name.includes(searchQ) || code.includes(searchQ)) &&
              (!regionQ || String(e.region||'')===regionQ) &&
-             (!projectQ || String(e.project||'')===projectQ);
+             (!projectQ || String(e.project||'')===projectQ))) return false;
+      if(statusQ){
+        const sm=attSummaryForCols(statusCols, e.id);
+        // «دوام» = أي يوم عمل فعلي (حضور أو تغطية أو إضافي)
+        if(statusQ==='دوام') return (sm['ح']+sm['ط']+sm['ض'])>0;
+        return (sm[statusQ]||0)>0;
+      }
+      return true;
     });
   }
   function renderAttendance(){
@@ -2642,6 +2651,7 @@
   document.getElementById('attSearch').addEventListener('input', renderAttendance);
   document.getElementById('attRegionFilter').addEventListener('change', renderAttendance);
   document.getElementById('attProjectFilter').addEventListener('change', renderAttendance);
+  document.getElementById('attStatusFilter')?.addEventListener('change', renderAttendance);
   document.getElementById('attExportBtn')?.addEventListener('click', ()=>{
     const cols=attColumns();
     const headers=['الموظف','الكود','المنطقة','المشروع',...cols.map(c=>attState.mode==='custom'?`${pad2(c.d)}/${c.ym.slice(5)}`:String(c.d)),'دوام','غياب','تغطية','جزاء','راحات','إضافي','انسحاب','جمع'];
@@ -2965,22 +2975,20 @@
   function actTypeText(){ const v=$a('p_type')?.value||''; return v===ACT_OTHER ? ($a('p_typeOther')?.value.trim()||'') : v; }
   function actRefreshProjects(){
     const sel=$a('p_project'); if(!sel) return;
-    const cur=sel.value, q=($a('p_projSearch')?.value||'').trim().toLowerCase();
-    const list=actProjectNames().filter(n=>n===cur || !q || n.toLowerCase().includes(q));
+    const cur=sel.value;
+    const list=actProjectNames();
     sel.innerHTML='<option value="">اختر المشروع</option>'+list.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
     sel.value=cur;
-    if(q && !cur){ const only=list.filter(n=>n.toLowerCase().includes(q)); if(only.length===1){ sel.value=only[0]; actOnProject(); } }
   }
   function actRefreshEmps(){
     const sel=$a('p_emp'); if(!sel) return;
-    const proj=$a('p_project')?.value||'', cur=sel.value, q=($a('p_empSearch')?.value||'').trim().toLowerCase();
+    const proj=$a('p_project')?.value||'', cur=sel.value;
     if(!proj){ sel.innerHTML='<option value="">اختر المشروع أولاً</option>'; return; }
     const all=employees.filter(e=>String(e.project||'')===proj);
-    const list=all.filter(e=>String(e.id)===cur || !q || String(e.fullname||'').toLowerCase().includes(q) || String(e.empcode||'').toLowerCase().includes(q));
+    const list=all;
     sel.innerHTML=(all.length?'<option value="">اختر الحارس</option>':'<option value="">لا يوجد حراس مضافون على هذا المشروع</option>')
       + list.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'')}${e.empcode?` — ${escapeHtml(e.empcode)}`:''}</option>`).join('');
     sel.value=cur;
-    if(q && !sel.value){ const only=list.filter(e=>String(e.fullname||'').toLowerCase().includes(q)||String(e.empcode||'').toLowerCase().includes(q)); if(only.length===1) sel.value=only[0].id; }
   }
   function actRefreshTypes(){
     const sel=$a('p_type'); if(!sel) return;
@@ -3044,7 +3052,8 @@
     }
     actSyncButtons(); actRenderPolicyPanel();
   }
-  function actOnProject(){ actRefreshEmps(); actRefreshTypes(); actUpdateCalc(); }
+  function actSyncEmpSearch(){ const es=$a('p_empSearch'); if(es){ const emp=actEmp(); es.value=emp?(emp.fullname||''):''; } }
+  function actOnProject(){ const ps=$a('p_projSearch'); if(ps) ps.value=$a('p_project')?.value||''; actRefreshEmps(); actRefreshTypes(); actUpdateCalc(); actSyncEmpSearch(); }
   function actOnType(){
     const name=actTypeName();
     if(name) $a('p_code').value=penaltyCodeForName(name);
@@ -3055,10 +3064,8 @@
     if($a('p_type')) $a('p_type').value=''; if($a('p_code')) $a('p_code').value='ج'; if($a('p_days')) $a('p_days').value=''; if($a('p_amount')) $a('p_amount').value='';
     actState.daysManual=false; actState.amountManual=false; actUpdateCalc();
   }
-  $a('p_projSearch')?.addEventListener('input', actRefreshProjects);
   $a('p_project')?.addEventListener('change', actOnProject);
-  $a('p_empSearch')?.addEventListener('input', actRefreshEmps);
-  $a('p_emp')?.addEventListener('change', actUpdateCalc);
+  $a('p_emp')?.addEventListener('change', ()=>{ actSyncEmpSearch(); actUpdateCalc(); });
   $a('p_type')?.addEventListener('change', actOnType);
   $a('p_code')?.addEventListener('change', actUpdateCalc);
   $a('p_days')?.addEventListener('input', actUpdateCalc);
@@ -3140,6 +3147,133 @@
     const w = ATT_CODE_LABELS[c]||'';
     return w===c ? c : `${c} — ${w}`;
   }
+
+  /* ===== بحث تلقائي (اقتراحات أسفل خانة البحث) في إجراءات الموظفين ===== */
+  function actAutocomplete(inputId, getItems, onPick){
+    const input=$a(inputId); if(!input || input._acReady) return; input._acReady=true;
+    const wrap=input.parentElement; if(wrap) wrap.style.position='relative';
+    const box=document.createElement('div'); box.className='act-suggest'; box.style.display='none'; wrap.appendChild(box);
+    let items=[], active=-1;
+    const hide=()=>{ box.style.display='none'; active=-1; };
+    const paint=()=>{ [...box.querySelectorAll('.act-suggest-item')].forEach((el,i)=>el.classList.toggle('active',i===active)); };
+    const pick=i=>{ const it=items[i]; if(!it) return; hide(); onPick(it); };
+    const render=()=>{
+      const q=input.value.trim().toLowerCase();
+      if(!q){ hide(); return; }
+      const all=getItems().filter(it=>it.hay.toLowerCase().includes(q));
+      all.sort((a,b)=>(b.hay.toLowerCase().startsWith(q)?1:0)-(a.hay.toLowerCase().startsWith(q)?1:0));
+      items=all.slice(0,40); active=-1;
+      box.innerHTML=items.length?items.map((it,i)=>`<div class="act-suggest-item" data-i="${i}">${escapeHtml(it.label)}</div>`).join(''):'<div class="act-suggest-empty">لا توجد نتائج مطابقة</div>';
+      box.style.display='';
+    };
+    input.addEventListener('input',render);
+    input.addEventListener('focus',render);
+    input.addEventListener('blur',()=>setTimeout(hide,160));
+    input.addEventListener('keydown',ev=>{
+      if(box.style.display==='none') return;
+      if(ev.key==='ArrowDown'){ ev.preventDefault(); active=Math.min(items.length-1,active+1); paint(); }
+      else if(ev.key==='ArrowUp'){ ev.preventDefault(); active=Math.max(0,active-1); paint(); }
+      else if(ev.key==='Enter'){ if(active>=0){ ev.preventDefault(); pick(active); } else if(items.length===1){ ev.preventDefault(); pick(0); } }
+      else if(ev.key==='Escape'){ hide(); }
+    });
+    box.addEventListener('mousedown',ev=>{ const el=ev.target.closest('.act-suggest-item'); if(!el) return; ev.preventDefault(); pick(Number(el.dataset.i)); });
+  }
+  actAutocomplete('p_projSearch', ()=>actProjectNames().map(n=>({label:n, hay:n, value:n})), it=>{
+    const sel=$a('p_project'); if(!sel) return;
+    if(![...sel.options].some(o=>o.value===it.value)) actRefreshProjects();
+    sel.value=it.value; actOnProject();
+  });
+  actAutocomplete('p_empSearch', ()=>{
+    const proj=$a('p_project')?.value||'';
+    return employees.filter(e=>!proj || String(e.project||'')===proj).map(e=>({
+      label:`${e.fullname||''}${e.empcode?` — ${e.empcode}`:''}${!proj&&e.project?` (${e.project})`:''}`,
+      hay:`${e.fullname||''} ${e.empcode||''}`, value:e.id, project:e.project||''
+    }));
+  }, it=>{
+    const ps=$a('p_project'); if(!ps) return;
+    if(it.project && ps.value!==it.project){
+      if(![...ps.options].some(o=>o.value===it.project)) actRefreshProjects();
+      ps.value=it.project; actOnProject();
+    }
+    const es=$a('p_emp'); if(es){ es.value=it.value; }
+    actSyncEmpSearch(); actUpdateCalc();
+  });
+
+  /* ===== قائمة كليك يمين على الموظف ===== */
+  function empCtxClose(){ document.getElementById('empCtxMenu')?.remove(); }
+  function empCtxAlert(msg){ showToast('⚠ تنبيه: '+msg); try{ alert('تنبيه: '+msg); }catch(_){} }
+  function empCtxGo(view, after){ expandParentGroup(view); switchView(view); if(after) setTimeout(after,80); }
+  const EMP_CTX = {
+    viewContract(e){
+      const c=employeeContractInfo(e.id).contract;
+      if(!c){ empCtxAlert('الموظف بدون عقد'); return; }
+      expandParentGroup('contracts'); openContractForEdit(e.id, c.id);
+    },
+    viewComm(e){
+      const r=employeeCommencementInfo(e);
+      if(!r){ empCtxAlert('الموظف بدون مباشرة'); return; }
+      openCommencementForRecord(r.id);
+    },
+    profile(e){ openProfile(e.id); },
+    makeContract(e){
+      empCtxGo('contracts', ()=>{ const sel=document.getElementById('contract_emp'); if(sel){ sel.value=e.id; sel.dispatchEvent(new Event('change')); } });
+    },
+    makeComm(e){
+      empCtxGo('commencements', ()=>{
+        const ps=document.getElementById('comm_project'), es=document.getElementById('comm_employee');
+        if(ps){ ps.value=e.project||''; ps.dispatchEvent(new Event('change')); }
+        setTimeout(()=>{ if(es){ es.value=e.id; es.dispatchEvent(new Event('change')); } },60);
+      });
+    },
+    makeAction(e){
+      empCtxGo('actions', ()=>{
+        renderPenalties();
+        const ps=$a('p_project'); if(ps){ if(e.project && ![...ps.options].some(o=>o.value===e.project)) actRefreshProjects(); ps.value=e.project||''; actOnProject(); }
+        const es=$a('p_emp'); if(es){ es.value=e.id; }
+        actSyncEmpSearch(); actUpdateCalc();
+      });
+    },
+    previewAtt(e){
+      renderAttendance();
+      openAttendanceSheet({list:[e], cols:attColumns(), single:true});
+    }
+  };
+  function empCtxShow(x, y, e){
+    empCtxClose();
+    const hasContract=!!employeeContractInfo(e.id).contract;
+    const hasComm=!!employeeCommencementInfo(e);
+    const items=[
+      {k:'viewContract', t:'عرض عقد الموظف'},
+      {k:'viewComm', t:'عرض مباشرة الموظف'},
+      {k:'profile', t:'عرض بيانات الموظف'},
+      ...(!hasContract?[{k:'makeContract', t:'عمل عقد'}]:[]),
+      ...(!hasComm?[{k:'makeComm', t:'عمل مباشرة'}]:[]),
+      {k:'makeAction', t:'عمل إجراء'},
+      {k:'previewAtt', t:'معاينة الحضور والانصراف'}
+    ];
+    const m=document.createElement('div'); m.id='empCtxMenu'; m.className='emp-ctx-menu'; m.setAttribute('dir','rtl');
+    m.innerHTML=`<div class="emp-ctx-head">${escapeHtml(e.fullname||'الموظف')}</div>`+items.map(i=>`<button type="button" class="emp-ctx-item" data-k="${i.k}">${escapeHtml(i.t)}</button>`).join('');
+    document.body.appendChild(m);
+    const w=m.offsetWidth, hgt=m.offsetHeight;
+    m.style.left=Math.max(6,Math.min(x, window.innerWidth-w-6))+'px';
+    m.style.top=Math.max(6,Math.min(y, window.innerHeight-hgt-6))+'px';
+    m.addEventListener('click',ev=>{
+      const b=ev.target.closest('.emp-ctx-item'); if(!b) return;
+      empCtxClose(); EMP_CTX[b.dataset.k]?.(e);
+    });
+  }
+  document.addEventListener('contextmenu', ev=>{
+    const tr=ev.target.closest?.('#allEmployeesTableBody tr[data-id], #empTableBody tr[data-id], #attBody tr[data-att-row], #penaltyTableBody tr[data-emp]');
+    if(!tr) return;
+    const id=tr.dataset.id||tr.dataset.attRow||tr.dataset.emp;
+    const emp=employees.find(x=>String(x.id)===String(id)); if(!emp) return;
+    ev.preventDefault(); empCtxShow(ev.clientX, ev.clientY, emp);
+  });
+  document.addEventListener('click', ev=>{ if(!ev.target.closest?.('#empCtxMenu')) empCtxClose(); });
+  document.addEventListener('keydown', ev=>{ if(ev.key==='Escape') empCtxClose(); });
+  window.addEventListener('scroll', empCtxClose, true);
+  window.addEventListener('resize', empCtxClose);
+
   function renderPenalties(){
     if($a('p_project')){ actRefreshProjects(); actRefreshEmps(); actRefreshTypes(); actUpdateCalc(); }
     const body = document.getElementById('penaltyTableBody');
@@ -3151,7 +3285,7 @@
       const penAmount = (emp && ['غ','س','ج'].includes(pcode)) ? recInfo.amount : 0;
       const manual = (p.manualAmount!=null && p.manualAmount!=='') || p.manualDays;
       const daysText = (!manual && recInfo.item) ? (recInfo.item.fixed?'مقطوع':recInfo.item.days) : (p.days??'');
-      return `<tr>
+      return `<tr data-emp="${escapeAttr(p.empId)}">
         <td>${escapeHtml(emp ? emp.fullname : 'موظف محذوف')}</td>
         <td>${escapeHtml(p.project||emp?.project||'—')}</td>
         <td class="mono">${escapeHtml(p.date||'')}</td>
