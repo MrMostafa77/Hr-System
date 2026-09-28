@@ -600,7 +600,7 @@
           <div class="field"><label>الموقع</label><select id="c_location" required></select></div>
           <div class="field"><label>تاريخ التغطية</label><input type="date" id="c_date" required></div>
           <div class="field"><label>اسم الحارس الغائب (الذي تمت تغطيته)</label><select id="c_absent" required></select></div>
-          <div class="field"><label>الحالة</label><select id="c_status" required><option>غياب</option><option>انسحاب</option><option>راحة</option><option>اجازة سنوية</option><option>اجازة مرضية</option><option>اخرى</option></select></div>
+          <div class="field"><label>الحالة</label><select id="c_status" required></select></div>
           <div class="field"><label>المستحق (ريال)</label><div class="inline-control"><input type="number" id="c_amount" min="0" step="0.01"><button type="button" class="btn btn-sm" id="covOtherAmountBtn">+ مبلغ آخر</button></div><small id="covAmountHint" class="field-note">يُحسب تلقائيًا من راتب الحارس في المشروع ÷ 30.</small></div>
           <div class="field"><label>اسم صاحب الحساب</label><div class="inline-control"><input type="text" id="c_holder" readonly><label class="check-inline"><input type="checkbox" id="c_delegate"> تفويض</label></div><input type="text" id="c_delegate_holder" placeholder="اكتب اسم صاحب الحساب الجديد" style="display:none;margin-top:8px"></div>
           <div class="field"><label>رقم الآيبان البنكي</label><input type="text" id="c_iban" class="mono" maxlength="24" placeholder="SAxxxxxxxxxxxxxxxxxxxxxx" inputmode="text"></div>
@@ -610,7 +610,7 @@
           <div class="field full" style="flex-direction:row;gap:8px;flex-wrap:wrap;"><button type="submit" class="btn btn-primary btn-sm">حفظ التغطية</button><button type="button" class="btn btn-sm" id="covSaveNewBtn">حفظ وإضافة جديدة</button><button type="button" class="btn btn-sm" id="covResetBtn">إضافة جديدة</button></div>
         </form>
       </div>
-      <div class="filters"><select id="covFilterStatus"><option value="">كل الحالات</option><option>غياب</option><option>انسحاب</option><option>راحة</option><option>اجازة سنوية</option><option>اجازة مرضية</option><option>اخرى</option></select><div style="margin-inline-start:auto;font-size:13px;color:var(--ink-soft);">إجمالي المستحقات: <b class="mono" id="covTotal">0</b> ﷼</div></div>
+      <div class="filters"><select id="covFilterStatus"><option value="">كل الحالات</option></select><div style="margin-inline-start:auto;font-size:13px;color:var(--ink-soft);">إجمالي المستحقات: <b class="mono" id="covTotal">0</b> ﷼</div></div>
       <div class="table-wrap"><table><thead><tr><th>الحارس المغطّي</th><th>الوردية</th><th>الموقع</th><th>التاريخ</th><th>الحارس الغائب</th><th>الحالة</th><th>المستحق</th><th>صاحب الحساب</th><th>البنك</th><th>رقم الحساب</th><th></th></tr></thead><tbody id="covTableBody"></tbody></table></div>
     </section>
 

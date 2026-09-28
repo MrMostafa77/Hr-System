@@ -3474,8 +3474,49 @@
   }
   function renderCoverageAbsentOptions(selected=''){
     const el=document.getElementById('c_absent'); if(!el)return;
-    el.innerHTML='<option value="">اختر الحارس الغائب</option>'+employees.filter(e=>e?.id&&e?.fullname).map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname)}</option>`).join('');
+    const loc=String(document.getElementById('c_location')?.value||'').trim();
+    // عند اختيار المشروع: حراس/موظفو هذا المشروع فقط (مع إبقاء المختار سابقاً عند التعديل)
+    const list=employees.filter(e=>e?.id&&e?.fullname&&(!loc||String(e.project||'').trim()===loc||String(e.id)===String(selected)));
+    el.innerHTML=`<option value="">${loc&&!list.length?'لا يوجد حراس على هذا المشروع':'اختر الحارس الغائب'}</option>`+list.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname)}${e.empcode?` — ${escapeHtml(e.empcode)}`:''}</option>`).join('');
     el.value=selected||'';
+  }
+  /* حالات التغطية = نفس رموز الحضور والانصراف */
+  const COV_STATUS_CODES=['ح','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق'];
+  function covStatusLabel(k){ const l=ATT_CODE_LABELS[k]||k; return l===k?k:`${k} = ${l}`; }
+  function covStatusCode(status){
+    const v=String(status||'').trim();
+    if(COV_STATUS_CODES.includes(v)) return v;
+    const found=COV_STATUS_CODES.find(k=>ATT_CODE_LABELS[k]===v);   // سجلات قديمة مخزنة كنص (غياب، انسحاب، راحة)
+    return found||'';
+  }
+  function covStatusText(status){ const k=covStatusCode(status); return k?covStatusLabel(k):String(status||''); }
+  function renderCoverageStatusOptions(){
+    const sel=document.getElementById('c_status'), fil=document.getElementById('covFilterStatus');
+    if(sel && !sel.dataset.ready){
+      sel.innerHTML=COV_STATUS_CODES.map(k=>`<option value="${escapeAttr(k)}"${k==='غ'?' selected':''}>${escapeHtml(covStatusLabel(k))}</option>`).join('');
+      sel.dataset.ready='1';
+    }
+    if(fil && !fil.dataset.ready){
+      fil.innerHTML='<option value="">كل الحالات</option>'+COV_STATUS_CODES.map(k=>`<option value="${escapeAttr(k)}">${escapeHtml(covStatusLabel(k))}</option>`).join('');
+      fil.dataset.ready='1';
+    }
+  }
+  renderCoverageStatusOptions();
+  /* تسميع حالة التغطية في الحضور والانصراف (للحارس الغائب في نفس اليوم) */
+  function covAttendanceKey(rec){
+    const d=String(rec?.date||'').slice(0,10), id=rec?.absentId;
+    if(!id||!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+    return {ym:d.slice(0,7), day:Number(d.slice(8,10)), empId:id};
+  }
+  function covClearAttendance(rec){
+    const k=covAttendanceKey(rec), code=covStatusCode(rec?.status); if(!k||!code) return;
+    const cell=attendance[k.ym]?.[k.empId];
+    if(cell && cell[k.day]===code) delete cell[k.day];
+  }
+  function covApplyAttendance(rec){
+    const k=covAttendanceKey(rec), code=covStatusCode(rec?.status); if(!k||!code) return;
+    attendance[k.ym]=attendance[k.ym]||{}; attendance[k.ym][k.empId]=attendance[k.ym][k.empId]||{};
+    if(code!==autoAttendanceCode(k.ym,k.empId,k.day)) attendance[k.ym][k.empId][k.day]=code; else delete attendance[k.ym][k.empId][k.day];
   }
   function renderCoverageShiftOptions(selected=''){
     const el=document.getElementById('c_shift'); if(!el)return;
@@ -3546,11 +3587,11 @@
     renderCoverageLocationOptions(document.getElementById('c_location')?.value||'');
     const fs=document.getElementById('covFilterStatus').value;
     let list=[...coverage].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    if(fs)list=list.filter(c=>c.status===fs);
+    if(fs)list=list.filter(c=>covStatusCode(c.status)===fs);
     const body=document.getElementById('covTableBody');
-    body.innerHTML=list.map(c=>`<tr><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.shift||'')}</td><td>${escapeHtml(c.location||'')}</td><td class="mono">${escapeHtml(c.date||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(c.status||'')}</td><td class="mono">${fmt(c.amount)}</td><td>${escapeHtml(c.holder||'')}</td><td>${escapeHtml(c.bank||'')}</td><td class="mono">${escapeHtml(c.accountno||'')}</td><td><button class="btn btn-sm" data-cov-edit="${c.id}">تعديل</button> <button class="btn icon-btn btn-ghost btn-danger" data-del="${c.id}" title="حذف">✕</button></td></tr>`).join('')||'<tr><td colspan="11" class="empty-note">لا توجد تغطيات مسجلة.</td></tr>';
+    body.innerHTML=list.map(c=>`<tr><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.shift||'')}</td><td>${escapeHtml(c.location||'')}</td><td class="mono">${escapeHtml(c.date||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusText(c.status))}</td><td class="mono">${fmt(c.amount)}</td><td>${escapeHtml(c.holder||'')}</td><td>${escapeHtml(c.bank||'')}</td><td class="mono">${escapeHtml(c.accountno||'')}</td><td><button class="btn btn-sm" data-cov-edit="${c.id}">تعديل</button> <button class="btn icon-btn btn-ghost btn-danger" data-del="${c.id}" title="حذف">✕</button></td></tr>`).join('')||'<tr><td colspan="11" class="empty-note">لا توجد تغطيات مسجلة.</td></tr>';
     document.getElementById('covTotal').textContent=fmt(list.reduce((sum,c)=>sum+(Number(c.amount)||0),0));
-    body.querySelectorAll('[data-del]').forEach(btn=>btn.onclick=()=>{if(confirm('هل تريد حذف سجل التغطية هذا؟')){coverage=coverage.filter(c=>c.id!==btn.dataset.del);saveCoverage();renderCoverage();}});
+    body.querySelectorAll('[data-del]').forEach(btn=>btn.onclick=()=>{if(confirm('هل تريد حذف سجل التغطية هذا؟')){const old=coverage.find(c=>c.id===btn.dataset.del); if(old) covClearAttendance(old); coverage=coverage.filter(c=>c.id!==btn.dataset.del);saveCoverage();renderCoverage();}});
     body.querySelectorAll('[data-cov-edit]').forEach(btn=>btn.onclick=()=>loadCoverageForEdit(btn.dataset.covEdit));
   }
   function loadCoverageForEdit(id){
@@ -3559,7 +3600,7 @@
     renderCoverageGuardOptions(c.guardId||'');
     if(c.guardType==='manual')document.getElementById('c_guard').dataset.manualName=c.guardName||'';
     renderCoverageShiftOptions(c.shift||''); renderCoverageLocationOptions(c.location||''); renderCoverageAbsentOptions(c.absentId||'');
-    document.getElementById('c_date').value=c.date||''; document.getElementById('c_status').value=c.status||'غياب';
+    document.getElementById('c_date').value=c.date||''; { const st=document.getElementById('c_status'), k=covStatusCode(c.status); if(!k && c.status && ![...st.options].some(o=>o.value===c.status)){ const o=document.createElement('option'); o.value=c.status; o.textContent=c.status; st.appendChild(o); } st.value=k||c.status||'غ'; }
     document.getElementById('c_amount').value=c.amount??''; document.getElementById('c_amount').dataset.manual=c.amountManual?'1':'';
     document.getElementById('c_holder').value=c.guardName||''; document.getElementById('c_delegate').checked=!!c.delegated;
     document.getElementById('c_delegate_holder').value=c.delegateHolder||''; document.getElementById('c_delegate_holder').style.display=c.delegated?'block':'none';
@@ -3567,7 +3608,7 @@
     updateCoverageAmount(false); window.scrollTo({top:0,behavior:'smooth'}); showToast('تم فتح التغطية للتعديل');
   }
   document.getElementById('covFilterStatus').addEventListener('change',renderCoverage);
-  document.getElementById('c_location').addEventListener('change',()=>{document.getElementById('c_amount').dataset.manual='';updateCoverageAmount(true);});
+  document.getElementById('c_location').addEventListener('change',()=>{document.getElementById('c_amount').dataset.manual='';updateCoverageAmount(true);renderCoverageAbsentOptions('');});
   document.getElementById('c_amount').addEventListener('input',()=>document.getElementById('c_amount').dataset.manual='1');
   document.getElementById('c_iban').addEventListener('input',updateCoverageBank);
   document.getElementById('c_delegate').addEventListener('change',function(){const show=this.checked;document.getElementById('c_delegate_holder').style.display=show?'block':'none';if(show)document.getElementById('c_delegate_holder').focus();});
@@ -3590,12 +3631,15 @@
     const delegated=document.getElementById('c_delegate').checked, delegateHolder=document.getElementById('c_delegate_holder').value.trim();
     if(delegated&&!delegateHolder){showToast('اكتب اسم صاحب الحساب عند تفعيل التفويض');return;}
     const data={id:document.getElementById('c_id').value||'c'+Date.now(),guardId:employee?.id||guardId,guardName:employee?.fullname||manualName,guardType:employee?'employee':'manual',shift:document.getElementById('c_shift').value,location,date:document.getElementById('c_date').value,absentId,absentName:absent.fullname,status:document.getElementById('c_status').value,amount,amountManual:document.getElementById('c_amount').dataset.manual==='1',projectGuardSalary:salary,holder:delegated?delegateHolder:(employee?.fullname||manualName),delegated,delegateHolder,iban:document.getElementById('c_iban').value.toUpperCase(),bank:document.getElementById('c_bank').value,accountno:document.getElementById('c_account').value,notes:document.getElementById('c_notes').value};
-    const idx=coverage.findIndex(x=>x.id===data.id); if(idx>=0)coverage[idx]=data; else coverage.push(data);
-    saveCoverage(); renderCoverage(); const makeNew=document.getElementById('coverageForm').dataset.saveNew==='1'; delete document.getElementById('coverageForm').dataset.saveNew; showToast(idx>=0?'تم تحديث التغطية':'تم حفظ التغطية'); if(makeNew)resetCoverageForm();
+    const idx=coverage.findIndex(x=>x.id===data.id);
+    if(idx>=0) covClearAttendance(coverage[idx]);          // إزالة تسميع السجل القديم لو تغيّر اليوم/الحارس/الحالة
+    if(idx>=0)coverage[idx]=data; else coverage.push(data);
+    covApplyAttendance(data);
+    saveCoverage(); renderCoverage(); const makeNew=document.getElementById('coverageForm').dataset.saveNew==='1'; delete document.getElementById('coverageForm').dataset.saveNew; showToast((idx>=0?'تم تحديث التغطية':'تم حفظ التغطية')+' — وسُجّلت الحالة «'+covStatusText(data.status)+'» للحارس الغائب في الحضور والانصراف بتاريخ '+fmtDMY(data.date)); if(makeNew)resetCoverageForm();
   });
   document.getElementById('covExportBtn').addEventListener('click',()=>{
     const headers=['اسم الحارس القائم بالتغطية','الوردية','الموقع','التاريخ','الحارس الغائب','الحالة','المستحق','اسم صاحب الحساب','الآيبان','البنك','رقم الحساب','ملاحظات'];
-    const rows=coverage.map(c=>[c.guardName,c.shift,c.location,c.date,c.absentName,c.status,c.amount,c.holder,c.iban,c.bank,c.accountno,c.notes]); downloadCsv('coverage_export.csv',headers,rows);
+    const rows=coverage.map(c=>[c.guardName,c.shift,c.location,c.date,c.absentName,covStatusText(c.status),c.amount,c.holder,c.iban,c.bank,c.accountno,c.notes]); downloadCsv('coverage_export.csv',headers,rows);
   });
   resetCoverageForm();
 
