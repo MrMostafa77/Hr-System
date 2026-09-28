@@ -12,7 +12,7 @@
   const CONTRACT_KEY = 'hr_contracts_v1';
   const COMMENCEMENT_KEY = 'hr_commencements_v1';
   const PROJECT_ACCOUNT_KEY = 'hr_project_accounts_v1';
-  const ATT_CODES = ['','ح','غ','ش','ج','راحة','ط','ض','س','جمع','عيد'];
+  const ATT_CODES = ['','ح','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق'];
   let employees = [];
   let attendance = {};   // { "YYYY-MM": { empId: { day: code } } }
   let penalties = [];    // [{id, empId, date, type, days, notes}]
@@ -2224,11 +2224,11 @@
     const basic=Number(e.basicsalary)||0;
     const day=basic/30;
     const allowances=Number(e.otherallow)||0;
-    const overtime=(sum['اضافي']||0)*day*1.5;
+    const overtime=(sum['ض']||0)*day*1.5;
     const gross=basic+allowances+overtime;
     const absence=(sum['غ']||0)*day*3.5;
     const penalty=(sum['ج']||0)*day;
-    const withdrawal=(sum['انسحاب']||0)*day*5;
+    const withdrawal=(sum['س']||0)*day*5;
     const other=0;
     const project=projects.find(p=>String(p.name||'')===String(e.project||''));
     const insuranceBase=basic+(Number(e.housing)||0);
@@ -2316,7 +2316,7 @@
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
   }
   const ATT_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
-  const ATT_CODE_LABELS = {'':'—','ح':'حضور','غ':'غياب','ش':'انكشاف','ج':'جزاء','راحة':'راحة','ط':'تغطية','ض':'إضافي','س':'انسحاب','جمع':'جمع','عيد':'عيد'};
+  const ATT_CODE_LABELS = {'':'—','ح':'حضور','غ':'غياب','ش':'انكشاف','ج':'جزاء','راحة':'راحة','ط':'تغطية','ض':'إضافي','س':'انسحاب','جمع':'جمع','عيد':'عيد','ق':'تطبيق'};
   function daysInMonth(ym){
     const [y,m] = ym.split('-').map(Number);
     return new Date(y, m, 0).getDate();
@@ -2340,17 +2340,27 @@
     if(!matches.length) return null;
     return matches.sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate)))[0];
   }
-  function autoAttendanceCode(ym, empId, day){
+  function attStartDateFor(empId){
     const c = commencementForEmployee(empId);
-    if(!c?.startDate) return '';
-    const start = String(c.startDate);
-    const [y,m] = String(ym).split('-').map(Number);
-    const startDate = new Date(start+'T00:00:00');
-    if(Number.isNaN(startDate.getTime())) return '';
-    const startYm = `${startDate.getFullYear()}-${String(startDate.getMonth()+1).padStart(2,'0')}`;
-    if(String(ym) < startYm) return '';
-    if(String(ym) === startYm && Number(day) < startDate.getDate()) return '';
-    return 'ح';
+    const e = employees.find(x=>String(x.id)===String(empId));
+    const start = String(c?.startDate || e?.startdate || '').slice(0,10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : '';
+  }
+  // إجراء مسجل في تبويب إجراءات الموظفين لهذا اليوم؟ (انسحاب => س ، غيره => ج)
+  function attActionCodeFor(empId, dateStr){
+    const hit = (penalties||[]).filter(p=>String(p.empId)===String(empId) && String(p.date||'').slice(0,10)===dateStr);
+    if(!hit.length) return '';
+    return hit.some(p=>/انسحاب/.test(String(p.type||''))) ? 'س' : 'ج';
+  }
+  // الافتراضي: من تاريخ المباشرة حتى اليوم = ح ، إلا إذا وُجد إجراء في ذلك اليوم
+  function autoAttendanceCode(ym, empId, day){
+    const start = attStartDateFor(empId);
+    if(!start) return '';
+    const dateStr = `${ym}-${String(day).padStart(2,'0')}`;
+    const t = new Date();
+    const todayStr = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    if(dateStr < start || dateStr > todayStr) return '';
+    return attActionCodeFor(empId, dateStr) || 'ح';
   }
   function effectiveAttendanceRecord(ym, empId){
     const raw = (attendance[ym] && attendance[ym][empId]) || {};
@@ -2366,16 +2376,17 @@
   }
   function attSummaryFor(ym, empId){
     const rec = effectiveAttendanceRecord(ym, empId);
-    const counts = {'ح':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0};
+    const counts = {'ح':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
     Object.values(rec).forEach(code=>{ if(Object.prototype.hasOwnProperty.call(counts,code)) counts[code]++; });
     return counts;
   }
   function initAttendanceMonthControls(){
     const hidden = document.getElementById('attMonth');
     const result = document.getElementById('attMonthResult');
-    if(!hidden || !result) return;
+    const select = document.getElementById('attMonthSelect');
+    if(!hidden || !result || !select) return;
     if(!hidden.value) hidden.value = currentMonthStr();
-    // قائمة الأشهر: من 24 شهراً سابقاً إلى 6 أشهر قادمة + أي شهر لديه بيانات محفوظة
+    const [year, month] = hidden.value.split('-').map(Number);
     const now = new Date(), set = new Set();
     for(let k=-24; k<=6; k++){
       const d = new Date(now.getFullYear(), now.getMonth()+k, 1);
@@ -2383,10 +2394,15 @@
     }
     Object.keys(attendance||{}).forEach(k=>{ if(/^\d{4}-\d{2}$/.test(k)) set.add(k); });
     set.add(hidden.value);
-    const list = Array.from(set).sort().reverse();
-    result.innerHTML = list.map(ym=>`<option value="${ym}">${monthLabel(ym)}</option>`).join('');
+    result.innerHTML = Array.from(set).sort().reverse().map(ym=>`<option value="${ym}">${monthLabel(ym)}</option>`).join('');
     result.value = hidden.value;
+    select.innerHTML = ATT_MONTHS.map((name,i)=>`<option value="${i+1}">${name}</option>`).join('');
+    select.value = String(month);
     result.onchange = ()=>{ hidden.value = result.value; renderAttendance(); };
+    select.onchange = ()=>{
+      hidden.value = `${year}-${String(Number(select.value)).padStart(2,'0')}`;
+      renderAttendance();
+    };
   }
   function refreshAttendanceFilters(){
     const region=document.getElementById('attRegionFilter'), project=document.getElementById('attProjectFilter');
@@ -2405,6 +2421,8 @@
       save:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg>'
     }; return icons[name]||'';
   }
+  // عمود الحالة: يُربط لاحقاً بحالة الحضور من تبويب إجراءات الموظفين
+  function attStatusFor(ym, empId){ return '—'; }
   function closeAttendanceMenus(){ document.querySelectorAll('.att-edit-menu.open').forEach(m=>m.classList.remove('open')); }
 
   function renderAttendance(){
@@ -2420,7 +2438,7 @@
     const head = document.getElementById('attHeadRow');
     let headHtml = '<th class="name-col">الحارس</th><th>الكود</th><th>المنطقة</th><th>المشروع</th>';
     for(let d=1; d<=nDays; d++) headHtml += `<th>${d}</th>`;
-    headHtml += '<th>دوام</th><th>غياب</th><th>تغطية</th><th>جزاء</th><th>راحات</th><th>إضافي</th><th>انسحاب</th><th>جمع</th><th>الإجراءات</th>';
+    headHtml += '<th>دوام</th><th>غياب</th><th>تغطية</th><th>جزاء</th><th>راحات</th><th>إضافي</th><th>انسحاب</th><th>جمع</th><th>الحالة</th><th>الإجراءات</th>';
     head.innerHTML = headHtml;
 
     const list = employees.filter(e=>{
@@ -2440,7 +2458,7 @@
         <td>${escapeHtml(e.project||'—')}</td>`;
       for(let d=1; d<=nDays; d++){
         const code = rec[d] || '';
-        const opts = ATT_CODES.map(c=>`<option value="${c}" ${c===code?'selected':''}>${ATT_CODE_LABELS[c]||c}</option>`).join('');
+        const opts = ATT_CODES.map(c=>`<option value="${c}" title="${ATT_CODE_LABELS[c]||''}" ${c===code?'selected':''}>${c||'—'}</option>`).join('');
         cells += `<td><select class="att-select code-${code}" data-emp="${e.id}" data-day="${d}" disabled>${opts}</select></td>`;
       }
       cells += `<td class="sum-col" data-sum="ح" data-emp="${e.id}">${sum['ح']}</td>
@@ -2451,9 +2469,9 @@
         <td class="sum-col" data-sum="ض" data-emp="${e.id}">${sum['ض']}</td>
         <td class="sum-col" data-sum="س" data-emp="${e.id}">${sum['س']}</td>
         <td class="sum-col" data-sum="جمع" data-emp="${e.id}">${sum['جمع']}</td>`;
+      cells += `<td class="status-col" data-status-emp="${e.id}">${escapeHtml(attStatusFor(ym, e.id))}</td>`;
       cells += `<td class="act-col"><div class="att-actions">
         <button type="button" class="btn btn-sm att-daily-edit" data-emp="${e.id}" title="تعديل يومي">${attIcon('edit')}<span>تعديل</span></button>
-        <button type="button" class="btn btn-sm att-range-edit" data-emp="${e.id}" title="تعديل بالتاريخ (من وإلى)">${attIcon('range')}<span>من - إلى</span></button>
         <button type="button" class="btn btn-sm btn-primary att-save-btn" data-emp="${e.id}" title="حفظ" disabled>${attIcon('save')}<span>حفظ</span></button>
       </div></td>`;
       return `<tr data-att-row="${e.id}">${cells}</tr>`;
@@ -2464,16 +2482,6 @@
       row.querySelectorAll('.att-select').forEach(sel=>sel.disabled=false);
       row.querySelector('.att-save-btn').disabled=false;
     }));
-    body.querySelectorAll('.att-range-edit').forEach(btn=>btn.addEventListener('click', ()=>{
-      const row=body.querySelector(`tr[data-att-row="${btn.dataset.emp}"]`); if(!row) return;
-      const first=prompt('أدخل تاريخ البداية داخل الشهر (مثال: 5)');
-      if(first===null) return;
-      const last=prompt('أدخل تاريخ النهاية داخل الشهر (مثال: 10)');
-      if(last===null) return;
-      const from=Math.max(1,Math.min(nDays,Number(first)||1)), to=Math.max(from,Math.min(nDays,Number(last)||from));
-      row.querySelectorAll('.att-select').forEach(sel=>{ const d=Number(sel.dataset.day); if(d>=from&&d<=to) sel.disabled=false; });
-      row.querySelector('.att-save-btn').disabled=false;
-    }));
     body.querySelectorAll('.att-save-btn').forEach(btn=>btn.addEventListener('click', ()=>{
       const row=body.querySelector(`tr[data-att-row="${btn.dataset.emp}"]`); if(!row) return;
       const empId=btn.dataset.emp;
@@ -2481,7 +2489,7 @@
       row.querySelectorAll('.att-select').forEach(sel=>{
         if(sel.disabled) return;
         const day=sel.dataset.day, code=sel.value;
-        if(code) attendance[ym][empId][day]=code; else delete attendance[ym][empId][day];
+        if(code && code!==autoAttendanceCode(ym,empId,day)) attendance[ym][empId][day]=code; else delete attendance[ym][empId][day];
         sel.disabled=true;
       });
       saveAttendance(); btn.disabled=true;

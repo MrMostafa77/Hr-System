@@ -2193,3 +2193,11 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 #view-attendance .att-actions .btn:disabled{opacity:.45;cursor:not-allowed;}
 #view-attendance .attendance-filters{grid-template-columns:1.2fr 1fr 1.3fr!important;}
 @media(max-width:900px){#view-attendance .attendance-filters{grid-template-columns:1fr!important;}}
+
+/* ق = تطبيق + عمود الحالة + أربعة فلاتر */
+.legend-q{background:#D8C6F5}
+.att-select.code-ق{background:#D8C6F5!important;color:#4B2A8A!important;border-color:#A98BE0!important;}
+#view-attendance .attendance-filters{grid-template-columns:1.1fr 1fr 1fr 1.2fr!important;}
+@media(max-width:900px){#view-attendance .attendance-filters{grid-template-columns:1fr 1fr!important;}}
+#view-attendance .att-table th:nth-last-child(2),#view-attendance .att-table td.status-col{min-width:110px!important;width:110px!important;}
+#view-attendance .att-table th:last-child,#view-attendance .att-table td.act-col{min-width:190px!important;width:190px!important;}
