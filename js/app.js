@@ -2217,25 +2217,42 @@
   });
 
   /* ===== payroll statement ===== */
-  function payrollStatementFor(e){
-    const ym=document.getElementById('payrollMonth')?.value || currentMonthStr();
-    const rec=(attendance[ym]&&attendance[ym][e.id])||{};
-    const sum=attSummaryFor(ym,e.id);
+  function monthCols(ym){
+    const cols=[]; for(let d=1; d<=daysInMonth(ym); d++) cols.push({ym, d, iso:`${ym}-${String(d).padStart(2,'0')}`});
+    return cols;
+  }
+  // الدوام = كل الأيام المسجلة بأي حرف (ح + أي إجراء) على أساس شهر = 30 يوم
+  function attWorkDays(cols, empId){
+    if(!cols.length) return 0;
+    let coded=0; cols.forEach(c=>{ if(attCodeAt(c.ym, empId, c.d)) coded++; });
+    const isCycle = cols[cols.length-1].iso === nextCycleEndISO(cols[0].iso);
+    if(isCycle && coded===cols.length && cols.length<30) coded=30;
+    return Math.min(30, coded);
+  }
+  function payrollStatementForCols(e, cols, sumIn){
+    const ym=cols.length?cols[0].ym:currentMonthStr();
+    const sum=sumIn||attSummaryForCols(cols,e.id);
     const basic=Number(e.basicsalary)||0;
     const day=basic/30;
     const allowances=Number(e.otherallow)||0;
     const overtime=(sum['ض']||0)*day*1.5;
     const gross=basic+allowances+overtime;
+    const absDay=(sum['غ']||0)*day;
     const absence=(sum['غ']||0)*day*3.5;
     const penalty=(sum['ج']||0)*day;
     const withdrawal=(sum['س']||0)*day*5;
     const other=0;
+    const otherded=Number(e.otherded)||0;
     const project=projects.find(p=>String(p.name||'')===String(e.project||''));
     const insuranceBase=basic+(Number(e.housing)||0);
     const gosi=(project?.socialInsurance ? insuranceBase*(Number(project.socialInsuranceRate)||0)/100 : (Number(e.gosi)||0));
-    const deduction=(sum['غ']||0)*day + gosi+(Number(e.otherded)||0)+absence+penalty+withdrawal+other;
+    const deduction=absDay+gosi+otherded+absence+penalty+withdrawal+other;
     const net=gross-deduction;
-    return {ym,day,allowances,overtime,gross,deduction,absence,penalty,withdrawal,other,net,gosi,insuranceBase};
+    return {ym,day,basic,allowances,overtime,gross,deduction,absence,absDay,otherded,penalty,withdrawal,other,net,gosi,insuranceBase,sum,workDays:attWorkDays(cols,e.id)};
+  }
+  function payrollStatementFor(e){
+    const ym=document.getElementById('payrollMonth')?.value || currentMonthStr();
+    return payrollStatementForCols(e, monthCols(ym));
   }
   function renderReports(){
     const projectMode=window.currentReport==='projects';
@@ -2259,10 +2276,14 @@
         <td class="mono">${i+1}</td><td><b>${escapeHtml(e.fullname||'—')}</b></td><td>${escapeHtml(e.project||e.region||'—')}</td><td>${escapeHtml(e.jobtitle||'—')}</td>
         <td class="mono">${fmt(p.day)}</td><td class="mono">${fmt(e.basicsalary)}</td><td class="mono">${fmt(p.allowances)}</td><td class="mono">${fmt(p.overtime)}</td><td class="mono">${fmt(p.gross)}</td>
         <td class="mono" title="التأمينات الاجتماعية من الأساسي + السكن">${fmt(p.gosi)}</td><td class="mono">${fmt(p.absence)}</td><td class="mono">${fmt(p.penalty)}</td><td class="mono">0</td><td class="mono">0</td><td class="mono">${fmt(p.withdrawal)}</td><td class="mono">${fmt(p.other)}</td><td class="mono">${fmt(p.deduction)}</td>
-        <td class="mono" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td><td>${escapeHtml(e.bankname||'—')}</td><td>${escapeHtml(employeeContractStatus(e))}</td><td><button class="btn btn-sm payroll-edit-btn" data-emp="${e.id}">تعديل</button></td>
+        <td class="mono" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td><td>${escapeHtml(e.bankname||'—')}</td><td>${escapeHtml(employeeContractStatus(e))}</td><td><div style="display:flex;gap:6px;white-space:nowrap"><button class="btn btn-sm payroll-edit-btn" data-emp="${e.id}">تعديل</button><button class="btn btn-sm payroll-preview-btn" data-emp="${e.id}">معاينة المسير</button></div></td>
       </tr>`;
     }).join('') || '<tr><td colspan="21" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     body.querySelectorAll('.payroll-edit-btn').forEach(btn=>btn.addEventListener('click',()=>loadIntoForm(btn.dataset.emp)));
+    body.querySelectorAll('.payroll-preview-btn').forEach(btn=>btn.addEventListener('click',()=>{
+      const emp=employees.find(x=>String(x.id)===String(btn.dataset.emp)); if(!emp) return;
+      openPayrollPreview({list:[emp], cols:monthCols(document.getElementById('payrollMonth')?.value||currentMonthStr()), single:true});
+    }));
   }
   const payrollMonth=document.getElementById('payrollMonth');
   if(payrollMonth){
@@ -2272,6 +2293,11 @@
     payrollMonth.addEventListener('change', ()=>{ if(!payrollMonth.value || payrollMonth.value>lastDone) payrollMonth.value=lastDone; renderReports(); });
   }
   document.getElementById('payrollSearch').addEventListener('input', renderReports);
+  document.getElementById('payrollPreviewAllBtn')?.addEventListener('click', ()=>{
+    const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase();
+    const list=employees.filter(e=>!q || [e.fullname,e.empcode,e.region,e.project,e.jobtitle].some(v=>String(v||'').toLowerCase().includes(q)));
+    openPayrollPreview({list, cols:monthCols(document.getElementById('payrollMonth')?.value||currentMonthStr()), single:false});
+  });
   document.getElementById('printReportBtn').addEventListener('click', ()=>window.print());
 
   /* ===== export / import ===== */
@@ -2356,7 +2382,9 @@
   function attActionCodeFor(empId, dateStr){
     const hit = (penalties||[]).filter(p=>String(p.empId)===String(empId) && String(p.date||'').slice(0,10)===dateStr);
     if(!hit.length) return '';
-    return hit.some(p=>/انسحاب/.test(String(p.type||''))) ? 'س' : 'ج';
+    const last = hit[hit.length-1];
+    if(last.code && ATT_CODES.includes(last.code)) return last.code;
+    return /انسحاب/.test(String(last.type||'')) ? 'س' : 'ج';
   }
   // الافتراضي: من تاريخ المباشرة حتى اليوم = ح ، إلا إذا وُجد إجراء في ذلك اليوم
   function autoAttendanceCode(ym, empId, day){
@@ -2477,6 +2505,7 @@
     const icons={
       edit:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>',
       range:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>',
+      doc:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
       save:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg>'
     }; return icons[name]||'';
   }
@@ -2484,6 +2513,17 @@
   function attStatusFor(ym, empId){ return '—'; }
   function closeAttendanceMenus(){ document.querySelectorAll('.att-edit-menu.open').forEach(m=>m.classList.remove('open')); }
 
+  function attFilteredList(){
+    const searchQ=(document.getElementById('attSearch')?.value||'').trim().toLowerCase();
+    const regionQ=document.getElementById('attRegionFilter')?.value||'';
+    const projectQ=document.getElementById('attProjectFilter')?.value||'';
+    return employees.filter(e=>{
+      const name=String(e.fullname||'').toLowerCase(), code=String(e.empcode||'').toLowerCase();
+      return (!searchQ || name.includes(searchQ) || code.includes(searchQ)) &&
+             (!regionQ || String(e.region||'')===regionQ) &&
+             (!projectQ || String(e.project||'')===projectQ);
+    });
+  }
   function renderAttendance(){
     const monthInput = document.getElementById('attMonth');
     if(!monthInput.value) monthInput.value = currentMonthStr();
@@ -2502,12 +2542,7 @@
     headHtml += '<th>دوام</th><th>غياب</th><th>تغطية</th><th>جزاء</th><th>راحات</th><th>إضافي</th><th>انسحاب</th><th>جمع</th><th>الحالة</th><th>الإجراءات</th>';
     head.innerHTML = headHtml;
 
-    const list = employees.filter(e=>{
-      const name=String(e.fullname||'').toLowerCase(), code=String(e.empcode||'').toLowerCase();
-      return (!searchQ || name.includes(searchQ) || code.includes(searchQ)) &&
-             (!regionQ || String(e.region||'')===regionQ) &&
-             (!projectQ || String(e.project||'')===projectQ);
-    });
+    const list = attFilteredList();
     const body = document.getElementById('attBody');
     if(list.length===0){ body.innerHTML = '<tr><td colspan="60" class="empty-note">لا توجد نتائج مطابقة.</td></tr>'; return; }
     const anchorYm = cols.length ? cols[0].ym : currentMonthStr();
@@ -2534,11 +2569,16 @@
       cells += `<td class="act-col"><div class="att-actions">
         <button type="button" class="btn btn-sm att-daily-edit" data-emp="${e.id}" title="تعديل يومي">${attIcon('edit')}<span>تعديل</span></button>
         <button type="button" class="btn btn-sm btn-primary att-save-btn" data-emp="${e.id}" title="حفظ" disabled>${attIcon('save')}<span>حفظ</span></button>
+        <button type="button" class="btn btn-sm att-payroll-btn" data-emp="${e.id}" title="معاينة المسير">${attIcon('doc')}<span>معاينة المسير</span></button>
       </div></td>`;
       return `<tr data-att-row="${e.id}">${cells}</tr>`;
     }).join('');
 
     body.querySelectorAll('.att-select').forEach(sel=>sel.addEventListener('change',()=>{ sel.className='att-select code-'+sel.value; }));
+    body.querySelectorAll('.att-payroll-btn').forEach(btn=>btn.addEventListener('click', ()=>{
+      const emp=employees.find(x=>String(x.id)===String(btn.dataset.emp)); if(!emp) return;
+      openPayrollPreview({list:[emp], cols, single:true});
+    }));
     body.querySelectorAll('.att-daily-edit').forEach(btn=>btn.addEventListener('click', ()=>{
       const row=body.querySelector(`tr[data-att-row="${btn.dataset.emp}"]`); if(!row) return;
       row.querySelectorAll('.att-select').forEach(sel=>sel.disabled=false);
@@ -2560,6 +2600,7 @@
       showToast('تم حفظ الحضور للموظف');
     }));
   }
+  document.getElementById('attPayrollAllBtn')?.addEventListener('click', ()=>openPayrollPreview({list:attFilteredList(), cols:attColumns(), single:false}));
   document.getElementById('attMonth').addEventListener('change', renderAttendance);
   document.getElementById('attSearch').addEventListener('input', renderAttendance);
   document.getElementById('attRegionFilter').addEventListener('change', renderAttendance);
@@ -2571,6 +2612,177 @@
     downloadCsv(cols.length?`attendance_${cols[0].iso}_${cols[cols.length-1].iso}.csv`:'attendance.csv',headers,rows);
   });
 
+  /* ===== معاينة المسير (شاشة + طباعة + PDF + Excel) ===== */
+  const PP_CSS = `
+  .pp-paper{background:#fff;color:#111;direction:rtl;box-sizing:border-box;padding:16px 18px;font-family:'JF Flat Regular','JF Flat','Segoe UI',Tahoma,Arial,sans-serif;}
+  .pp-title{font-size:19px;font-weight:800;text-align:center;margin:0}
+  .pp-sub{font-size:11.5px;text-align:center;color:#444;margin:5px 0 12px}
+  .pp-table{width:100%;border-collapse:collapse;font-size:9.5px}
+  .pp-table th,.pp-table td{border:1px solid #6b7780;padding:3px 4px;text-align:center;white-space:nowrap}
+  .pp-table thead{display:table-header-group}
+  .pp-table tr{page-break-inside:avoid}
+  .pp-table th{background:#e6edf0;font-weight:700}
+  .pp-table tr.g th{background:#c9d9df}
+  .pp-table td.s{text-align:right}
+  .pp-table td.b{font-weight:700}
+  .pp-table tfoot td{background:#eef3f4;font-weight:800}
+  .pp-table td.net{font-weight:800;background:#eaf6ef}`;
+  const PP_GROUPS = [['بيانات الموظف',5],['الحضور والانصراف (أيام)',9],['المستحقات (ريال)',5],['الخصومات (ريال)',6],['الصافي',1],['البنك',1]];
+  const ppSum = code => r => r.p.sum[code]||0;
+  const PP_COLS = [
+    {h:'م',k:r=>r.i,t:'i'},
+    {h:'الاسم',k:r=>r.name,t:'s',w:26},
+    {h:'الكود',k:r=>r.code,t:'c'},
+    {h:'المشروع',k:r=>r.project,t:'s',w:18},
+    {h:'الوظيفة',k:r=>r.job,t:'s',w:16},
+    {h:'الدوام',k:r=>r.workDays,t:'i',sum:1,b:1},
+    {h:'حضور',k:ppSum('ح'),t:'i',sum:1},{h:'غياب',k:ppSum('غ'),t:'i',sum:1},{h:'راحة',k:ppSum('راحة'),t:'i',sum:1},
+    {h:'جزاء',k:ppSum('ج'),t:'i',sum:1},{h:'تغطية',k:ppSum('ط'),t:'i',sum:1},{h:'إضافي',k:ppSum('ض'),t:'i',sum:1},
+    {h:'انسحاب',k:ppSum('س'),t:'i',sum:1},{h:'جمع',k:ppSum('جمع'),t:'i',sum:1},
+    {h:'اليوم',k:r=>r.p.day,t:'n'},
+    {h:'الأساسي',k:r=>r.p.basic,t:'n',sum:1},{h:'البدلات',k:r=>r.p.allowances,t:'n',sum:1},
+    {h:'الإضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'الإجمالي',k:r=>r.p.gross,t:'n',sum:1,b:1},
+    {h:'التأمينات',k:r=>r.p.gosi,t:'n',sum:1},{h:'الغياب',k:r=>r.p.absDay+r.p.absence,t:'n',sum:1},
+    {h:'الجزاء',k:r=>r.p.penalty,t:'n',sum:1},{h:'الانسحاب',k:r=>r.p.withdrawal,t:'n',sum:1},
+    {h:'أخرى',k:r=>r.p.otherded+r.p.other,t:'n',sum:1},{h:'إجمالي الخصم',k:r=>r.p.deduction,t:'n',sum:1,b:1},
+    {h:'الصافي',k:r=>r.p.net,t:'n',sum:1,b:1,net:1},
+    {h:'البنك',k:r=>r.bank,t:'s',w:16}
+  ];
+  function ppNf(n){ return (Math.round((Number(n)||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2}); }
+  function ppFmt(col,v){ return col.t==='n' ? ppNf(v) : (col.t==='i' ? String(Number(v)||0) : String(v==null?'':v)); }
+  function buildPayrollModel(list, cols, single){
+    const first=cols[0], last=cols[cols.length-1];
+    const isMonth = first.d===1 && first.ym===last.ym && cols.length===daysInMonth(first.ym);
+    const periodLabel = isMonth ? `شهر ${monthLabel(first.ym)}` : `الفترة من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)}`;
+    const projs=[...new Set(list.map(e=>e.project).filter(Boolean))];
+    const scope = single ? `الموظف: ${list[0].fullname||''}${list[0].empcode?` (${list[0].empcode})`:''}` : (projs.length===1 ? `المشروع: ${projs[0]}` : 'كل المشاريع');
+    const rows=list.map((e,i)=>{ const p=payrollStatementForCols(e,cols); return {i:i+1,name:e.fullname||'',code:e.empcode||'',project:e.project||e.region||'',job:e.jobtitle||'',bank:e.bankname||'',workDays:p.workDays,p}; });
+    const totals=PP_COLS.map(c=>c.sum ? rows.reduce((a,r)=>a+(Number(c.k(r))||0),0) : null);
+    const title = `${single?'مسير راتب':'مسير رواتب'} ${periodLabel}`;
+    const sub = `${scope} — من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)} — أساس الحساب 30 يوم${single?'':` — عدد الموظفين: ${rows.length}`} — تاريخ الإعداد: ${fmtDMY(todayISO())}`;
+    const fileBase = `مسير_${single?(list[0].fullname||'موظف'):(projs.length===1?projs[0]:'كل_المشاريع')}_${isMonth?monthLabel(first.ym):fmtDMY(first.iso)+'_'+fmtDMY(last.iso)}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
+    return {title, sub, rows, totals, single, fileBase};
+  }
+  function ppPaperHTML(m){
+    let h=`<div class="pp-title">${escapeHtml(m.title)}</div><div class="pp-sub">${escapeHtml(m.sub)}</div><table class="pp-table"><thead><tr class="g">`;
+    PP_GROUPS.forEach(([t,n])=>{ h+=`<th colspan="${n}">${escapeHtml(t)}</th>`; });
+    h+='</tr><tr>'+PP_COLS.map(c=>`<th>${escapeHtml(c.h)}</th>`).join('')+'</tr></thead><tbody>';
+    m.rows.forEach(r=>{ h+='<tr>'+PP_COLS.map(c=>`<td class="${c.t==='s'?'s ':''}${c.b?'b ':''}${c.net?'net':''}">${escapeHtml(ppFmt(c,c.k(r)))}</td>`).join('')+'</tr>'; });
+    if(!m.single){
+      h+='</tbody><tfoot><tr><td colspan="5">الإجمالي</td>'+PP_COLS.slice(5).map((c,i)=>`<td>${m.totals[i+5]==null?'':escapeHtml(ppFmt(c,m.totals[i+5]))}</td>`).join('')+'</tr></tfoot></table>';
+    } else h+='</tbody></table>';
+    return h;
+  }
+  function ppDownloadBlob(blob,name){
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
+  }
+  function ppPrint(m){
+    const f=document.createElement('iframe'); f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(f);
+    const d=f.contentDocument; d.open();
+    d.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${escapeHtml(m.title)}</title><style>${PP_CSS} @page{size:A4 landscape;margin:8mm} html,body{margin:0;background:#fff}</style></head><body><div class="pp-paper">${ppPaperHTML(m)}</div></body></html>`);
+    d.close();
+    setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>f.remove(),3000); },350);
+  }
+  async function ppDownloadPdf(m){
+    if(!window.html2canvas || !(window.jspdf&&window.jspdf.jsPDF)){ showToast('مكتبة PDF غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
+    const PAGE_W=1123, PAGE_H=794, M=14, SC=2;
+    const host=document.createElement('div'); host.className='pp-paper';
+    host.style.cssText=`position:fixed;left:-20000px;top:0;width:${PAGE_W}px;`; host.innerHTML=ppPaperHTML(m); document.body.appendChild(host);
+    try{
+      const canvas=await html2canvas(host,{scale:SC,backgroundColor:'#ffffff',useCORS:true});
+      const top0=host.getBoundingClientRect().top, rel=el=>{const r=el.getBoundingClientRect(); return {t:r.top-top0,b:r.bottom-top0};};
+      const th=rel(host.querySelector('thead')), hh=th.b-th.t;
+      const rows=[...host.querySelectorAll('tbody tr, tfoot tr')].map(rel);
+      const pdf=new window.jspdf.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+      const put=(parts,first)=>{
+        const H=parts.reduce((a,p)=>a+p.h,0), c=document.createElement('canvas'); c.width=canvas.width; c.height=Math.ceil(H*SC);
+        const x=c.getContext('2d'); x.fillStyle='#fff'; x.fillRect(0,0,c.width,c.height);
+        let y=0; parts.forEach(p=>{ x.drawImage(canvas,0,p.srcY*SC,canvas.width,p.h*SC,0,y*SC,canvas.width,p.h*SC); y+=p.h; });
+        if(!first) pdf.addPage();
+        pdf.addImage(c.toDataURL('image/jpeg',0.93),'JPEG',0,0,297,(H/PAGE_W)*297);
+      };
+      let i=0, first=true;
+      while(i<rows.length){
+        let j=i;
+        if(first){ while(j+1<rows.length && rows[j+1].b<=PAGE_H-M) j++; put([{srcY:0,h:rows[j].b+1}],true); first=false; }
+        else { while(j+1<rows.length && (rows[j+1].b-rows[i].t)+hh<=PAGE_H-2*M) j++; put([{srcY:th.t,h:hh},{srcY:rows[i].t,h:rows[j].b-rows[i].t+1}],false); }
+        i=j+1;
+      }
+      if(first) put([{srcY:0,h:th.b+1}],true);
+      pdf.save(m.fileBase+'.pdf');
+    }catch(err){ console.error(err); showToast('تعذر إنشاء ملف PDF'); }
+    finally{ host.remove(); }
+  }
+  async function ppDownloadXlsx(m){
+    if(!window.JSZip){ showToast('مكتبة Excel غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
+    const esc=t=>String(t==null?'':t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    const colName=n=>{ let s=''; n++; while(n>0){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); } return s; };
+    const N=PP_COLS.length, rowsXml=[], merges=[];
+    const sc=(r,c,t,st)=>`<c r="${colName(c)}${r}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${esc(t)}</t></is></c>`;
+    const nc=(r,c,v,st)=>`<c r="${colName(c)}${r}" s="${st}"><v>${Number(v)||0}</v></c>`;
+    const blank=(r,c,st)=>`<c r="${colName(c)}${r}" s="${st}"/>`;
+    rowsXml.push(`<row r="1" ht="26" customHeight="1">${sc(1,0,m.title,1)}</row>`); merges.push(`A1:${colName(N-1)}1`);
+    rowsXml.push(`<row r="2">${sc(2,0,m.sub,2)}</row>`); merges.push(`A2:${colName(N-1)}2`);
+    let c0=0, g=''; PP_GROUPS.forEach(([t,n])=>{ g+=sc(3,c0,t,3); for(let k=1;k<n;k++) g+=blank(3,c0+k,3); if(n>1) merges.push(`${colName(c0)}3:${colName(c0+n-1)}3`); c0+=n; });
+    rowsXml.push(`<row r="3" ht="20" customHeight="1">${g}</row>`);
+    rowsXml.push(`<row r="4" ht="20" customHeight="1">${PP_COLS.map((c,i)=>sc(4,i,c.h,4)).join('')}</row>`);
+    let r=5;
+    m.rows.forEach(row=>{
+      rowsXml.push(`<row r="${r}">${PP_COLS.map((c,i)=>{ const v=c.k(row); return c.t==='s'||c.t==='c' ? sc(r,i,v,5) : nc(r,i,v,c.t==='n'?7:6); }).join('')}</row>`); r++;
+    });
+    if(!m.single){
+      let t=sc(r,0,'الإجمالي',8); for(let k=1;k<5;k++) t+=blank(r,k,8); merges.push(`A${r}:E${r}`);
+      PP_COLS.forEach((c,i)=>{ if(i<5) return; t+= m.totals[i]==null ? blank(r,i,8) : nc(r,i,m.totals[i],c.t==='n'?10:9); });
+      rowsXml.push(`<row r="${r}">${t}</row>`);
+    }
+    const colsXml=PP_COLS.map((c,i)=>`<col min="${i+1}" max="${i+1}" width="${c.w||(c.t==='n'?11:8)}" customWidth="1"/>`).join('');
+    const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView rightToLeft="1" workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rowsXml.join('')}</sheetData><mergeCells count="${merges.length}">${merges.map(x=>`<mergeCell ref="${x}"/>`).join('')}</mergeCells><pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+    const bd='<border><left style="thin"><color rgb="FF6B7780"/></left><right style="thin"><color rgb="FF6B7780"/></right><top style="thin"><color rgb="FF6B7780"/></top><bottom style="thin"><color rgb="FF6B7780"/></bottom><diagonal/></border>';
+    const xf=(num,font,fill,border,h,wrap)=>`<xf numFmtId="${num}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="${h}" vertical="center"${wrap?' wrapText="1"':''}/></xf>`;
+    const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFC9D9DF"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE6EDF0"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEEF3F4"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>${bd}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="11">${xf(0,0,0,0,'center')}${xf(0,2,0,0,'center')}${xf(0,0,0,0,'center')}${xf(0,1,2,1,'center')}${xf(0,1,3,1,'center',1)}${xf(0,0,0,1,'right')}${xf(1,0,0,1,'center')}${xf(4,0,0,1,'center')}${xf(0,1,4,1,'center')}${xf(1,1,4,1,'center')}${xf(4,1,4,1,'center')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+    const zip=new JSZip();
+    zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
+    zip.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+    zip.file('xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView rightToLeft="1"/></bookViews><sheets><sheet name="المسير" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    zip.file('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+    zip.file('xl/styles.xml',styles); zip.file('xl/worksheets/sheet1.xml',sheet);
+    const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    ppDownloadBlob(blob,m.fileBase+'.xlsx');
+  }
+  function closePayrollPreview(){ document.getElementById('ppOverlay')?.remove(); document.removeEventListener('keydown',ppEsc); }
+  function ppEsc(ev){ if(ev.key==='Escape') closePayrollPreview(); }
+  function openPayrollPreview({list, cols, single}){
+    if(!list||!list.length){ showToast('لا يوجد موظفون لعرض المسير'); return; }
+    if(!cols||!cols.length){ showToast('حدد فترة صحيحة أولاً'); return; }
+    if(!document.getElementById('ppStyle')){
+      const st=document.createElement('style'); st.id='ppStyle';
+      st.textContent=PP_CSS+`
+      .pp-overlay{position:fixed;inset:0;z-index:9999;background:rgba(10,14,18,.72);display:flex;flex-direction:column;}
+      .pp-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:var(--surface,#fff);border-bottom:1px solid var(--border,#ddd);}
+      .pp-bar .pp-name{font-weight:800;margin-inline-end:auto;font-size:14px;}
+      .pp-body{flex:1;overflow:auto;padding:16px;}
+      .pp-body .pp-paper{width:1123px;margin:0 auto;box-shadow:0 8px 30px rgba(0,0,0,.35);border-radius:4px;}`;
+      document.head.appendChild(st);
+    }
+    closePayrollPreview();
+    const m=buildPayrollModel(list, cols, !!single);
+    const ov=document.createElement('div'); ov.className='pp-overlay'; ov.id='ppOverlay';
+    ov.innerHTML=`<div class="pp-bar"><span class="pp-name">${escapeHtml(m.title)}</span>
+      <button class="btn btn-sm btn-primary" data-pp="print">طباعة</button>
+      <button class="btn btn-sm" data-pp="pdf">تنزيل PDF</button>
+      <button class="btn btn-sm" data-pp="xlsx">تنزيل Excel</button>
+      <button class="btn btn-sm" data-pp="close">إغلاق</button></div>
+      <div class="pp-body"><div class="pp-paper">${ppPaperHTML(m)}</div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('[data-pp="print"]').onclick=()=>ppPrint(m);
+    ov.querySelector('[data-pp="pdf"]').onclick=()=>ppDownloadPdf(m);
+    ov.querySelector('[data-pp="xlsx"]').onclick=()=>ppDownloadXlsx(m);
+    ov.querySelector('[data-pp="close"]').onclick=closePayrollPreview;
+    document.addEventListener('keydown',ppEsc);
+  }
+
   /* ===== penalties ===== */
   function refreshEmpSelect(selectEl, placeholder){
     selectEl.innerHTML = (placeholder ? `<option value="">${placeholder}</option>` : '') +
@@ -2580,8 +2792,14 @@
     chip.addEventListener('click', ()=>{
       document.getElementById('p_type').value = chip.dataset.type;
       document.getElementById('p_days').value = chip.dataset.days;
+      if(chip.dataset.code) document.getElementById('p_code').value = chip.dataset.code;
     });
   });
+  function penCodeText(p){
+    const c = (p.code && ATT_CODES.includes(p.code)) ? p.code : (/انسحاب/.test(String(p.type||'')) ? 'س' : 'ج');
+    const w = ATT_CODE_LABELS[c]||'';
+    return w===c ? c : `${c} — ${w}`;
+  }
   function renderPenalties(){
     refreshEmpSelect(document.getElementById('p_emp'), null);
     const body = document.getElementById('penaltyTableBody');
@@ -2591,12 +2809,13 @@
       return `<tr>
         <td>${escapeHtml(emp ? emp.fullname : 'موظف محذوف')}</td>
         <td class="mono">${escapeHtml(p.date||'')}</td>
+        <td><b>${escapeHtml(penCodeText(p))}</b></td>
         <td>${escapeHtml(p.type||'')}</td>
         <td class="mono">${escapeHtml(String(p.days??''))}</td>
         <td>${escapeHtml(p.notes||'')}</td>
         <td><button class="btn icon-btn btn-ghost btn-danger" data-del="${p.id}" title="حذف">✕</button></td>
       </tr>`;
-    }).join('') || '<tr><td colspan="6" class="empty-note">لا توجد جزاءات مسجلة.</td></tr>';
+    }).join('') || '<tr><td colspan="7" class="empty-note">لا توجد جزاءات مسجلة.</td></tr>';
     body.querySelectorAll('[data-del]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         if(confirm('هل تريد حذف هذا الجزاء؟')){
@@ -2612,7 +2831,8 @@
       id:'p'+Date.now(),
       empId: document.getElementById('p_emp').value,
       date: document.getElementById('p_date').value,
-      type: document.getElementById('p_type').value,
+      code: document.getElementById('p_code').value,
+      type: document.getElementById('p_type').value.trim() || (ATT_CODE_LABELS[document.getElementById('p_code').value]||''),
       days: document.getElementById('p_days').value,
       notes: document.getElementById('p_notes').value
     });
