@@ -2247,3 +2247,17 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 .emp-ctx-head{padding:7px 10px 8px;font-weight:800;font-size:13px;color:var(--navy-2);border-bottom:1px solid var(--border-soft);margin-bottom:4px;}
 .emp-ctx-item{all:unset;box-sizing:border-box;display:block;width:100%;padding:8px 10px;border-radius:7px;font-size:13.5px;color:var(--ink);cursor:pointer;text-align:right;}
 .emp-ctx-item:hover,.emp-ctx-item:focus-visible{background:var(--teal-soft);color:var(--teal);}
+
+/* ===== رأس أيام الحضور: تاريخ اليوم + تمييز الجمعة بالذهبي ===== */
+#view-attendance .att-table th.att-day-th{min-width:46px;}
+#view-attendance .att-th-date{display:block;font-weight:800;}
+#view-attendance .att-table th.att-fri{background:#FFF1BF;color:#9A6700;box-shadow:inset 0 -3px 0 #D4A017;}
+#view-attendance .att-th-fri{display:block;font-size:9.5px;font-weight:500;line-height:1.1;margin-top:1px;color:#9A6700;}
+:root[data-theme="dark"] #view-attendance .att-table th.att-fri,
+:root[data-theme="dark"] #view-attendance .att-th-fri{color:#F3C74D;}
+:root[data-theme="dark"] #view-attendance .att-table th.att-fri{background:#4A3B0C;}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) #view-attendance .att-table th.att-fri,
+  :root:not([data-theme="light"]) #view-attendance .att-th-fri{color:#F3C74D;}
+  :root:not([data-theme="light"]) #view-attendance .att-table th.att-fri{background:#4A3B0C;}
+}

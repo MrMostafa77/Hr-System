@@ -2584,8 +2584,11 @@
     const projectQ=document.getElementById('attProjectFilter')?.value||'';
     const head = document.getElementById('attHeadRow');
     let headHtml = '<th class="name-col">الحارس</th><th>الكود</th><th>المنطقة</th><th>المشروع</th>';
-    cols.forEach(c=>{ headHtml += `<th class="att-day-th">${c.d}${isCustom?`<span class="att-th-m">/${c.ym.slice(5)}</span>`:''}</th>`; });
-    headHtml += '<th>دوام</th><th>غياب</th><th>تغطية</th><th>جزاء</th><th>راحات</th><th>إضافي</th><th>انسحاب</th><th>جمع</th><th>الحالة</th><th>الإجراءات</th>';
+    cols.forEach(c=>{
+      const fri = new Date(c.iso+'T00:00:00').getDay()===5;
+      headHtml += `<th class="att-day-th${fri?' att-fri':''}"><span class="att-th-date">${c.d}/${Number(c.ym.slice(5))}</span>${fri?'<span class="att-th-fri">جمع</span>':''}</th>`;
+    });
+    headHtml += '<th>دوام</th><th>حضور</th><th>غياب</th><th>تغطية</th><th>جزاء</th><th>راحات</th><th>إضافي</th><th>انسحاب</th><th>جمع</th><th>الحالة</th><th>الإجراءات</th>';
     head.innerHTML = headHtml;
 
     const list = attFilteredList();
@@ -2603,7 +2606,8 @@
         const opts = ATT_CODES.map(k=>`<option value="${k}" title="${ATT_CODE_LABELS[k]||''}" ${k===code?'selected':''}>${k||'—'}</option>`).join('');
         cells += `<td><select class="att-select code-${code}" data-emp="${e.id}" data-ym="${c.ym}" data-day="${c.d}" disabled>${opts}</select></td>`;
       });
-      cells += `<td class="sum-col" data-sum="ح" data-emp="${e.id}">${sum['ح']}</td>
+      cells += `<td class="sum-col" data-sum="work" data-emp="${e.id}">${attWorkDays(cols, e.id)}</td>
+        <td class="sum-col" data-sum="ح" data-emp="${e.id}">${sum['ح']}</td>
         <td class="sum-col" data-sum="غ" data-emp="${e.id}">${sum['غ']}</td>
         <td class="sum-col" data-sum="ط" data-emp="${e.id}">${sum['ط']}</td>
         <td class="sum-col" data-sum="ج" data-emp="${e.id}">${sum['ج']}</td>
@@ -2641,7 +2645,7 @@
         sel.disabled=true;
       });
       saveAttendance(); btn.disabled=true;
-      const sums=attSummaryForCols(cols, empId);
+      const sums=attSummaryForCols(cols, empId); sums.work=attWorkDays(cols, empId);
       row.querySelectorAll('.sum-col').forEach(cell=>{ cell.textContent=sums[cell.dataset.sum]||0; });
       showToast('تم حفظ الحضور للموظف');
     }));
@@ -2654,8 +2658,8 @@
   document.getElementById('attStatusFilter')?.addEventListener('change', renderAttendance);
   document.getElementById('attExportBtn')?.addEventListener('click', ()=>{
     const cols=attColumns();
-    const headers=['الموظف','الكود','المنطقة','المشروع',...cols.map(c=>attState.mode==='custom'?`${pad2(c.d)}/${c.ym.slice(5)}`:String(c.d)),'دوام','غياب','تغطية','جزاء','راحات','إضافي','انسحاب','جمع'];
-    const rows=employees.map(e=>{const s=attSummaryForCols(cols,e.id);return [e.fullname,e.empcode,e.region,e.project,...cols.map(c=>attCodeAt(c.ym,e.id,c.d)||''),s['ح'],s['غ'],s['ط'],s['ج'],s['راحة'],s['ض'],s['س'],s['جمع']];});
+    const headers=['الموظف','الكود','المنطقة','المشروع',...cols.map(c=>`${c.d}/${Number(c.ym.slice(5))}`),'دوام','حضور','غياب','تغطية','جزاء','راحات','إضافي','انسحاب','جمع'];
+    const rows=employees.map(e=>{const s=attSummaryForCols(cols,e.id);return [e.fullname,e.empcode,e.region,e.project,...cols.map(c=>attCodeAt(c.ym,e.id,c.d)||''),attWorkDays(cols,e.id),s['ح'],s['غ'],s['ط'],s['ج'],s['راحة'],s['ض'],s['س'],s['جمع']];});
     downloadCsv(cols.length?`attendance_${cols[0].iso}_${cols[cols.length-1].iso}.csv`:'attendance.csv',headers,rows);
   });
 
