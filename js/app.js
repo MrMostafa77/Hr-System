@@ -2769,6 +2769,22 @@
       showToast('تم حفظ الحضور للموظف');
     }));
   }
+  /* ===== تحديث الحضور التلقائي يومياً ===== */
+  // «ح» تُحسب تلقائياً من تاريخ المباشرة حتى اليوم فقط؛ لذلك نُعيد رسم الكشف عند تغيّر التاريخ
+  // (حتى لو ظلت الصفحة مفتوحة بعد منتصف الليل) وعند العودة للتبويب/النافذة.
+  let attLastDay=todayISO();
+  function attDailyTick(){
+    const now=todayISO(); if(now===attLastDay) return;
+    if(document.querySelector('#attBody .att-select:not([disabled])')) return;   // لا نقاطع تعديلاً جارياً
+    const prevYm=attLastDay.slice(0,7); attLastDay=now;
+    const hidden=document.getElementById('attMonth');
+    if(hidden && attState.mode!=='custom' && !attState.calDate && hidden.value===prevYm) hidden.value=now.slice(0,7);   // انتقل للشهر الجديد إن كنت تعرض الشهر الحالي
+    if(currentView==='attendance') renderAttendance();
+    try{ if(currentView==='dashboard'||currentView==='reports') switchView(currentView); }catch(e){}
+  }
+  setInterval(attDailyTick, 60000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) attDailyTick(); });
+  window.addEventListener('focus', attDailyTick);
   document.getElementById('attPayrollAllBtn')?.addEventListener('click', ()=>openAttendanceSheet({list:attFilteredList(), cols:attColumns(), single:false}));
   document.getElementById('attMonth').addEventListener('change', renderAttendance);
   document.getElementById('attSearch').addEventListener('input', renderAttendance);
