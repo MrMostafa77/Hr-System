@@ -2264,7 +2264,13 @@
     }).join('') || '<tr><td colspan="21" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     body.querySelectorAll('.payroll-edit-btn').forEach(btn=>btn.addEventListener('click',()=>loadIntoForm(btn.dataset.emp)));
   }
-  const payrollMonth=document.getElementById('payrollMonth'); if(payrollMonth){ payrollMonth.value=currentMonthStr(); payrollMonth.addEventListener('change', renderReports); }
+  const payrollMonth=document.getElementById('payrollMonth');
+  if(payrollMonth){
+    // شهر الرواتب لا يظهر إلا بعد انتهاء الشهر: آخر خيار = الشهر السابق للشهر الحالي
+    const lastDone=(()=>{ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
+    payrollMonth.max=lastDone; payrollMonth.value=lastDone;
+    payrollMonth.addEventListener('change', ()=>{ if(!payrollMonth.value || payrollMonth.value>lastDone) payrollMonth.value=lastDone; renderReports(); });
+  }
   document.getElementById('payrollSearch').addEventListener('input', renderReports);
   document.getElementById('printReportBtn').addEventListener('click', ()=>window.print());
 
@@ -2380,28 +2386,81 @@
     Object.values(rec).forEach(code=>{ if(Object.prototype.hasOwnProperty.call(counts,code)) counts[code]++; });
     return counts;
   }
-  function initAttendanceMonthControls(){
-    const hidden = document.getElementById('attMonth');
-    const result = document.getElementById('attMonthResult');
-    const select = document.getElementById('attMonthSelect');
-    if(!hidden || !result || !select) return;
-    if(!hidden.value) hidden.value = currentMonthStr();
-    const [year, month] = hidden.value.split('-').map(Number);
-    const now = new Date(), set = new Set();
-    for(let k=-24; k<=6; k++){
-      const d = new Date(now.getFullYear(), now.getMonth()+k, 1);
-      set.add(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+  /* ===== فترة الحضور: شهر كامل / شهر مخصص ===== */
+  const attState = {mode:'month', from:'', to:'', calDate:''};
+  function pad2(n){ return String(n).padStart(2,'0'); }
+  function todayISO(){ const t=new Date(); return `${t.getFullYear()}-${pad2(t.getMonth()+1)}-${pad2(t.getDate())}`; }
+  function addDaysISO(iso, n){ const d=new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return `${d.getFullYear()}-${pad2(d.getMonth()+1)}-${pad2(d.getDate())}`; }
+  function fmtDMY(iso){ const [y,m,d]=String(iso).split('-'); return `${d}/${m}/${y}`; }
+  // نهاية دورة الراتب: نفس اليوم في الشهر التالي ناقص يوم (مثال: 20/08 ← 19/09)
+  function nextCycleEndISO(from){
+    const [y,m,d]=from.split('-').map(Number);
+    let ny=y, nm=m+1; if(nm>12){ nm=1; ny++; }
+    const nd=Math.min(d, daysInMonth(`${ny}-${pad2(nm)}`));
+    return addDaysISO(`${ny}-${pad2(nm)}-${pad2(nd)}`, -1);
+  }
+  function attColumns(){
+    const cols=[];
+    if(attState.mode==='custom' && attState.from && attState.to && attState.from<=attState.to){
+      let cur=attState.from, guard=0;
+      while(cur<=attState.to && guard++<93){ cols.push({ym:cur.slice(0,7), d:Number(cur.slice(8,10)), iso:cur}); cur=addDaysISO(cur,1); }
+      return cols;
     }
-    Object.keys(attendance||{}).forEach(k=>{ if(/^\d{4}-\d{2}$/.test(k)) set.add(k); });
-    set.add(hidden.value);
-    result.innerHTML = Array.from(set).sort().reverse().map(ym=>`<option value="${ym}">${monthLabel(ym)}</option>`).join('');
-    result.value = hidden.value;
-    select.innerHTML = ATT_MONTHS.map((name,i)=>`<option value="${i+1}">${name}</option>`).join('');
-    select.value = String(month);
-    result.onchange = ()=>{ hidden.value = result.value; renderAttendance(); };
-    select.onchange = ()=>{
-      hidden.value = `${year}-${String(Number(select.value)).padStart(2,'0')}`;
+    const ym=document.getElementById('attMonth').value||currentMonthStr();
+    for(let d=1; d<=daysInMonth(ym); d++) cols.push({ym, d, iso:`${ym}-${pad2(d)}`});
+    return cols;
+  }
+  function attCodeAt(ym, empId, day){
+    const raw = (attendance[ym] && attendance[ym][empId]) ? attendance[ym][empId][day] : undefined;
+    if(raw!==undefined && raw!=='') return raw;
+    return autoAttendanceCode(ym, empId, day);
+  }
+  function attSummaryForCols(cols, empId){
+    const counts = {'ح':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
+    cols.forEach(c=>{ const code=attCodeAt(c.ym, empId, c.d); if(Object.prototype.hasOwnProperty.call(counts,code)) counts[code]++; });
+    return counts;
+  }
+  function initAttendanceMonthControls(){
+    const hidden=document.getElementById('attMonth'), cal=document.getElementById('attMonthResult'), select=document.getElementById('attMonthSelect');
+    const modeSel=document.getElementById('attPeriodMode'), fromEl=document.getElementById('attFromDate'), toEl=document.getElementById('attToDate');
+    const wrap=document.querySelector('.attendance-filters');
+    if(!hidden||!cal||!select||!modeSel||!fromEl||!toEl||!wrap) return;
+    const today=todayISO(), curYm=today.slice(0,7), curYear=Number(curYm.slice(0,4)), curMonth=Number(curYm.slice(5,7));
+    if(!hidden.value) hidden.value=curYm;
+    if(hidden.value>curYm) hidden.value=curYm;          // لا نعرض شهراً لم يأتِ بعد
+    const [year, month]=hidden.value.split('-').map(Number);
+    wrap.classList.toggle('mode-custom', attState.mode==='custom');
+    modeSel.value=attState.mode;
+    // تقويم كامل (الشهر - نتيجة)
+    cal.max=today;
+    cal.value=(attState.calDate && attState.calDate.slice(0,7)===hidden.value) ? attState.calDate : (hidden.value===curYm ? today : hidden.value+'-01');
+    // قائمة أسماء الأشهر (حتى الشهر الحالي فقط)
+    const maxM = year<curYear ? 12 : curMonth;
+    select.innerHTML=ATT_MONTHS.slice(0,maxM).map((name,i)=>`<option value="${i+1}">${name}</option>`).join('');
+    select.value=String(Math.min(month,maxM));
+    // شهر مخصص
+    fromEl.max=today; toEl.max=today; fromEl.value=attState.from||''; toEl.value=attState.to||'';
+
+    modeSel.onchange=()=>{
+      attState.mode=modeSel.value;
+      if(attState.mode==='custom' && (!attState.from || !attState.to)){
+        const from=hidden.value+'-01', end=nextCycleEndISO(from);
+        attState.from=from; attState.to=end>today?today:end;
+      }
       renderAttendance();
+    };
+    cal.onchange=()=>{ if(!cal.value) return; let v=cal.value; if(v>today) v=today; attState.calDate=v; hidden.value=v.slice(0,7); renderAttendance(); };
+    select.onchange=()=>{ hidden.value=`${year}-${pad2(Number(select.value))}`; attState.calDate=''; renderAttendance(); };
+    fromEl.onchange=()=>{
+      let v=fromEl.value; if(!v) return; if(v>today) v=today;
+      attState.from=v; const end=nextCycleEndISO(v); attState.to=end>today?today:end;   // تعبئة تلقائية لنهاية الدورة
+      renderAttendance();
+    };
+    toEl.onchange=()=>{
+      let v=toEl.value; if(!v) return; if(v>today) v=today;
+      if(attState.from && v<attState.from) attState.from=v;
+      if(attState.from && v>addDaysISO(attState.from,92)){ v=addDaysISO(attState.from,92); showToast('الحد الأقصى للفترة 93 يوماً'); }
+      attState.to=v; renderAttendance();
     };
   }
   function refreshAttendanceFilters(){
@@ -2429,15 +2488,17 @@
     const monthInput = document.getElementById('attMonth');
     if(!monthInput.value) monthInput.value = currentMonthStr();
     initAttendanceMonthControls();
-    const ym = monthInput.value;
-    const nDays = daysInMonth(ym);
     refreshAttendanceFilters();
+    const cols = attColumns();
+    const isCustom = attState.mode==='custom';
+    const resEl = document.getElementById('attPeriodResult');
+    if(resEl && cols.length) resEl.textContent = `الفترة المعروضة: ${fmtDMY(cols[0].iso)} ← ${fmtDMY(cols[cols.length-1].iso)} (${cols.length} يوم)`;
     const searchQ=(document.getElementById('attSearch')?.value||'').trim().toLowerCase();
     const regionQ=document.getElementById('attRegionFilter')?.value||'';
     const projectQ=document.getElementById('attProjectFilter')?.value||'';
     const head = document.getElementById('attHeadRow');
     let headHtml = '<th class="name-col">الحارس</th><th>الكود</th><th>المنطقة</th><th>المشروع</th>';
-    for(let d=1; d<=nDays; d++) headHtml += `<th>${d}</th>`;
+    cols.forEach(c=>{ headHtml += `<th class="att-day-th">${c.d}${isCustom?`<span class="att-th-m">/${c.ym.slice(5)}</span>`:''}</th>`; });
     headHtml += '<th>دوام</th><th>غياب</th><th>تغطية</th><th>جزاء</th><th>راحات</th><th>إضافي</th><th>انسحاب</th><th>جمع</th><th>الحالة</th><th>الإجراءات</th>';
     head.innerHTML = headHtml;
 
@@ -2449,18 +2510,18 @@
     });
     const body = document.getElementById('attBody');
     if(list.length===0){ body.innerHTML = '<tr><td colspan="60" class="empty-note">لا توجد نتائج مطابقة.</td></tr>'; return; }
+    const anchorYm = cols.length ? cols[0].ym : currentMonthStr();
     body.innerHTML = list.map(e=>{
-      const sum = attSummaryFor(ym, e.id);
-      const rec = effectiveAttendanceRecord(ym, e.id);
+      const sum = attSummaryForCols(cols, e.id);
       let cells = `<td class="name-col">${escapeHtml(e.fullname)}</td>
         <td class="mono">${escapeHtml(e.empcode||'—')}</td>
         <td>${escapeHtml(e.region||'—')}</td>
         <td>${escapeHtml(e.project||'—')}</td>`;
-      for(let d=1; d<=nDays; d++){
-        const code = rec[d] || '';
-        const opts = ATT_CODES.map(c=>`<option value="${c}" title="${ATT_CODE_LABELS[c]||''}" ${c===code?'selected':''}>${c||'—'}</option>`).join('');
-        cells += `<td><select class="att-select code-${code}" data-emp="${e.id}" data-day="${d}" disabled>${opts}</select></td>`;
-      }
+      cols.forEach(c=>{
+        const code = attCodeAt(c.ym, e.id, c.d) || '';
+        const opts = ATT_CODES.map(k=>`<option value="${k}" title="${ATT_CODE_LABELS[k]||''}" ${k===code?'selected':''}>${k||'—'}</option>`).join('');
+        cells += `<td><select class="att-select code-${code}" data-emp="${e.id}" data-ym="${c.ym}" data-day="${c.d}" disabled>${opts}</select></td>`;
+      });
       cells += `<td class="sum-col" data-sum="ح" data-emp="${e.id}">${sum['ح']}</td>
         <td class="sum-col" data-sum="غ" data-emp="${e.id}">${sum['غ']}</td>
         <td class="sum-col" data-sum="ط" data-emp="${e.id}">${sum['ط']}</td>
@@ -2469,7 +2530,7 @@
         <td class="sum-col" data-sum="ض" data-emp="${e.id}">${sum['ض']}</td>
         <td class="sum-col" data-sum="س" data-emp="${e.id}">${sum['س']}</td>
         <td class="sum-col" data-sum="جمع" data-emp="${e.id}">${sum['جمع']}</td>`;
-      cells += `<td class="status-col" data-status-emp="${e.id}">${escapeHtml(attStatusFor(ym, e.id))}</td>`;
+      cells += `<td class="status-col" data-status-emp="${e.id}">${escapeHtml(attStatusFor(anchorYm, e.id))}</td>`;
       cells += `<td class="act-col"><div class="att-actions">
         <button type="button" class="btn btn-sm att-daily-edit" data-emp="${e.id}" title="تعديل يومي">${attIcon('edit')}<span>تعديل</span></button>
         <button type="button" class="btn btn-sm btn-primary att-save-btn" data-emp="${e.id}" title="حفظ" disabled>${attIcon('save')}<span>حفظ</span></button>
@@ -2477,6 +2538,7 @@
       return `<tr data-att-row="${e.id}">${cells}</tr>`;
     }).join('');
 
+    body.querySelectorAll('.att-select').forEach(sel=>sel.addEventListener('change',()=>{ sel.className='att-select code-'+sel.value; }));
     body.querySelectorAll('.att-daily-edit').forEach(btn=>btn.addEventListener('click', ()=>{
       const row=body.querySelector(`tr[data-att-row="${btn.dataset.emp}"]`); if(!row) return;
       row.querySelectorAll('.att-select').forEach(sel=>sel.disabled=false);
@@ -2485,28 +2547,28 @@
     body.querySelectorAll('.att-save-btn').forEach(btn=>btn.addEventListener('click', ()=>{
       const row=body.querySelector(`tr[data-att-row="${btn.dataset.emp}"]`); if(!row) return;
       const empId=btn.dataset.emp;
-      attendance[ym]=attendance[ym]||{}; attendance[ym][empId]=attendance[ym][empId]||{};
       row.querySelectorAll('.att-select').forEach(sel=>{
         if(sel.disabled) return;
-        const day=sel.dataset.day, code=sel.value;
-        if(code && code!==autoAttendanceCode(ym,empId,day)) attendance[ym][empId][day]=code; else delete attendance[ym][empId][day];
+        const ymx=sel.dataset.ym, day=sel.dataset.day, code=sel.value;
+        attendance[ymx]=attendance[ymx]||{}; attendance[ymx][empId]=attendance[ymx][empId]||{};
+        if(code && code!==autoAttendanceCode(ymx,empId,day)) attendance[ymx][empId][day]=code; else delete attendance[ymx][empId][day];
         sel.disabled=true;
       });
       saveAttendance(); btn.disabled=true;
-      row.querySelectorAll('.sum-col').forEach(cell=>{ const k=cell.dataset.sum; cell.textContent=attSummaryFor(ym,empId)[k]||0; });
+      const sums=attSummaryForCols(cols, empId);
+      row.querySelectorAll('.sum-col').forEach(cell=>{ cell.textContent=sums[cell.dataset.sum]||0; });
       showToast('تم حفظ الحضور للموظف');
     }));
   }
-  document.addEventListener('click', e=>{ if(!e.target.closest('.att-edit-wrap')) closeAttendanceMenus(); });
   document.getElementById('attMonth').addEventListener('change', renderAttendance);
   document.getElementById('attSearch').addEventListener('input', renderAttendance);
   document.getElementById('attRegionFilter').addEventListener('change', renderAttendance);
   document.getElementById('attProjectFilter').addEventListener('change', renderAttendance);
   document.getElementById('attExportBtn')?.addEventListener('click', ()=>{
-    const ym=document.getElementById('attMonth').value||currentMonthStr(), nDays=daysInMonth(ym);
-    const headers=['الموظف','الكود','المنطقة','المشروع',...Array.from({length:nDays},(_,i)=>String(i+1)),'دوام','غياب','تغطية','جزاء','راحات','إضافي','انسحاب','جمع'];
-    const rows=employees.map(e=>{const s=attSummaryFor(ym,e.id),rec=effectiveAttendanceRecord(ym,e.id);return [e.fullname,e.empcode,e.region,e.project,...Array.from({length:nDays},(_,i)=>rec[i+1]||''),s['ح'],s['غ'],s['ط'],s['ج'],s['راحة'],s['ض'],s['س'],s['جمع']];});
-    downloadCsv(`attendance_${ym}.csv`,headers,rows);
+    const cols=attColumns();
+    const headers=['الموظف','الكود','المنطقة','المشروع',...cols.map(c=>attState.mode==='custom'?`${pad2(c.d)}/${c.ym.slice(5)}`:String(c.d)),'دوام','غياب','تغطية','جزاء','راحات','إضافي','انسحاب','جمع'];
+    const rows=employees.map(e=>{const s=attSummaryForCols(cols,e.id);return [e.fullname,e.empcode,e.region,e.project,...cols.map(c=>attCodeAt(c.ym,e.id,c.d)||''),s['ح'],s['غ'],s['ط'],s['ج'],s['راحة'],s['ض'],s['س'],s['جمع']];});
+    downloadCsv(cols.length?`attendance_${cols[0].iso}_${cols[cols.length-1].iso}.csv`:'attendance.csv',headers,rows);
   });
 
   /* ===== penalties ===== */

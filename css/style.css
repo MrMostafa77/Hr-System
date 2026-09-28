@@ -2201,3 +2201,13 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 @media(max-width:900px){#view-attendance .attendance-filters{grid-template-columns:1fr 1fr!important;}}
 #view-attendance .att-table th:nth-last-child(2),#view-attendance .att-table td.status-col{min-width:110px!important;width:110px!important;}
 #view-attendance .att-table th:last-child,#view-attendance .att-table td.act-col{min-width:190px!important;width:190px!important;}
+
+/* ===== فترة الحضور: شهر كامل / مخصص ===== */
+#view-attendance .attendance-filters{grid-template-columns:repeat(5,minmax(0,1fr))!important;}
+#view-attendance .attendance-filters .att-mode-custom{display:none!important;}
+#view-attendance .attendance-filters.mode-custom .att-mode-custom{display:flex!important;}
+#view-attendance .attendance-filters.mode-custom .att-mode-month{display:none!important;}
+@media(max-width:900px){#view-attendance .attendance-filters{grid-template-columns:1fr 1fr!important;}}
+.att-period-result{margin:2px 0 10px;padding:7px 12px;border-radius:8px;background:var(--border-soft);color:var(--ink);font-size:12.5px;font-weight:700;display:inline-block;}
+#view-attendance .att-table th.att-day-th{min-width:74px;line-height:1.15;}
+#view-attendance .att-th-m{display:block;font-size:10px;font-weight:600;opacity:.7;}

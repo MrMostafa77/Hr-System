@@ -543,11 +543,15 @@
       <div class="card section-card full-page-card">
         <h3>سجل الحضور الشهري</h3>
         <div class="att-toolbar attendance-filters">
-          <div class="att-filter-field"><label>الشهر (نتيجة)</label><select id="attMonthResult"></select></div>
-          <div class="att-filter-field"><label>الشهر</label><select id="attMonthSelect"></select><input type="month" id="attMonth" class="att-month-hidden" aria-hidden="true" tabindex="-1"></div>
+          <div class="att-filter-field"><label>عرض الحضور</label><select id="attPeriodMode"><option value="month">شهر كامل</option><option value="custom">شهر مخصص</option></select></div>
+          <div class="att-filter-field att-mode-month"><label>الشهر (نتيجة) — اختر من التقويم</label><input type="date" id="attMonthResult"></div>
+          <div class="att-filter-field att-mode-month"><label>الشهر</label><select id="attMonthSelect"></select><input type="month" id="attMonth" class="att-month-hidden" aria-hidden="true" tabindex="-1"></div>
+          <div class="att-filter-field att-mode-custom"><label>من تاريخ (بداية الرواتب)</label><input type="date" id="attFromDate"></div>
+          <div class="att-filter-field att-mode-custom"><label>إلى تاريخ (نهاية الرواتب)</label><input type="date" id="attToDate"></div>
           <div class="att-filter-field"><label>المنطقة</label><select id="attRegionFilter"><option value="">كل المناطق</option></select></div>
           <div class="att-filter-field"><label>المشروع</label><select id="attProjectFilter"><option value="">كل المشاريع</option></select></div>
         </div>
+        <div class="att-period-result" id="attPeriodResult"></div>
         <div class="att-search-row"><input type="search" id="attSearch" placeholder="البحث باسم الحارس أو الكود"></div>
         <div class="legend att-legend"><span><i class="legend-h"></i> ح = حضور</span><span><i class="legend-gh"></i> غ = غياب</span><span><i class="legend-sh"></i> ش = انكشاف</span><span><i class="legend-j"></i> ج = جزاء</span><span><i class="legend-r"></i> راحة</span><span><i class="legend-t"></i> ط = تغطية</span><span><i class="legend-d"></i> ض = إضافي</span><span><i class="legend-s"></i> س = انسحاب</span><span><i class="legend-g"></i> جمع</span><span><i class="legend-e"></i> عيد</span><span><i class="legend-q"></i> ق = تطبيق</span></div>
         <div class="table-wrap"><table class="att-table"><thead><tr id="attHeadRow"></tr></thead><tbody id="attBody"></tbody></table></div>
