@@ -2218,10 +2218,11 @@
 
   /* ===== الخصومات من لائحة الجزاءات والخصومات الخاصة بكل مشروع ===== */
   function projectOfEmployee(e){ return projects.find(p=>String(p.name||'')===String(e?.project||'')); }
-  function policyFor(e){
-    const p=projectOfEmployee(e);
+  function policyForProjectName(name){
+    const p=projects.find(x=>String(x.name||'')===String(name||''));
     return (p && Array.isArray(p.penaltiesPolicy) && p.penaltiesPolicy.length) ? p.penaltiesPolicy : projectPenaltyDefaults();
   }
+  function policyFor(e){ return policyForProjectName(e?.project); }
   function policyNorm(t){ return String(t||'').replace(/\s+/g,' ').trim(); }
   function policyItemByName(list,name){ const n=policyNorm(name); if(!n) return null; return (list||[]).find(x=>policyNorm(x.name)===n)||null; }
   function policyAmount(item,dayRate){ return item ? (item.fixed ? (Number(item.amount)||0) : (Number(item.days)||0)*dayRate) : 0; }
@@ -2230,6 +2231,8 @@
   // قيمة خصم إجراء واحد: من لائحة المشروع (أيام × أجر اليوم أو مبلغ مقطوع)
   function recordPolicyAmount(e, rec, code, dayRate, listIn){
     const list=listIn||policyFor(e);
+    if(rec && rec.manualAmount!=null && rec.manualAmount!=='') return {amount:Number(rec.manualAmount)||0, name:rec.type||'', item:null};
+    if(rec && rec.manualDays) return {amount:(Number(rec.days)||0)*dayRate, name:rec.type||'', item:null};
     let item=rec ? policyItemByName(list, rec.type) : null;
     if(!item && policyDefaultNameForCode(code)) item=policyItemByName(list, policyDefaultNameForCode(code));
     if(item) return {amount:policyAmount(item,dayRate), name:item.name, item};
@@ -2692,6 +2695,23 @@
   .as-sig{display:flex;justify-content:space-around;gap:30px;font-size:11.5px;font-weight:700}
   .as-sig div{flex:1;text-align:center}
   .as-sig i{display:block;margin:34px 16px 0;border-top:1px solid #444}`;
+  const ACT_SHEET_CSS = `
+  .ac-paper{color:#111 !important;background:#fff !important;padding:28px 34px !important;font-size:13px;line-height:1.5}
+  .ac-paper .ac-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:3px solid #1f4e5a;padding-bottom:10px;margin-bottom:14px}
+  .ac-paper .ac-co{font-weight:800;font-size:14px;color:#1f4e5a;max-width:32%}
+  .ac-paper .ac-title{font-weight:800;font-size:24px;color:#1f4e5a;text-align:center;flex:1}
+  .ac-paper .ac-date{font-size:12px;text-align:left;min-width:32%;color:#222}
+  .ac-paper .ac-band{background:#dfe9ed;border:1px solid #6b7780;padding:8px 12px;font-weight:800;font-size:15px;margin-bottom:-1px}
+  .ac-paper .ac-grid{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid #6b7780;border-right:1px solid #6b7780;margin-bottom:22px}
+  .ac-paper .ac-cell{border-left:1px solid #6b7780;border-bottom:1px solid #6b7780;padding:8px 12px;min-height:44px}
+  .ac-paper .ac-cell.full{grid-column:1 / -1}
+  .ac-paper .ac-cell span{display:block;font-size:11px;color:#4a5a62;margin-bottom:2px}
+  .ac-paper .ac-cell b{font-size:14px;font-weight:700;color:#111}
+  .ac-paper .ac-cell.big b{font-size:17px;color:#a3261a}
+  .ac-paper .ac-cell.notes{min-height:96px}
+  .ac-paper .ac-sign{display:flex;gap:26px;margin-top:46px}
+  .ac-paper .ac-sign div{flex:1;text-align:center;font-weight:700;font-size:13px}
+  .ac-paper .ac-sign i{display:block;margin-top:44px;border-top:1px solid #444}`;
   const AS_CLS={'ح':'h','غ':'a','ج':'p','س':'w','راحة':'r','ط':'c','ض':'o','عيد':'e'};
   const AS_SUMS=[['الدوام',null],['حضور','ح'],['غياب','غ'],['تغطية','ط'],['جزاء','ج'],['راحات','راحة'],['إضافي','ض'],['انسحاب','س'],['جمع','جمع']];
   const PP_GROUPS = [['بيانات الموظف',5],['الحضور والانصراف (أيام)',9],['المستحقات (ريال)',5],['الخصومات (ريال)',6],['الصافي',1],['البنك',1]];
@@ -2749,7 +2769,7 @@
     const f=document.createElement('iframe'); f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
     document.body.appendChild(f);
     const d=f.contentDocument; d.open();
-    d.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${escapeHtml(m.title)}</title><style>${PP_CSS}${m.css||''} @page{size:A4 landscape;margin:8mm} html,body{margin:0;background:#fff}</style></head><body><div class="pp-paper ${m.cls||''}">${ppHTML(m)}</div></body></html>`);
+    d.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${escapeHtml(m.title)}</title><style>${PP_CSS}${m.css||''} @page{size:${m.page||'A4 landscape'};margin:8mm} html,body{margin:0;background:#fff}</style></head><body><div class="pp-paper ${m.cls||''}">${ppHTML(m)}</div></body></html>`);
     d.close();
     setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>f.remove(),3000); },350);
   }
@@ -2869,7 +2889,7 @@
   function ensurePpStyle(){
     if(document.getElementById('ppStyle')) return;
     const st=document.createElement('style'); st.id='ppStyle';
-    st.textContent=PP_CSS+ATT_SHEET_CSS+`
+    st.textContent=PP_CSS+ATT_SHEET_CSS+ACT_SHEET_CSS+`
     .pp-overlay{position:fixed;inset:0;z-index:9999;background:#cfd8dc;display:flex;flex-direction:column;}
     .pp-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:var(--surface,#fff);border-bottom:1px solid var(--border,#ddd);}
     .pp-bar .pp-name{font-weight:800;margin-inline-end:auto;font-size:14px;}
@@ -2879,7 +2899,8 @@
   }
   function ppFit(ov){
     const body=ov.querySelector('.pp-body'), paper=ov.querySelector('.pp-paper'); if(!body||!paper) return;
-    paper.style.zoom=Math.min(2,Math.max(.45,(body.clientWidth-32)/1123));
+    const W=Number(paper.dataset.w)||1123;
+    paper.style.zoom=Math.min(2,Math.max(.45,(body.clientWidth-32)/W));
   }
   function openAttendanceSheet({list, cols, single}){
     if(!list||!list.length){ showToast('لا يوجد موظفون لعرض الكشف'); return; }
@@ -2931,71 +2952,222 @@
     selectEl.innerHTML = (placeholder ? `<option value="">${placeholder}</option>` : '') +
       employees.map(e=>`<option value="${e.id}">${escapeHtml(e.fullname)}</option>`).join('');
   }
+  /* ===== إجراءات الموظفين: مشروع ← حارس ← إجراء من لائحة المشروع ===== */
+  const actState={daysManual:false, amountManual:false};
+  const $a=id=>document.getElementById(id);
+  const ACT_OTHER='__other';
   function penaltyCodeForName(name){ return /انسحاب/.test(name) ? 'س' : (/غياب/.test(name) ? 'غ' : 'ج'); }
-  function selectedPenaltyEmp(){ const id=document.getElementById('p_emp')?.value; return employees.find(e=>String(e.id)===String(id)); }
-  function renderReasonChips(){
-    const box=document.getElementById('reasonPresets'); if(!box) return;
-    const emp=selectedPenaltyEmp();
-    const dl=document.getElementById('p_type_list');
-    if(!emp){ box.innerHTML='<span class="muted">اختر الموظف لعرض لائحة جزاءات مشروعه</span>'; if(dl) dl.innerHTML=''; return; }
-    const list=policyFor(emp);
-    box.innerHTML=`<span class="muted" style="align-self:center">لائحة مشروع: <b>${escapeHtml(emp.project||'—')}</b></span>`
-      + list.map((x,i)=>`<span class="reason-chip" data-i="${i}">${escapeHtml(x.name)} — ${x.fixed?('خصم '+fmt(x.amount)+' ريال'):('خصم '+x.days+' يوم')}</span>`).join('')
-      + '<span class="reason-chip" data-i="-1">أخرى</span>';
-    if(dl) dl.innerHTML=list.map(x=>`<option value="${escapeAttr(x.name)}"></option>`).join('');
+  function actProjectNames(){
+    return [...new Set([...projects.map(p=>p.name),...employees.map(e=>e.project)].map(x=>String(x||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
   }
-  function updatePenaltyAmount(){
-    const out=document.getElementById('p_amount'), daysEl=document.getElementById('p_days'); if(!out) return;
-    const emp=selectedPenaltyEmp(); const type=document.getElementById('p_type')?.value||'';
-    const code=document.getElementById('p_code')?.value||'ج';
+  function actEmp(){ return employees.find(e=>String(e.id)===String($a('p_emp')?.value)); }
+  function actTypeName(){ const v=$a('p_type')?.value||''; return v===ACT_OTHER ? '' : v; }
+  function actTypeText(){ const v=$a('p_type')?.value||''; return v===ACT_OTHER ? ($a('p_typeOther')?.value.trim()||'') : v; }
+  function actRefreshProjects(){
+    const sel=$a('p_project'); if(!sel) return;
+    const cur=sel.value, q=($a('p_projSearch')?.value||'').trim().toLowerCase();
+    const list=actProjectNames().filter(n=>n===cur || !q || n.toLowerCase().includes(q));
+    sel.innerHTML='<option value="">اختر المشروع</option>'+list.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join('');
+    sel.value=cur;
+    if(q && !cur){ const only=list.filter(n=>n.toLowerCase().includes(q)); if(only.length===1){ sel.value=only[0]; actOnProject(); } }
+  }
+  function actRefreshEmps(){
+    const sel=$a('p_emp'); if(!sel) return;
+    const proj=$a('p_project')?.value||'', cur=sel.value, q=($a('p_empSearch')?.value||'').trim().toLowerCase();
+    if(!proj){ sel.innerHTML='<option value="">اختر المشروع أولاً</option>'; return; }
+    const all=employees.filter(e=>String(e.project||'')===proj);
+    const list=all.filter(e=>String(e.id)===cur || !q || String(e.fullname||'').toLowerCase().includes(q) || String(e.empcode||'').toLowerCase().includes(q));
+    sel.innerHTML=(all.length?'<option value="">اختر الحارس</option>':'<option value="">لا يوجد حراس مضافون على هذا المشروع</option>')
+      + list.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'')}${e.empcode?` — ${escapeHtml(e.empcode)}`:''}</option>`).join('');
+    sel.value=cur;
+    if(q && !sel.value){ const only=list.filter(e=>String(e.fullname||'').toLowerCase().includes(q)||String(e.empcode||'').toLowerCase().includes(q)); if(only.length===1) sel.value=only[0].id; }
+  }
+  function actRefreshTypes(){
+    const sel=$a('p_type'); if(!sel) return;
+    const proj=$a('p_project')?.value||'', cur=sel.value;
+    const list=proj?policyForProjectName(proj):[];
+    sel.innerHTML='<option value="">اختر الإجراء</option>'+list.map(x=>`<option value="${escapeAttr(x.name)}">${escapeHtml(x.name)}</option>`).join('')+`<option value="${ACT_OTHER}">أخرى (يدوي)</option>`;
+    sel.value=[...sel.options].some(o=>o.value===cur)?cur:'';
+  }
+  function actRenderPolicyPanel(){
+    const box=$a('actPolicyPanel'); if(!box) return;
+    const proj=$a('p_project')?.value||'';
+    if(!proj){ box.innerHTML='<div class="act-policy-head">لائحة الجزاءات والخصومات<small>اختر المشروع لعرض لائحته</small></div>'; return; }
+    const cur=actTypeName();
+    box.innerHTML=`<div class="act-policy-head">${escapeHtml(proj)}<small>لائحة الجزاءات والخصومات</small></div>`
+      + policyForProjectName(proj).map((x,i)=>`<div class="act-policy-row${x.name===cur?' active':''}" data-i="${i}"><span>${escapeHtml(x.name)}</span><b>${x.fixed?escapeHtml(ppNf(x.amount))+' ريال':escapeHtml(String(x.days))+' يوم'}</b></div>`).join('');
+  }
+  function actSyncButtons(){
+    const isOther=($a('p_type')?.value||'')===ACT_OTHER;
+    const d=$a('p_daysPlus'), m=$a('p_amountPlus');
+    if(d){ const on=actState.daysManual||isOther; d.classList.toggle('on',on); d.textContent=on&&!isOther?'−':'+'; d.disabled=isOther; d.title=on?'العودة لعدد الأيام من اللائحة':'تحديد عدد الأيام يدويًا'; }
+    if(m){ m.classList.toggle('on',actState.amountManual); m.textContent=actState.amountManual?'−':'+'; m.title=actState.amountManual?'العودة للحساب من اللائحة':'تحديد المبلغ يدويًا'; }
+    const other=$a('p_typeOtherWrap'); if(other) other.style.display=isOther?'':'none';
+  }
+  function actFormRec(){
+    const isOther=($a('p_type')?.value||'')===ACT_OTHER;
+    const dEdit=actState.daysManual||isOther;
+    const rec={project:$a('p_project')?.value||'', date:$a('p_date')?.value||'', code:$a('p_code')?.value||'ج', type:actTypeText(), days:$a('p_days')?.value||'', notes:$a('p_notes')?.value||'', manualDays:dEdit};
+    if(actState.amountManual && $a('p_amount')?.value!=='') rec.manualAmount=Number($a('p_amount').value)||0;
+    return rec;
+  }
+  function actionCalc(emp, rec){
+    const code=rec.code||'ج', isDed=['غ','س','ج'].includes(code);
     const day=(Number(emp?.basicsalary)||0)/30;
-    const item=emp ? policyItemByName(policyFor(emp), type) : null;
-    if(item){ if(daysEl){ daysEl.value=item.fixed?'':item.days; daysEl.readOnly=true; } }
-    else if(daysEl){ daysEl.readOnly=false; }
-    if(!emp || !['غ','س','ج'].includes(code)){ out.value='—'; return; }
-    const v=item ? policyAmount(item,day) : (Number(daysEl?.value)||0)*day;
-    out.value=fmt(v)+' ريال'+(item?' (من لائحة المشروع)':'');
+    const item=policyItemByName(policyForProjectName(rec.project||emp?.project), rec.type);
+    let days, amount, source;
+    const hasD=rec.days!=='' && rec.days!=null;
+    if(rec.manualAmount!=null && rec.manualAmount!==''){ amount=Number(rec.manualAmount)||0; days=hasD?Number(rec.days):''; source='مبلغ محدد يدويًا'; }
+    else if(rec.manualDays || !item){ days=hasD?(Number(rec.days)||0):(rec.id?1:0); amount=days*day; source=item?'عدد أيام محدد يدويًا':'تحديد يدوي'; }
+    else { days=item.fixed?'':item.days; amount=policyAmount(item,day); source='لائحة الجزاءات والخصومات لمشروع '+(rec.project||emp?.project||''); }
+    return {days, amount:isDed?Math.round(amount*100)/100:0, item, source, isDed};
   }
-  document.getElementById('reasonPresets')?.addEventListener('click', ev=>{
-    const chip=ev.target.closest('.reason-chip'); if(!chip) return;
-    const emp=selectedPenaltyEmp(); const i=Number(chip.dataset.i);
-    const item = emp && i>=0 ? policyFor(emp)[i] : null;
-    document.getElementById('p_type').value = item ? item.name : '';
-    document.getElementById('p_code').value = item ? penaltyCodeForName(item.name) : 'ج';
-    document.getElementById('p_days').value = item ? (item.fixed?'':item.days) : '';
-    updatePenaltyAmount();
+  function actUpdateCalc(){
+    const emp=actEmp(), proj=$a('p_project')?.value||'';
+    const isOther=($a('p_type')?.value||'')===ACT_OTHER;
+    const daysEl=$a('p_days'), amtEl=$a('p_amount'); if(!daysEl||!amtEl) return;
+    const name=actTypeName();
+    const item=name?policyItemByName(policyForProjectName(proj),name):null;
+    const dEdit=actState.daysManual||isOther;
+    daysEl.readOnly=!dEdit;
+    if(!dEdit) daysEl.value=item?(item.fixed?'':item.days):'';
+    amtEl.readOnly=!actState.amountManual;
+    if(!actState.amountManual){
+      const code=$a('p_code')?.value||'ج', isDed=['غ','س','ج'].includes(code);
+      const day=(Number(emp?.basicsalary)||0)/30;
+      let amt=0; if(item && !dEdit) amt=policyAmount(item,day); else amt=(Number(daysEl.value)||0)*day;
+      amtEl.value=(isDed && emp && (item||dEdit)) ? String(Math.round(amt*100)/100) : '';
+    }
+    const note=$a('p_calcNote');
+    if(note){
+      note.textContent = !proj ? '' : (actState.amountManual ? 'المبلغ محدد يدويًا' : (dEdit ? 'عدد الأيام محدد يدويًا — المبلغ = الأيام × أجر اليوم' : (item ? 'محسوب من لائحة مشروع '+proj : 'اختر الإجراء لتحديد أيام الخصم')));
+    }
+    actSyncButtons(); actRenderPolicyPanel();
+  }
+  function actOnProject(){ actRefreshEmps(); actRefreshTypes(); actUpdateCalc(); }
+  function actOnType(){
+    const name=actTypeName();
+    if(name) $a('p_code').value=penaltyCodeForName(name);
+    actState.daysManual=false; actUpdateCalc();
+  }
+  function actResetForm(keep){
+    ['p_date','p_notes','p_typeOther'].forEach(id=>{ const el=$a(id); if(el) el.value=''; });
+    if($a('p_type')) $a('p_type').value=''; if($a('p_code')) $a('p_code').value='ج'; if($a('p_days')) $a('p_days').value=''; if($a('p_amount')) $a('p_amount').value='';
+    actState.daysManual=false; actState.amountManual=false; actUpdateCalc();
+  }
+  $a('p_projSearch')?.addEventListener('input', actRefreshProjects);
+  $a('p_project')?.addEventListener('change', actOnProject);
+  $a('p_empSearch')?.addEventListener('input', actRefreshEmps);
+  $a('p_emp')?.addEventListener('change', actUpdateCalc);
+  $a('p_type')?.addEventListener('change', actOnType);
+  $a('p_code')?.addEventListener('change', actUpdateCalc);
+  $a('p_days')?.addEventListener('input', actUpdateCalc);
+  $a('p_daysPlus')?.addEventListener('click', ()=>{ actState.daysManual=!actState.daysManual; actUpdateCalc(); if(actState.daysManual) $a('p_days').focus(); });
+  $a('p_amountPlus')?.addEventListener('click', ()=>{ actState.amountManual=!actState.amountManual; if(!actState.amountManual) $a('p_amount').value=''; actUpdateCalc(); if(actState.amountManual) $a('p_amount').focus(); });
+  $a('actPolicyPanel')?.addEventListener('click', ev=>{
+    const row=ev.target.closest('.act-policy-row'); if(!row) return;
+    const item=policyForProjectName($a('p_project').value)[Number(row.dataset.i)]; if(!item) return;
+    $a('p_type').value=item.name; actOnType();
   });
-  document.getElementById('p_emp')?.addEventListener('change', ()=>{ renderReasonChips(); updatePenaltyAmount(); });
-  ['p_type','p_days'].forEach(id=>document.getElementById(id)?.addEventListener('input', updatePenaltyAmount));
-  document.getElementById('p_code')?.addEventListener('change', updatePenaltyAmount);
+
+  /* ===== عرض الإجراء (نموذج جاهز للطباعة) ===== */
+  function buildActionSheetModel(emp, rec){
+    const calc=actionCalc(emp, rec);
+    const proj=rec.project||emp.project||'';
+    const codeTxt=penCodeText(rec.code?rec:{...rec,code:'ج'});
+    const daysTxt = calc.item && !rec.manualDays && !(rec.manualAmount!=null&&rec.manualAmount!=='') && calc.item.fixed ? 'مبلغ مقطوع' : (calc.days===''||calc.days==null ? '—' : String(calc.days)+' يوم');
+    const amtTxt = calc.isDed ? ppNf(calc.amount)+' ريال' : '—';
+    const cells=[
+      ['اسم الحارس',emp.fullname||'—'],['الرقم الوظيفي',emp.empcode||'—'],
+      ['الوظيفة',emp.jobtitle||'—'],['رقم الهوية',emp.idnum||'—'],
+      ['المنطقة',emp.region||'—'],['تاريخ الإجراء',rec.date?fmtDMY(rec.date):'—'],
+      ['نوع الإجراء',codeTxt],['أيام الخصم',daysTxt],
+    ];
+    const m={title:'نموذج إجراء موظف', page:'A4 portrait', paperW:794, css:ACT_SHEET_CSS, cls:'ac-paper',
+      fileBase:`اجراء_${emp.fullname||'حارس'}_${rec.date||todayISO()}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_')};
+    m.pdf=ppDownloadActionPdf;
+    m.html=()=>`<div class="ac-head"><div class="ac-co">${escapeHtml(settings.company||'')}</div><div class="ac-title">نموذج إجراء موظف</div><div class="ac-date">تاريخ الإصدار: ${fmtDMY(todayISO())}</div></div>
+      <div class="ac-band">المشروع: ${escapeHtml(proj||'—')}</div>
+      <div class="ac-grid">${cells.map(([k,v])=>`<div class="ac-cell"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('')}
+        <div class="ac-cell full"><span>المخالفة / سبب الإجراء</span><b>${escapeHtml(rec.type||'—')}</b></div>
+        <div class="ac-cell full big"><span>قيمة الخصم</span><b>${escapeHtml(amtTxt)}</b></div>
+        <div class="ac-cell full"><span>أساس الحساب</span><b>${escapeHtml(calc.isDed?calc.source:'إجراء لا يترتب عليه خصم')}</b></div>
+        <div class="ac-cell full notes"><span>ملاحظات</span><b>${escapeHtml(rec.notes||'')}</b></div></div>
+      <div class="ac-sign"><div>الحارس<i></i></div><div>مدير المشروع<i></i></div><div>الموارد البشرية<i></i></div></div>`;
+    return m;
+  }
+  async function ppDownloadActionPdf(m){
+    if(!window.html2canvas || !(window.jspdf&&window.jspdf.jsPDF)){ showToast('مكتبة PDF غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
+    const host=document.createElement('div'); host.className='pp-paper '+(m.cls||'');
+    host.style.cssText='position:fixed;left:-20000px;top:0;width:794px;'; host.innerHTML=m.html(); document.body.appendChild(host);
+    try{
+      const canvas=await html2canvas(host,{scale:2,backgroundColor:'#ffffff',useCORS:true});
+      const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+      const mar=8, maxW=210-2*mar, maxH=297-2*mar;
+      let w=maxW, h=canvas.height*w/canvas.width; if(h>maxH){ h=maxH; w=canvas.width*h/canvas.height; }
+      pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',(210-w)/2,mar,w,h);
+      pdf.save(m.fileBase+'.pdf');
+    }catch(err){ console.error(err); showToast('تعذر إنشاء ملف PDF'); }
+    finally{ host.remove(); }
+  }
+  function openActionSheet(emp, rec){
+    ensurePpStyle(); closePayrollPreview();
+    const m=buildActionSheetModel(emp, rec);
+    const ov=document.createElement('div'); ov.className='pp-overlay'; ov.id='ppOverlay';
+    ov.innerHTML=`<div class="pp-bar"><span class="pp-name">${escapeHtml(m.title)} — ${escapeHtml(emp.fullname||'')}</span>
+      <button class="btn btn-sm btn-primary" data-pp="print">طباعة</button>
+      <button class="btn btn-sm" data-pp="pdf">تنزيل PDF</button>
+      <button class="btn btn-sm" data-pp="full">ملء الشاشة</button>
+      <button class="btn btn-sm" data-pp="close">إغلاق</button></div>
+      <div class="pp-body"><div class="pp-paper ac-paper" data-w="794" style="width:794px">${m.html()}</div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('[data-pp="print"]').onclick=()=>ppPrint(m);
+    ov.querySelector('[data-pp="pdf"]').onclick=()=>m.pdf(m);
+    ov.querySelector('[data-pp="close"]').onclick=closePayrollPreview;
+    ov.querySelector('[data-pp="full"]').onclick=()=>{ try{ if(document.fullscreenElement) document.exitFullscreen(); else (ov.requestFullscreen||ov.webkitRequestFullscreen).call(ov); }catch(e){} };
+    window.__ppResize=()=>ppFit(ov); window.addEventListener('resize',window.__ppResize); document.addEventListener('fullscreenchange',window.__ppResize);
+    ppFit(ov); document.addEventListener('keydown',ppEsc);
+  }
+  $a('viewActionBtn')?.addEventListener('click', ()=>{
+    const emp=actEmp();
+    if(!$a('p_project').value){ showToast('اختر المشروع أولاً'); return; }
+    if(!emp){ showToast('اختر الحارس أولاً'); return; }
+    if(!actTypeText() && !($a('p_code').value)){ showToast('اختر الإجراء'); return; }
+    openActionSheet(emp, actFormRec());
+  });
   function penCodeText(p){
     const c = (p.code && ATT_CODES.includes(p.code)) ? p.code : (/انسحاب/.test(String(p.type||'')) ? 'س' : 'ج');
     const w = ATT_CODE_LABELS[c]||'';
     return w===c ? c : `${c} — ${w}`;
   }
   function renderPenalties(){
-    const pEmpEl=document.getElementById('p_emp'), prevEmp=pEmpEl.value;
-    refreshEmpSelect(pEmpEl, null);
-    if(prevEmp && [...pEmpEl.options].some(o=>o.value===prevEmp)) pEmpEl.value=prevEmp;
-    renderReasonChips(); updatePenaltyAmount();
+    if($a('p_project')){ actRefreshProjects(); actRefreshEmps(); actRefreshTypes(); actUpdateCalc(); }
     const body = document.getElementById('penaltyTableBody');
     const sorted = [...penalties].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     body.innerHTML = sorted.map(p=>{
       const emp = employees.find(e=>e.id===p.empId);
       const pcode = penRecCode(p);
-      const recInfo = emp ? recordPolicyAmount(emp, p, pcode, (Number(emp.basicsalary)||0)/30) : {amount:0,item:null};
+      const recInfo = emp ? recordPolicyAmount(emp, p, pcode, (Number(emp.basicsalary)||0)/30, policyForProjectName(p.project||emp.project)) : {amount:0,item:null};
       const penAmount = (emp && ['غ','س','ج'].includes(pcode)) ? recInfo.amount : 0;
+      const manual = (p.manualAmount!=null && p.manualAmount!=='') || p.manualDays;
+      const daysText = (!manual && recInfo.item) ? (recInfo.item.fixed?'مقطوع':recInfo.item.days) : (p.days??'');
       return `<tr>
         <td>${escapeHtml(emp ? emp.fullname : 'موظف محذوف')}</td>
+        <td>${escapeHtml(p.project||emp?.project||'—')}</td>
         <td class="mono">${escapeHtml(p.date||'')}</td>
         <td><b>${escapeHtml(penCodeText(p))}</b></td>
         <td>${escapeHtml(p.type||'')}</td>
-        <td class="mono">${escapeHtml(String(recInfo.item ? (recInfo.item.fixed?'مقطوع':recInfo.item.days) : (p.days??'')))}</td>
+        <td class="mono">${escapeHtml(String(daysText))}${manual?' <small>(يدوي)</small>':''}</td>
         <td class="mono">${penAmount?escapeHtml(fmt(penAmount)):'—'}</td>
         <td>${escapeHtml(p.notes||'')}</td>
-        <td><button class="btn icon-btn btn-ghost btn-danger" data-del="${p.id}" title="حذف">✕</button></td>
+        <td style="white-space:nowrap"><button class="btn btn-sm btn-ghost" data-show="${p.id}" title="عرض الإجراء">عرض</button> <button class="btn icon-btn btn-ghost btn-danger" data-del="${p.id}" title="حذف">✕</button></td>
       </tr>`;
-    }).join('') || '<tr><td colspan="8" class="empty-note">لا توجد جزاءات مسجلة.</td></tr>';
+    }).join('') || '<tr><td colspan="9" class="empty-note">لا توجد جزاءات مسجلة.</td></tr>';
+    body.querySelectorAll('[data-show]').forEach(btn=>btn.addEventListener('click',()=>{
+      const p=penalties.find(x=>x.id===btn.dataset.show); const emp=p&&employees.find(e=>e.id===p.empId);
+      if(!emp){ showToast('الموظف غير موجود'); return; }
+      openActionSheet(emp,{...p, project:p.project||emp.project});
+    }));
     body.querySelectorAll('[data-del]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         if(confirm('هل تريد حذف هذا الجزاء؟')){
@@ -3007,17 +3179,20 @@
   }
   document.getElementById('penaltyForm').addEventListener('submit', (ev)=>{
     ev.preventDefault();
-    penalties.push({
-      id:'p'+Date.now(),
-      empId: document.getElementById('p_emp').value,
-      date: document.getElementById('p_date').value,
-      code: document.getElementById('p_code').value,
-      type: document.getElementById('p_type').value.trim() || (ATT_CODE_LABELS[document.getElementById('p_code').value]||''),
-      days: document.getElementById('p_days').value,
-      notes: document.getElementById('p_notes').value
-    });
+    const emp=actEmp();
+    if(!$a('p_project').value){ showToast('اختر المشروع'); return; }
+    if(!emp){ showToast('اختر الحارس'); return; }
+    const rec=actFormRec();
+    if(!rec.type) rec.type=ATT_CODE_LABELS[rec.code]||'';
+    if(['غ','س','ج'].includes(rec.code) && rec.manualAmount==null && !(Number(rec.days)>0) && !(policyItemByName(policyForProjectName(rec.project),rec.type)?.fixed && !rec.manualDays)){
+      showToast('حدد عدد أيام الخصم أو المبلغ'); return;
+    }
+    const out={id:'p'+Date.now(), empId:emp.id, project:rec.project, date:rec.date, code:rec.code, type:rec.type, days:rec.days, notes:rec.notes};
+    if(rec.manualDays) out.manualDays=true;
+    if(rec.manualAmount!=null) out.manualAmount=rec.manualAmount;
+    penalties.push(out);
     savePenalties();
-    ev.target.reset();
+    actResetForm();
     renderPenalties();
     showToast('تم تسجيل الجزاء');
   });
