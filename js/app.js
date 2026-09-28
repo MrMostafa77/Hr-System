@@ -1291,6 +1291,50 @@
     sel.innerHTML='<option value="">كل المشاريع</option>'+vals.map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
     sel.value=vals.includes(cur)?cur:'';
   }
+  const allEmpIbanOpen=new Set();
+  function allEmpIbanSubRow(e){
+    const list=employeeIbanList(e), hist=employeeIbanHistory(e);
+    const rows=list.map(x=>{
+      const isActive=x.iban===e.iban;
+      const h=[...hist].filter(z=>z.iban===x.iban).sort((a,b)=>String(a.from||'').localeCompare(String(b.from||''))).pop();
+      const since=isActive?(h&&h.from?`مفعّل من ${fmtDMY(h.from)}`:'الآيبان الأصلي'):'';
+      return `<tr class="${isActive?'iban-active':''}"><td><input type="checkbox" class="iban-active-cb" data-emp="${escapeAttr(e.id)}" data-iban="${escapeAttr(x.iban)}" ${isActive?'checked':''} title="الآيبان المفعّل"></td>
+        <td>${escapeHtml(x.bankname||'—')}</td><td class="mono">${escapeHtml(x.iban)}</td><td class="mono">${escapeHtml(x.accountno||'—')}</td><td class="mono">${escapeHtml(x.bankcode||'—')}</td>
+        <td>${since?`<span class="pill pill-gray">${escapeHtml(since)}</span>`:''}</td>
+        <td><button type="button" class="btn btn-sm btn-danger iban-del" data-emp="${escapeAttr(e.id)}" data-iban="${escapeAttr(x.iban)}">حذف</button></td></tr>`;
+    }).join('')||'<tr><td colspan="7" class="empty-note">لا توجد آيبانات مضافة.</td></tr>';
+    return `<tr class="iban-sub-row" data-sub="${escapeAttr(e.id)}"><td colspan="8"><div class="iban-sub-box"><div class="iban-sub-title">آيبانات ${escapeHtml(e.fullname||'')} — علّم على الآيبان المفعّل ليصبح الافتراضي من تاريخ اليوم، وما قبله يبقى على الآيبان السابق</div>
+      <table class="iban-sub-table"><thead><tr><th>مفعّل</th><th>اسم البنك</th><th>رقم الآيبان</th><th>رقم الحساب</th><th>رمز البنك</th><th>الحالة</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></td></tr>`;
+  }
+  function setActiveIban(empId, iban){
+    const e=employees.find(x=>x.id===empId); if(!e) return;
+    const item=employeeIbanList(e).find(x=>x.iban===iban); if(!item) return;
+    if(e.iban===iban){ showToast('هذا هو الآيبان المفعّل حالياً — فعّل آيبان آخر لتغييره'); renderAllEmployees(); return; }
+    const today=todayISO();
+    const hist=employeeIbanHistory(e).filter(x=>x.from!==today);
+    hist.push({iban:item.iban,bankname:item.bankname,accountno:item.accountno,bankcode:item.bankcode,from:today});
+    if(!Array.isArray(e.ibans)||!e.ibans.length) e.ibans=employeeIbanList(e);
+    e.ibanHistory=hist; e.iban=item.iban; e.bankname=item.bankname; e.accountno=item.accountno; e.bankcode=item.iban.slice(4,6);
+    saveEmployees(); renderAllEmployees();
+    showToast('تم تفعيل الآيبان كافتراضي من تاريخ '+fmtDMY(today));
+  }
+  function deleteEmployeeIban(empId, iban){
+    const e=employees.find(x=>x.id===empId); if(!e) return;
+    if(e.iban===iban){ showToast('لا يمكن حذف الآيبان المفعّل — فعّل آيبان آخر أولاً'); return; }
+    if(!confirm('هل تريد حذف هذا الآيبان؟')) return;
+    e.ibans=employeeIbanList(e).filter(x=>x.iban!==iban);
+    if(!e.ibanHistory) e.ibanHistory=employeeIbanHistory(e);
+    saveEmployees(); renderAllEmployees();
+  }
+  document.getElementById('allEmployeesTableBody')?.addEventListener('click',ev=>{
+    const t=ev.target.closest('.iban-toggle');
+    if(t){ const id=t.dataset.id; if(allEmpIbanOpen.has(id)) allEmpIbanOpen.delete(id); else allEmpIbanOpen.add(id); renderAllEmployees(); return; }
+    const del=ev.target.closest('.iban-del'); if(del){ deleteEmployeeIban(del.dataset.emp, del.dataset.iban); return; }
+  });
+  document.getElementById('allEmployeesTableBody')?.addEventListener('change',ev=>{
+    const cb=ev.target.closest('.iban-active-cb'); if(!cb) return;
+    setActiveIban(cb.dataset.emp, cb.dataset.iban);
+  });
   function renderAllEmployees(){
     renderAllEmployeeProjectFilter();
     const q=(document.getElementById('allEmployeesSearch')?.value||'').trim().toLowerCase();
@@ -1315,8 +1359,8 @@
         <td>${contractBtn}</td>
         <td>${commBtn}</td>
         <td class="mono">${fmt(lastWageTotal(e))} ﷼</td>
-        <td><div class="row-actions"><button class="btn btn-sm btn-ghost all-employee-view" data-id="${escapeAttr(e.id)}">معاينة</button><button class="btn btn-sm btn-ghost all-employee-edit" data-id="${escapeAttr(e.id)}">تعديل</button></div></td>
-      </tr>`;
+        <td><div class="row-actions"><button class="btn btn-sm btn-ghost all-employee-view" data-id="${escapeAttr(e.id)}">معاينة</button><button class="btn btn-sm btn-ghost all-employee-edit" data-id="${escapeAttr(e.id)}">تعديل</button><button class="btn btn-sm btn-ghost iban-toggle${allEmpIbanOpen.has(e.id)?' on':''}" data-id="${escapeAttr(e.id)}" title="عرض الآيبانات">الآيبانات (${employeeIbanList(e).length})</button></div></td>
+      </tr>${allEmpIbanOpen.has(e.id)?allEmpIbanSubRow(e):''}`;
     }).join('') || '';
   }
   document.getElementById('allEmployeesSearch')?.addEventListener('input',renderAllEmployees);
@@ -1594,12 +1638,64 @@
     if(clean.length>=6){ const bankCode=clean.slice(4,6); const bankInfo=SAUDI_BANKS[bankCode]; if(bank) bank.value=bankInfo?.name||''; if(code) code.value=bankInfo?.code||''; } else { if(bank) bank.value=''; if(code) code.value=''; }
     if(account) account.value=/^SA[0-9]{6,}$/.test(clean) ? clean.slice(6,24) : '';
   }
+
+  /* ===== الآيبانات المتعددة للموظف ===== */
+  // employee.ibans        : كل الآيبانات [{id,iban,bankname,accountno,bankcode}]
+  // employee.ibanHistory  : سجل التفعيل [{iban,bankname,accountno,bankcode,from}] — from فارغ = الآيبان الأصلي
+  // employee.iban/bankname/accountno/bankcode : الآيبان المفعّل حالياً (الافتراضي)
+  function ibanBankInfo(clean){
+    const c=String(clean||'').slice(4,6), info=SAUDI_BANKS[c];
+    return {bankname:info?.name||'', bankcode:info?.code||'', accountno:/^SA[0-9]{6,}$/.test(clean)?clean.slice(6,24):''};
+  }
+  function employeeIbanList(e){
+    if(!e) return [];
+    if(Array.isArray(e.ibans)&&e.ibans.length) return e.ibans;
+    if(e.iban){ const i=ibanBankInfo(e.iban); return [{id:'ib0',iban:e.iban,bankname:e.bankname||i.bankname,accountno:e.accountno||i.accountno,bankcode:i.bankcode}]; }
+    return [];
+  }
+  function employeeIbanHistory(e){
+    if(Array.isArray(e?.ibanHistory)&&e.ibanHistory.length) return e.ibanHistory;
+    return e&&e.iban?[{iban:e.iban,bankname:e.bankname||'',accountno:e.accountno||'',bankcode:ibanBankInfo(e.iban).bankcode,from:''}]:[];
+  }
+  // الآيبان الساري في تاريخ معيّن (لاستخدامه لاحقاً في مسيرات الرواتب): آخر تفعيل تاريخه <= التاريخ
+  function employeeIbanAt(e, dateISO){
+    const d=String(dateISO||todayISO()).slice(0,10);
+    const h=employeeIbanHistory(e).filter(x=>!x.from||x.from<=d).sort((a,b)=>String(a.from||'').localeCompare(String(b.from||'')));
+    return h.length?h[h.length-1]:(e&&e.iban?{iban:e.iban,bankname:e.bankname,accountno:e.accountno,bankcode:e.bankcode,from:''}:null);
+  }
+  let extraIbanSeq=0;
+  function clearExtraIbans(){ const box=document.getElementById('extraIbans'); if(box) box.innerHTML=''; }
+  function addExtraIbanRow(val=''){
+    const box=document.getElementById('extraIbans'); if(!box) return;
+    const n=++extraIbanSeq, row=document.createElement('div'); row.className='iban-extra-card';
+    row.innerHTML=`<div class="field-grid">
+      <div class="field"><label>رقم الايبان البنكي</label><input type="text" id="f_extra_iban_${n}" class="mono extra-iban" placeholder="SA..." maxlength="24" inputmode="text"></div>
+      <div class="field"><label>اسم البنك</label><input type="text" class="extra-bankname" readonly></div>
+      <div class="field"><label>رقم الحساب البنكي</label><input type="text" class="mono extra-accountno" readonly></div>
+      <div class="field"><label>رمز البنك</label><input type="text" class="mono extra-bankcode" readonly></div>
+    </div><button type="button" class="btn btn-sm btn-danger iban-extra-del" title="حذف هذا الآيبان">حذف</button>`;
+    box.appendChild(row);
+    const inp=row.querySelector('.extra-iban');
+    const sync=()=>{ inp.value=inp.value.replace(/[^a-zA-Z0-9]/g,'').toUpperCase().slice(0,24); const i=ibanBankInfo(inp.value.length>=6?inp.value:'');
+      row.querySelector('.extra-bankname').value=i.bankname; row.querySelector('.extra-bankcode').value=i.bankcode; row.querySelector('.extra-accountno').value=i.accountno; };
+    inp.addEventListener('input',sync); inp.value=val; sync();
+    row.querySelector('.iban-extra-del').addEventListener('click',()=>row.remove());
+    return inp;
+  }
+  document.getElementById('addIbanBtn')?.addEventListener('click',()=>{ addExtraIbanRow('')?.focus(); });
+  function loadIbansIntoForm(e){
+    clearExtraIbans();
+    const list=employeeIbanList(e); if(!list.length) return;
+    const f=document.getElementById('f_iban'); if(f){ f.value=list[0].iban; updateBankFromIBAN(); }
+    list.slice(1).forEach(x=>addExtraIbanRow(x.iban));
+  }
+  function collectExtraIbanInputs(){ return [...document.querySelectorAll('#extraIbans .extra-iban')]; }
   function markField(id, message=''){
     const el=document.getElementById(id)||document.getElementById('f_'+id); if(!el)return; const field=el.closest('.field'); if(!field)return; field.classList.toggle('field-invalid',!!message); let err=field.querySelector('.field-error'); if(message){ if(!err){err=document.createElement('div');err.className='field-error';field.appendChild(err);} err.textContent=message; } else if(err) err.remove();
   }
   function clearValidation(){ document.querySelectorAll('.field-invalid').forEach(x=>x.classList.remove('field-invalid')); document.querySelectorAll('.field-error').forEach(x=>x.remove()); }
   function showFormError(errors, focusId){
-    clearValidation(); Object.entries(errors).forEach(([id,msg])=>markField(id,msg)); if(focusId){(document.getElementById(focusId)||document.getElementById('f_'+focusId))?.focus();} const first=Object.keys(errors)[0]; const tab=first && ['firstname','fathername','grandname','familyname','fullname','idnum','nationality','dob','gender','iddate_issue','iddate_expiry','idplace','phone9','email','address','emname','emphone'].includes(first)?'personal':(first&&['iban','bankname','accountno','basicsalary','housing','transport','otherallow','gosi','otherded'].includes(first)?'pay':'job'); if(tab) document.querySelector(`.tab[data-tab="${tab}"]`)?.click(); showToast(Object.values(errors)[0]); }
+    clearValidation(); Object.entries(errors).forEach(([id,msg])=>markField(id,msg)); if(focusId){(document.getElementById(focusId)||document.getElementById('f_'+focusId))?.focus();} const first=Object.keys(errors)[0]; const tab=first && ['firstname','fathername','grandname','familyname','fullname','idnum','nationality','dob','gender','iddate_issue','iddate_expiry','idplace','phone9','email','address','emname','emphone'].includes(first)?'personal':(first&&['iban','bankname','accountno','basicsalary','housing','transport','otherallow','gosi','otherded'].includes(first)?'pay':'job'); if(tab) document.querySelector(`.tab[data-tab="${tab}"]`)?.click(); if(first&&String(first).startsWith('f_extra_iban')) document.querySelector('.tab[data-tab="bank"]')?.click(); showToast(Object.values(errors)[0]); }
 
   // توحيد التحقق من الخانات الإلزامية وإظهار رسالة واضحة بدل الاعتماد على تنبيه المتصفح فقط.
   document.addEventListener('invalid', ev=>{
@@ -1935,7 +2031,7 @@
     document.getElementById('formTitle').textContent = 'إضافة موظف جديد';
     syncStartDateAction();
     fillNationalityAndIssueRegion(); refreshDepartmentJobSelects(); refreshEmployeeProjectSelect(''); composeFullName(); updateBankFromIBAN(); syncAllowancePercentagesFromData(); clearValidation();
-    document.querySelectorAll('.tab')[0].click(); renderEmployeeFiles();
+    document.querySelectorAll('.tab')[0].click(); renderEmployeeFiles(); clearExtraIbans();
   }
   function loadIntoForm(id){
     const e = employees.find(x=>x.id===id);
@@ -1954,6 +2050,7 @@
     refreshDepartmentJobSelects(e.dept||'', e.jobtitle||''); fillNationalityAndIssueRegion(); refreshEmployeeProjectSelect(e.region||''); const projectEl=document.getElementById('f_project'); if(projectEl) projectEl.value=e.project||''; composeFullName(); updateBankFromIBAN();
     syncStartDateAction();
     pendingEmployeeFiles={};
+    loadIbansIntoForm(e);
     document.querySelectorAll('.tab')[0].click(); clearValidation(); renderEmployeeFiles();
   }
   function cancelEmployeeForm(){
@@ -2165,8 +2262,28 @@
     if(!ibanCheck.ok) errors.iban=ibanCheck.message;
     else { data.bankname=ibanCheck.bank; data.accountno=ibanCheck.account; data.bankcode=ibanCheck.bankCode; }
     if(!data.region) errors.region='اختر المنطقة / المدينة.';
+    const extraChecked=[]; const seenIban=new Set([String(data.iban||'').replace(/\s+/g,'').toUpperCase()]);
+    collectExtraIbanInputs().forEach(inp=>{
+      const raw=inp.value.replace(/\s+/g,'').toUpperCase(); if(!raw) return;
+      const v=validateSaudiIBAN(raw);
+      if(!v.ok){ errors[inp.id]=v.message; return; }
+      if(seenIban.has(raw)){ errors[inp.id]='هذا الآيبان مكرر.'; return; }
+      seenIban.add(raw); extraChecked.push(raw);
+    });
     if(Object.keys(errors).length){ showFormError(errors,Object.keys(errors)[0]); return; }
     data.idnum=normalizeDigits(data.idnum); data.iban=data.iban.replace(/\s+/g,'').toUpperCase();
+    {
+      const prev=employees.find(x=>x.id===id), prevList=employeeIbanList(prev);
+      const mk=raw=>{ const i=ibanBankInfo(raw), old=prevList.find(x=>x.iban===raw); return {id:old?.id||('ib'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)), iban:raw, bankname:i.bankname, accountno:i.accountno, bankcode:i.bankcode}; };
+      const list=[mk(data.iban), ...extraChecked.map(mk)];
+      const prevActive=prev?.iban;
+      const active=list.find(x=>x.iban===prevActive) || list[0];
+      let hist=prev?[...employeeIbanHistory(prev)]:[];
+      const lastH=hist.length?[...hist].sort((a,b)=>String(a.from||'').localeCompare(String(b.from||'')))[hist.length-1]:null;
+      if(!lastH || lastH.iban!==active.iban) hist.push({iban:active.iban,bankname:active.bankname,accountno:active.accountno,bankcode:active.bankcode,from:hist.length?todayISO():''});
+      data.ibans=list; data.ibanHistory=hist;
+      data.iban=active.iban; data.bankname=active.bankname; data.accountno=active.accountno; data.bankcode=active.iban.slice(4,6);
+    }
     if(id && employees.find(x=>x.id===id)?.empcode) data.empcode=employees.find(x=>x.id===id).empcode; else data.empcode=nextEmployeeCode(data.region,'');
     const capacityWarning=validateEmployeeCapacity(data,id);
     const siWarning=validateEmployeeSocialInsurance(data);
