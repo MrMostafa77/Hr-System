@@ -2555,6 +2555,7 @@
     const rec = {...raw};
     const nDays = daysInMonth(ym);
     for(let d=1; d<=nDays; d++){
+      if(rec[d]==='ح' && attIsFutureDay(ym,d)) delete rec[d];
       if(!Object.prototype.hasOwnProperty.call(rec,d) || rec[d]==='') {
         const auto = autoAttendanceCode(ym,empId,d);
         if(auto) rec[d]=auto;
@@ -2592,8 +2593,11 @@
     for(let d=1; d<=daysInMonth(ym); d++) cols.push({ym, d, iso:`${ym}-${pad2(d)}`});
     return cols;
   }
+  // «ح» المخزّنة لأيام لم تأتِ بعد (من الحفظ القديم لكامل الشهر) لا تُحتسب
+  function attIsFutureDay(ym, day){ return `${ym}-${String(day).padStart(2,'0')}` > todayISO(); }
   function attCodeAt(ym, empId, day){
-    const raw = (attendance[ym] && attendance[ym][empId]) ? attendance[ym][empId][day] : undefined;
+    let raw = (attendance[ym] && attendance[ym][empId]) ? attendance[ym][empId][day] : undefined;
+    if(raw==='ح' && attIsFutureDay(ym,day)) raw = undefined;
     if(raw!==undefined && raw!=='') return raw;
     return autoAttendanceCode(ym, empId, day);
   }
@@ -4334,15 +4338,8 @@
     const rec={id:existingIndex>=0?commencements[existingIndex].id:'cm'+Date.now()+Math.random().toString(36).slice(2,7),empId:e.id,employeeName:e.fullname||'',empcode:e.empcode||'',project,region:e.region||'',dept:e.dept||'',jobtitle:e.jobtitle||'',contractId:contract.id||'',contractCode:contract.contractCode||'',startDate,types,otherType:document.getElementById('comm_other_type')?.value||'',updatedAt:new Date().toISOString()};
     if(existingIndex>=0)commencements[existingIndex]=rec;else commencements.push(rec);
     saveCommencements();
-    // جهّز الحضور التلقائي للشهر الذي تبدأ فيه المباشرة، بدون الكتابة فوق أي تعديل يدوي سابق.
-    const startYm = startDate.slice(0,7);
-    attendance[startYm]=attendance[startYm]||{};
-    attendance[startYm][e.id]=attendance[startYm][e.id]||{};
-    const startDay = Number(startDate.slice(8,10));
-    const startDays = daysInMonth(startYm);
-    for(let day=startDay; day<=startDays; day++){
-      if(!attendance[startYm][e.id][day]) attendance[startYm][e.id][day]='ح';
-    }
+    // الحضور «ح» يُحسب تلقائياً يومياً من تاريخ المباشرة حتى اليوم فقط (autoAttendanceCode)،
+    // ولا تُكتب أيام مسبقة/مستقبلية داخل البيانات.
     saveAttendance();
     renderCommencementList();
     showToast(existingIndex>=0?'تم تحديث المباشرة والحضور التلقائي':'تم حفظ المباشرة والحضور التلقائي');
