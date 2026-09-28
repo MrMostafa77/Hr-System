@@ -12,6 +12,7 @@
   const CONTRACT_KEY = 'hr_contracts_v1';
   const COMMENCEMENT_KEY = 'hr_commencements_v1';
   const PROJECT_ACCOUNT_KEY = 'hr_project_accounts_v1';
+  const PAYROLL_KEY = 'hr_payroll_v1';
   const ATT_CODES = ['','ح','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق'];
   let employees = [];
   let attendance = {};   // { "YYYY-MM": { empId: { day: code } } }
@@ -24,6 +25,7 @@
   let contracts = [];
   let commencements = [];
   let projectAccounts = [];
+  let payrollRecords = {};
   let currentView = 'dashboard';
   let currentProfileId = null;
   let pendingDeleteId = null;
@@ -77,7 +79,7 @@
       departments: readLocal(DEPT_KEY, []),
       contracts: readLocal(CONTRACT_KEY, []),
       commencements: readLocal(COMMENCEMENT_KEY, []),
-      projectAccounts: readLocal(PROJECT_ACCOUNT_KEY, [])
+      projectAccounts: readLocal(PROJECT_ACCOUNT_KEY, []), payrollRecords: readLocal(PAYROLL_KEY, {})
     };
   }
   function applyState(state){
@@ -92,12 +94,13 @@
     contracts = Array.isArray(state?.contracts) ? state.contracts : [];
     commencements = Array.isArray(state?.commencements) ? state.commencements : [];
     projectAccounts = Array.isArray(state?.projectAccounts) ? state.projectAccounts : [];
+    payrollRecords = state?.payrollRecords && typeof state.payrollRecords==='object' ? state.payrollRecords : {};
     if(!departments.length && employees.length){
       const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map);
     }
   }
   function currentState(){
-    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts};
+    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords};
   }
   let cloudSaveTimer = null;
   let cloudApplying = false;
@@ -105,7 +108,7 @@
   function persistLocal(){
     writeLocal(STORAGE_KEY,employees); writeLocal(ATT_KEY,attendance);
     writeLocal(PEN_KEY,penalties); writeLocal(COV_KEY,coverage); writeLocal(SET_KEY,settings);
-    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts);
+    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords);
   }
   function persistCloud(message='تم حفظ التغييرات بنجاح'){
     persistLocal();
@@ -125,7 +128,7 @@
   function loadAux(){
     const state=localState();
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
-    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[];
+    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{};
     if(!departments.length && employees.length){ const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map); }
     persistLocal();
   }
@@ -2382,77 +2385,93 @@
     if(isCycle && coded===cols.length && cols.length<30) coded=30;
     return Math.min(30, coded);
   }
-  function payrollStatementForCols(e, cols, sumIn){
-    const ym=cols.length?cols[0].ym:currentMonthStr();
-    const sum=sumIn||attSummaryForCols(cols,e.id);
-    const basic=Number(e.basicsalary)||0;
-    const day=basic/30;
-    const allowances=Number(e.otherallow)||0;
-    const overtime=(sum['ض']||0)*day*1.5;
-    const gross=basic+allowances+overtime;
-    const absDay=(sum['غ']||0)*day;
-    const ded=attDeductionsFor(e, cols, day);
-    const absence=ded.absence;
-    const penalty=ded.penalty;
-    const withdrawal=ded.withdrawal;
-    const other=0;
-    const otherded=Number(e.otherded)||0;
+  function payrollAdjustmentFor(ym, empId){
+    return (payrollRecords?.[ym]?.[empId]) || {bonus:0,uniform:0,newspaper:0,advance:0,internalAction:'',note:''};
+  }
+  function updatePayrollField(empId,field,value){
+    const ym=document.getElementById('payrollMonth')?.value; if(!ym)return;
+    if(!payrollRecords[ym]) payrollRecords[ym]={};
+    payrollRecords[ym][empId]={...payrollAdjustmentFor(ym,empId),[field]:(['bonus','uniform','newspaper','advance'].includes(field)?(Number(value)||0):value)};
+    persistCloud(); renderReports();
+  }
+  function payrollAvailableMonths(){
+    return Object.keys(attendance||{}).filter(ym=>attendance[ym] && Object.values(attendance[ym]).some(r=>r&&typeof r==='object'&&Object.keys(r).length)).sort().reverse();
+  }
+  function nonAttendanceDaysFor(e,ym){
+    const start=attStartDateFor(e.id);
+    if(!start || start.slice(0,7)!==ym)return 0;
+    return Math.max(0,Math.min(30,Number(start.slice(8,10))-1));
+  }
+  function payrollStatementForCols(e,cols,sumIn){
+    const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
+    const basic=Number(e.basicsalary)||0,housing=Number(e.housing)||0,transport=Number(e.transport)||0,otherAllow=Number(e.otherallow)||0;
+    const monthlyGross=basic+housing+transport+otherAllow, day=monthlyGross/30;
+    const overtime=(sum['ض']||0)*(basic/30)*1.5, bonus=Number(a.bonus)||0, totalEarned=monthlyGross+overtime+bonus;
+    const nonWorkDays=nonAttendanceDaysFor(e,ym), nonWorkDed=nonWorkDays*day;
+    const absenceDays=(sum['غ']||0)+(sum['ش']||0), absence=absenceDays*day;
+    const ded=attDeductionsFor(e,cols,basic/30), penalty=ded.penalty, withdrawal=ded.withdrawal;
     const project=projects.find(p=>String(p.name||'')===String(e.project||''));
-    const insuranceBase=basic+(Number(e.housing)||0);
-    const gosi=(project?.socialInsurance ? insuranceBase*(Number(project.socialInsuranceRate)||0)/100 : (Number(e.gosi)||0));
-    const deduction=absDay+gosi+otherded+absence+penalty+withdrawal+other;
-    const net=gross-deduction;
-    return {dedItems:ded.items,ym,day,basic,allowances,overtime,gross,deduction,absence,absDay,otherded,penalty,withdrawal,other,net,gosi,insuranceBase,sum,workDays:attWorkDays(cols,e.id)};
+    const insuranceBase=basic+housing;
+    const gosi=project?.socialInsurance ? insuranceBase*(Number(project.socialInsuranceRate)||0)/100 : 0;
+    const uniform=Number(a.uniform)||0,newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0;
+    const deduction=nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance;
+    return {ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,deduction,net:totalEarned-deduction,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
   }
   function payrollStatementFor(e){
-    const ym=document.getElementById('payrollMonth')?.value || currentMonthStr();
-    return payrollStatementForCols(e, monthCols(ym));
+    const ym=document.getElementById('payrollMonth')?.value||payrollAvailableMonths()[0]||currentMonthStr();
+    return payrollStatementForCols(e,monthCols(ym));
+  }
+  function refreshPayrollMonthOptions(){
+    const sel=document.getElementById('payrollMonth'); if(!sel)return;
+    const months=payrollAvailableMonths(), old=sel.value;
+    sel.innerHTML=months.length?months.map(m=>`<option value="${escapeAttr(m)}">${escapeHtml(monthLabel(m))}</option>`).join(''):'<option value="">لا توجد مسيرات متاحة</option>';
+    sel.value=months.includes(old)?old:(months[0]||'');
+  }
+  function refreshPayrollFilters(){
+    const pf=document.getElementById('payrollProjectFilter'),rf=document.getElementById('payrollRegionFilter'); if(!pf||!rf)return;
+    const pv=pf.value,rv=rf.value,ps=[...new Set(employees.map(e=>String(e.project||'').trim()).filter(Boolean))].sort(),rs=[...new Set(employees.map(e=>String(e.region||'').trim()).filter(Boolean))].sort();
+    pf.innerHTML='<option value="">كل المشاريع</option>'+ps.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join('');
+    rf.innerHTML='<option value="">كل المناطق</option>'+rs.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join('');
+    pf.value=ps.includes(pv)?pv:''; rf.value=rs.includes(rv)?rv:'';
   }
   function renderReports(){
-    const projectMode=window.currentReport==='projects';
-    const payrollCard=document.querySelector('#view-reports .full-page-data-card');
-    const projectPanel=document.getElementById('projectReportsPanel');
-    if(payrollCard) payrollCard.style.display=projectMode?'none':'';
-    if(projectPanel) projectPanel.style.display=projectMode?'':'none';
-    if(projectMode){
-      renderProjects();
-      renderProjectCapacity();
-      return;
-    }
-    const body = document.getElementById('reportTableBody');
-    if(!body)return;
-    const q = (document.getElementById('payrollSearch')?.value || '').trim().toLowerCase();
-    const list = employees.filter(e=>!q || [e.fullname,e.empcode,e.region,e.project,e.jobtitle].some(v=>String(v||'').toLowerCase().includes(q)));
-    document.getElementById('payrollCount').textContent = `${list.length} موظف`;
-    body.innerHTML = list.map((e,i)=>{
-      const p=payrollStatementFor(e);
-      return `<tr data-pay-row="${e.id}">
-        <td class="mono">${i+1}</td><td><b>${escapeHtml(e.fullname||'—')}</b></td><td>${escapeHtml(e.project||e.region||'—')}</td><td>${escapeHtml(e.jobtitle||'—')}</td>
-        <td class="mono">${fmt(p.day)}</td><td class="mono">${fmt(e.basicsalary)}</td><td class="mono">${fmt(p.allowances)}</td><td class="mono">${fmt(p.overtime)}</td><td class="mono">${fmt(p.gross)}</td>
-        <td class="mono" title="التأمينات الاجتماعية من الأساسي + السكن">${fmt(p.gosi)}</td><td class="mono">${fmt(p.absence)}</td><td class="mono">${fmt(p.penalty)}</td><td class="mono">0</td><td class="mono">0</td><td class="mono">${fmt(p.withdrawal)}</td><td class="mono">${fmt(p.other)}</td><td class="mono">${fmt(p.deduction)}</td>
-        <td class="mono" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td><td>${escapeHtml(e.bankname||'—')}</td><td>${escapeHtml(employeeContractStatus(e))}</td><td><div style="display:flex;gap:6px;white-space:nowrap"><button class="btn btn-sm payroll-edit-btn" data-emp="${e.id}">تعديل</button><button class="btn btn-sm payroll-preview-btn" data-emp="${e.id}">معاينة المسير</button></div></td>
+    const projectMode=window.currentReport==='projects', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel');
+    if(card)card.style.display=projectMode?'none':'';
+    if(panel)panel.style.display=projectMode?'':'none';
+    if(projectMode){renderProjects();renderProjectCapacity();return;}
+    refreshPayrollMonthOptions();refreshPayrollFilters();
+    const ym=document.getElementById('payrollMonth')?.value,body=document.getElementById('reportTableBody'); if(!body)return;
+    if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="24" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
+    const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(), pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
+    const list=employees.filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    document.getElementById('payrollCount').textContent=`${list.length} موظف`;
+    body.innerHTML=list.map((e,i)=>{
+      const p=payrollStatementForCols(e,monthCols(ym)),a=p.adjustment||{},action=a.internalAction||'';
+      const red=v=>Number(v)>0?' style="color:#b42318;font-weight:700"':'';
+      return `<tr data-pay-row="${escapeAttr(e.id)}">
+      <td class="mono">${i+1}</td><td><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td>${escapeHtml(e.region||e.project||'—')}</td><td>${escapeHtml(e.jobtitle||'—')}</td>
+      <td class="mono">${fmt(p.day)}</td><td class="mono">${fmt(p.basic)}</td><td class="mono">${fmt(p.housing)}</td><td class="mono">${fmt(p.transport)}</td><td class="mono">${fmt(p.otherAllow)}</td><td class="mono">${fmt(p.monthlyGross)}</td>
+      <td class="mono">${fmt(p.overtime)}</td><td class="pay-input-cell"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}"></td><td class="mono">${fmt(p.totalEarned)}</td>
+      <td class="mono" ${red(p.nonWorkDed)}>${fmt(p.nonWorkDed)}${p.nonWorkDays?`<small class="pay-red-note">${p.nonWorkDays} يوم</small>`:''}</td><td class="mono">${fmt(p.gosi)}</td>
+      <td class="mono" ${red(p.absence)}>${fmt(p.absence)}${p.absenceDays?`<small class="pay-red-note">${p.absenceDays} يوم</small>`:''}</td><td class="mono">${fmt(p.penalty)}</td><td class="mono">${fmt(p.withdrawal)}</td>
+      <td class="pay-input-cell"><input type="number" min="0" step=".01" data-pay-field="uniform" data-emp="${escapeAttr(e.id)}" value="${Number(a.uniform)||0}"></td>
+      <td class="pay-input-cell"><input type="number" min="0" step=".01" data-pay-field="newspaper" data-emp="${escapeAttr(e.id)}" value="${Number(a.newspaper)||0}"></td>
+      <td class="pay-input-cell"><input type="number" min="0" step=".01" data-pay-field="advance" data-emp="${escapeAttr(e.id)}" value="${Number(a.advance)||0}"></td>
+      <td class="mono" ${red(p.deduction)}>${fmt(p.deduction)}</td><td class="mono" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
+      <td><select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}"><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="21" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
-    body.querySelectorAll('.payroll-edit-btn').forEach(btn=>btn.addEventListener('click',()=>loadIntoForm(btn.dataset.emp)));
-    body.querySelectorAll('.payroll-preview-btn').forEach(btn=>btn.addEventListener('click',()=>{
-      const emp=employees.find(x=>String(x.id)===String(btn.dataset.emp)); if(!emp) return;
-      openPayrollPreview({list:[emp], cols:monthCols(document.getElementById('payrollMonth')?.value||currentMonthStr()), single:true});
-    }));
+    }).join('')||'<tr><td colspan="24" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
+    body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
   }
-  const payrollMonth=document.getElementById('payrollMonth');
-  if(payrollMonth){
-    // شهر الرواتب لا يظهر إلا بعد انتهاء الشهر: آخر خيار = الشهر السابق للشهر الحالي
-    const lastDone=(()=>{ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); })();
-    payrollMonth.max=lastDone; payrollMonth.value=lastDone;
-    payrollMonth.addEventListener('change', ()=>{ if(!payrollMonth.value || payrollMonth.value>lastDone) payrollMonth.value=lastDone; renderReports(); });
-  }
-  document.getElementById('payrollSearch').addEventListener('input', renderReports);
-  document.getElementById('payrollPreviewAllBtn')?.addEventListener('click', ()=>{
-    const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase();
-    const list=employees.filter(e=>!q || [e.fullname,e.empcode,e.region,e.project,e.jobtitle].some(v=>String(v||'').toLowerCase().includes(q)));
-    openPayrollPreview({list, cols:monthCols(document.getElementById('payrollMonth')?.value||currentMonthStr()), single:false});
+  const payrollMonth=document.getElementById('payrollMonth'); if(payrollMonth)payrollMonth.addEventListener('change',renderReports);
+  ['payrollSearch','payrollProjectFilter','payrollRegionFilter'].forEach(id=>{document.getElementById(id)?.addEventListener('input',renderReports);document.getElementById(id)?.addEventListener('change',renderReports);});
+  document.getElementById('payrollPreviewAllBtn')?.addEventListener('click',()=>{
+    const ym=document.getElementById('payrollMonth')?.value;if(!ym){showToast('لا يوجد شهر حضور وانصراف متاح');return;}
+    const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(),pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
+    const list=employees.filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    openPayrollPreview({list,cols:monthCols(ym),single:false});
   });
-  document.getElementById('printReportBtn').addEventListener('click', ()=>window.print());
+  document.getElementById('printReportBtn')?.addEventListener('click',()=>window.print());
 
   /* ===== export / import ===== */
   document.getElementById('exportBtn')?.addEventListener('click', ()=>{
@@ -2867,41 +2886,25 @@
   .ac-paper .ac-sign i{display:block;margin-top:44px;border-top:1px solid #444}`;
   const AS_CLS={'ح':'h','غ':'a','ج':'p','س':'w','راحة':'r','ط':'c','ض':'o','عيد':'e'};
   const AS_SUMS=[['الدوام',null],['حضور','ح'],['غياب','غ'],['تغطية','ط'],['جزاء','ج'],['راحات','راحة'],['إضافي','ض'],['انسحاب','س'],['جمع','جمع']];
-  const PP_GROUPS = [['بيانات الموظف',5],['الحضور والانصراف (أيام)',9],['المستحقات (ريال)',5],['الخصومات (ريال)',6],['الصافي',1],['البنك',1]];
-  const ppSum = code => r => r.p.sum[code]||0;
-  const PP_COLS = [
-    {h:'م',k:r=>r.i,t:'i'},
-    {h:'الاسم',k:r=>r.name,t:'s',w:26},
-    {h:'الكود',k:r=>r.code,t:'c'},
-    {h:'المشروع',k:r=>r.project,t:'s',w:18},
-    {h:'الوظيفة',k:r=>r.job,t:'s',w:16},
-    {h:'الدوام',k:r=>r.workDays,t:'i',sum:1,b:1},
-    {h:'حضور',k:ppSum('ح'),t:'i',sum:1},{h:'غياب',k:ppSum('غ'),t:'i',sum:1},{h:'راحة',k:ppSum('راحة'),t:'i',sum:1},
-    {h:'جزاء',k:ppSum('ج'),t:'i',sum:1},{h:'تغطية',k:ppSum('ط'),t:'i',sum:1},{h:'إضافي',k:ppSum('ض'),t:'i',sum:1},
-    {h:'انسحاب',k:ppSum('س'),t:'i',sum:1},{h:'جمع',k:ppSum('جمع'),t:'i',sum:1},
-    {h:'اليوم',k:r=>r.p.day,t:'n'},
-    {h:'الأساسي',k:r=>r.p.basic,t:'n',sum:1},{h:'البدلات',k:r=>r.p.allowances,t:'n',sum:1},
-    {h:'الإضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'الإجمالي',k:r=>r.p.gross,t:'n',sum:1,b:1},
-    {h:'التأمينات',k:r=>r.p.gosi,t:'n',sum:1},{h:'الغياب',k:r=>r.p.absDay+r.p.absence,t:'n',sum:1},
-    {h:'الجزاء',k:r=>r.p.penalty,t:'n',sum:1},{h:'الانسحاب',k:r=>r.p.withdrawal,t:'n',sum:1},
-    {h:'أخرى',k:r=>r.p.otherded+r.p.other,t:'n',sum:1},{h:'إجمالي الخصم',k:r=>r.p.deduction,t:'n',sum:1,b:1},
-    {h:'الصافي',k:r=>r.p.net,t:'n',sum:1,b:1,net:1},
-    {h:'البنك',k:r=>r.bank,t:'s',w:16}
+  const PP_GROUPS=[['بيانات الموظف',4],['المستحقات (ريال)',9],['الخصومات (ريال)',9],['الصافي',1],['الإجراء الداخلي',1]];
+  const PP_COLS=[
+    {h:'م',k:r=>r.i,t:'i'},{h:'الاسم',k:r=>r.name,t:'s',w:25},{h:'الموقع',k:r=>r.location,t:'s',w:16},{h:'الوظيفة',k:r=>r.job,t:'s',w:16},
+    {h:'اليوم',k:r=>r.p.day,t:'n'},{h:'الأساسي',k:r=>r.p.basic,t:'n',sum:1},{h:'بدل السكن',k:r=>r.p.housing,t:'n',sum:1},{h:'بدل المواصلات',k:r=>r.p.transport,t:'n',sum:1},{h:'بدلات أخرى',k:r=>r.p.otherAllow,t:'n',sum:1},
+    {h:'إجمالي الراتب',k:r=>r.p.monthlyGross,t:'n',sum:1,b:1},{h:'إضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'مكافآت',k:r=>r.p.bonus,t:'n',sum:1},{h:'إجمالي الراتب بعد الإضافي والمكافآت',k:r=>r.p.totalEarned,t:'n',sum:1,b:1},
+    {h:'خصم عدم دوام',k:r=>r.p.nonWorkDed,t:'n',sum:1},{h:'تأمينات اجتماعية',k:r=>r.p.gosi,t:'n',sum:1},{h:'غيابات',k:r=>r.p.absence,t:'n',sum:1},{h:'جزاءات',k:r=>r.p.penalty,t:'n',sum:1},{h:'انسحاب',k:r=>r.p.withdrawal,t:'n',sum:1},
+    {h:'البدلة',k:r=>r.p.uniform,t:'n',sum:1},{h:'الصحيفة',k:r=>r.p.newspaper,t:'n',sum:1},{h:'سلف',k:r=>r.p.advance,t:'n',sum:1},{h:'إجمالي الخصومات',k:r=>r.p.deduction,t:'n',sum:1,b:1},{h:'صافي الراتب',k:r=>r.p.net,t:'n',sum:1,b:1,net:1},
+    {h:'إجراء داخلي',k:r=>r.p.adjustment?.internalAction||'',t:'s',w:22}
   ];
-  function ppNf(n){ return (Math.round((Number(n)||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2}); }
-  function ppFmt(col,v){ return col.t==='n' ? ppNf(v) : (col.t==='i' ? String(Number(v)||0) : String(v==null?'':v)); }
-  function buildPayrollModel(list, cols, single){
-    const first=cols[0], last=cols[cols.length-1];
-    const isMonth = first.d===1 && first.ym===last.ym && cols.length===daysInMonth(first.ym);
-    const periodLabel = isMonth ? `شهر ${monthLabel(first.ym)}` : `الفترة من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)}`;
-    const projs=[...new Set(list.map(e=>e.project).filter(Boolean))];
-    const scope = single ? `الموظف: ${list[0].fullname||''}${list[0].empcode?` (${list[0].empcode})`:''}` : (projs.length===1 ? `المشروع: ${projs[0]}` : 'كل المشاريع');
-    const rows=list.map((e,i)=>{ const p=payrollStatementForCols(e,cols); return {i:i+1,name:e.fullname||'',code:e.empcode||'',project:e.project||e.region||'',job:e.jobtitle||'',bank:e.bankname||'',workDays:p.workDays,p}; });
-    const totals=PP_COLS.map(c=>c.sum ? rows.reduce((a,r)=>a+(Number(c.k(r))||0),0) : null);
-    const title = `${single?'مسير راتب':'مسير رواتب'} ${periodLabel}`;
-    const sub = `${scope} — من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)} — أساس الحساب 30 يوم${single?'':` — عدد الموظفين: ${rows.length}`} — تاريخ الإعداد: ${fmtDMY(todayISO())}`;
-    const fileBase = `مسير_${single?(list[0].fullname||'موظف'):(projs.length===1?projs[0]:'كل_المشاريع')}_${isMonth?monthLabel(first.ym):fmtDMY(first.iso)+'_'+fmtDMY(last.iso)}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
-    return {title, sub, rows, totals, single, fileBase};
+  function ppNf(n){return(Math.round((Number(n)||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});}
+  function ppFmt(col,v){return col.t==='n'?ppNf(v):(col.t==='i'?String(Number(v)||0):String(v==null?'':v));}
+  function buildPayrollModel(list,cols,single){
+    const first=cols[0],last=cols[cols.length-1],isMonth=first.d===1&&first.ym===last.ym&&cols.length===daysInMonth(first.ym),periodLabel=isMonth?`شهر ${monthLabel(first.ym)}`:`الفترة من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)}`;
+    const projs=[...new Set(list.map(e=>e.project).filter(Boolean))],scope=single?`الموظف: ${list[0].fullname||''}`:(projs.length===1?`المشروع: ${projs[0]}`:'كل المشاريع');
+    const rows=list.map((e,i)=>({i:i+1,name:e.fullname||'',location:e.region||e.project||'',job:e.jobtitle||'',p:payrollStatementForCols(e,cols)}));
+    const totals=PP_COLS.map(c=>c.sum?rows.reduce((a,r)=>a+(Number(c.k(r))||0),0):null);
+    const title=`${single?'مسير راتب':'مسير رواتب'} ${periodLabel}`,sub=`${scope} — من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)} — أساس الحساب 30 يوم${single?'':` — عدد الموظفين: ${rows.length}`} — تاريخ الإعداد: ${fmtDMY(todayISO())}`;
+    const fileBase=`مسير_${single?(list[0].fullname||'موظف'):(projs.length===1?projs[0]:'كل_المشاريع')}_${isMonth?monthLabel(first.ym):fmtDMY(first.iso)+'_'+fmtDMY(last.iso)}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
+    return {title,sub,rows,totals,single,fileBase};
   }
   function ppPaperHTML(m){
     let h=`<div class="pp-title">${escapeHtml(m.title)}</div><div class="pp-sub">${escapeHtml(m.sub)}</div><table class="pp-table"><thead><tr class="g">`;

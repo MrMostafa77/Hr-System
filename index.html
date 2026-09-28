@@ -963,17 +963,18 @@
         </div>
       </div>
       <div class="card section-card full-page-data-card" style="margin-bottom:18px;">
-        <div class="att-toolbar">
-          <input type="month" id="payrollMonth" style="min-width:170px;">
-          <input type="search" id="payrollSearch" placeholder="بحث بالاسم أو الكود أو المنطقة أو المشروع" style="min-width:320px;">
+        <div class="att-toolbar payroll-toolbar">
+          <div class="payroll-filter-group"><label>شهر المسير</label><select id="payrollMonth"></select></div>
+          <div class="payroll-filter-group payroll-search-wide"><label>البحث بالكود أو الاسم</label><input type="search" id="payrollSearch" placeholder="بحث بالكود أو الاسم"></div>
+          <div class="payroll-filter-group"><label>المشروع</label><select id="payrollProjectFilter"><option value="">كل المشاريع</option></select></div>
+          <div class="payroll-filter-group"><label>المنطقة</label><select id="payrollRegionFilter"><option value="">كل المناطق</option></select></div>
           <span class="pill pill-gray" id="payrollCount">0 موظف</span>
         </div>
-        <div class="table-wrap">
-          <table class="payroll-table payroll-statement-table">
-            <thead><tr><th>م</th><th>الاسم</th><th>الموقع</th><th>الوظيفة</th><th>اليوم</th><th>اساسي</th><th>بدلات</th><th>اضافي</th><th>الاجمال</th><th>خصومات</th><th>غيابات</th><th>جزاء</th><th>بدلة</th><th>صحيفة</th><th>انسحاب</th><th>اخري</th><th>خصم</th><th>الصافي</th><th>البنك</th><th>السبب</th><th>الإجراء</th></tr></thead>
-            <tbody id="reportTableBody"></tbody>
-          </table>
-        </div>
+        <div class="payroll-info-note">تظهر هنا فقط الأشهر التي يوجد لها حضور وانصراف محفوظ؛ عند إضافة شهر جديد للحضور يظهر تلقائيًا في قائمة الرواتب.</div>
+        <div class="table-wrap"><table class="payroll-table payroll-statement-table">
+          <thead><tr><th>م</th><th>الاسم</th><th>الموقع</th><th>الوظيفة</th><th>اليوم</th><th>الأساسي</th><th>بدل سكن</th><th>بدل مواصلات</th><th>بدلات أخرى</th><th>إجمالي الراتب</th><th>إضافي</th><th>مكافآت</th><th>إجمالي الراتب بعد الإضافي والمكافآت</th><th>خصم عدم دوام</th><th>تأمينات اجتماعية</th><th>غيابات</th><th>جزاءات</th><th>انسحاب</th><th>البدلة</th><th>الصحيفة</th><th>سلف</th><th>إجمالي الخصومات</th><th>صافي الراتب</th><th>إجراء داخلي للرواتب</th></tr></thead>
+          <tbody id="reportTableBody"></tbody>
+        </table></div>
       </div>
 
       <div id="projectReportsPanel" class="project-reports-panel" style="display:none">
