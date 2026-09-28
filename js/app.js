@@ -2649,8 +2649,9 @@
     const region=document.getElementById('attRegionFilter'), project=document.getElementById('attProjectFilter');
     if(!region || !project) return;
     const rv=region.value, pv=project.value;
-    const regionsList=Array.from(new Set(employees.map(e=>e.region).filter(Boolean))).sort();
-    const projectsList=Array.from(new Set(employees.map(e=>e.project).filter(Boolean))).sort();
+    const covG=covManualGuardEntries();
+    const regionsList=Array.from(new Set([...employees,...covG].map(e=>e.region).filter(Boolean))).sort();
+    const projectsList=Array.from(new Set([...employees,...covG].map(e=>e.project).filter(Boolean))).sort();
     region.innerHTML='<option value="">كل المناطق</option>'+regionsList.map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
     project.innerHTML='<option value="">كل المشاريع</option>'+projectsList.map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
     region.value=rv; project.value=pv;
@@ -2673,7 +2674,7 @@
     const projectQ=document.getElementById('attProjectFilter')?.value||'';
     const statusQ=document.getElementById('attStatusFilter')?.value||'';
     const statusCols=statusQ?attColumns():null;
-    return employees.filter(e=>{
+    return [...employees, ...covManualGuardEntries()].filter(e=>{
       const name=String(e.fullname||'').toLowerCase(), code=String(e.empcode||'').toLowerCase();
       if(!((!searchQ || name.includes(searchQ) || code.includes(searchQ)) &&
              (!regionQ || String(e.region||'')===regionQ) &&
@@ -2714,7 +2715,7 @@
     const anchorYm = cols.length ? cols[0].ym : currentMonthStr();
     body.innerHTML = list.map(e=>{
       const sum = attSummaryForCols(cols, e.id);
-      let cells = `<td class="name-col">${escapeHtml(e.fullname)}</td>
+      let cells = `<td class="name-col">${escapeHtml(e.fullname)}${e.isCov?'<span class="att-cov-badge">تغطيات — ليس موظفاً مضافاً</span>':''}</td>
         <td class="mono">${escapeHtml(e.empcode||'—')}</td>
         <td>${escapeHtml(e.region||'—')}</td>
         <td>${escapeHtml(e.project||'—')}</td>`;
@@ -2733,6 +2734,7 @@
         <td class="sum-col" data-sum="س" data-emp="${e.id}">${sum['س']}</td>
         <td class="sum-col" data-sum="جمع" data-emp="${e.id}">${sum['جمع']}</td>`;
       cells += `<td class="status-col" data-status-emp="${e.id}">${escapeHtml(attStatusFor(anchorYm, e.id))}</td>`;
+      if(e.isCov){ cells += `<td class="act-col"><span class="pill pill-gray">تغطيات</span></td>`; return `<tr data-att-cov="${escapeAttr(e.id)}" class="att-cov-row">${cells}</tr>`; }
       cells += `<td class="act-col"><div class="att-actions">
         <button type="button" class="btn btn-sm att-daily-edit" data-emp="${e.id}" title="تعديل يومي">${attIcon('edit')}<span>تعديل</span></button>
         <button type="button" class="btn btn-sm btn-primary att-save-btn" data-emp="${e.id}" title="حفظ" disabled>${attIcon('save')}<span>حفظ</span></button>
@@ -3503,20 +3505,46 @@
   }
   renderCoverageStatusOptions();
   /* تسميع حالة التغطية في الحضور والانصراف (للحارس الغائب في نفس اليوم) */
-  function covAttendanceKey(rec){
-    const d=String(rec?.date||'').slice(0,10), id=rec?.absentId;
-    if(!id||!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
-    return {ym:d.slice(0,7), day:Number(d.slice(8,10)), empId:id};
+  function covSafe(v){ return String(v||'').trim().replace(/[^\p{L}\p{N}]+/gu,'_'); }
+  // معرّف الحارس القائم بالتغطية داخل الحضور: الموظف المضاف = معرّفه، وغير المضاف = معرّف خاص باسمه والمشروع
+  function covGuardAttId(rec){
+    if(!rec) return '';
+    return rec.guardType==='manual' ? `covg_${covSafe(rec.guardName)}_${covSafe(rec.location)}` : (rec.guardId||'');
   }
-  function covClearAttendance(rec){
-    const k=covAttendanceKey(rec), code=covStatusCode(rec?.status); if(!k||!code) return;
-    const cell=attendance[k.ym]?.[k.empId];
+  // حراس التغطيات غير المضافين كموظفين: يظهرون في الحضور والانصراف للمشروع مع إيضاح أنهم «تغطيات»
+  function covManualGuardEntries(){
+    const map=new Map();
+    (coverage||[]).forEach(c=>{
+      if(c.guardType!=='manual'||!c.guardName) return;
+      const id=covGuardAttId(c), loc=String(c.location||'').trim();
+      if(!map.has(id)){ const p=projects.find(x=>String(x?.name||'')===loc); map.set(id,{id,fullname:c.guardName,empcode:'',region:p?.region||'',project:loc,jobtitle:'تغطيات — غير موظف مضاف',isCov:true}); }
+    });
+    return [...map.values()];
+  }
+  function covDayKey(rec){
+    const d=String(rec?.date||'').slice(0,10);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+    return {ym:d.slice(0,7), day:Number(d.slice(8,10))};
+  }
+  function covSetCell(empId, k, code){
+    if(!empId||!k||!code) return;
+    attendance[k.ym]=attendance[k.ym]||{}; attendance[k.ym][empId]=attendance[k.ym][empId]||{};
+    if(code!==autoAttendanceCode(k.ym,empId,k.day)) attendance[k.ym][empId][k.day]=code; else delete attendance[k.ym][empId][k.day];
+  }
+  function covClearCell(empId, k, code){
+    if(!empId||!k||!code) return;
+    const cell=attendance[k.ym]?.[empId];
     if(cell && cell[k.day]===code) delete cell[k.day];
   }
+  function covClearAttendance(rec){
+    const k=covDayKey(rec); if(!k) return;
+    covClearCell(rec.absentId, k, covStatusCode(rec.status));   // الحارس الغائب
+    covClearCell(covGuardAttId(rec), k, 'ط');                    // الحارس المغطّي
+  }
   function covApplyAttendance(rec){
-    const k=covAttendanceKey(rec), code=covStatusCode(rec?.status); if(!k||!code) return;
-    attendance[k.ym]=attendance[k.ym]||{}; attendance[k.ym][k.empId]=attendance[k.ym][k.empId]||{};
-    if(code!==autoAttendanceCode(k.ym,k.empId,k.day)) attendance[k.ym][k.empId][k.day]=code; else delete attendance[k.ym][k.empId][k.day];
+    const k=covDayKey(rec); if(!k) return;
+    covSetCell(rec.absentId, k, covStatusCode(rec.status));      // الغائب: الحالة المختارة
+    covSetCell(covGuardAttId(rec), k, 'ط');                       // المغطّي: تغطية في يوم التغطية
   }
   function renderCoverageShiftOptions(selected=''){
     const el=document.getElementById('c_shift'); if(!el)return;
@@ -3635,7 +3663,7 @@
     if(idx>=0) covClearAttendance(coverage[idx]);          // إزالة تسميع السجل القديم لو تغيّر اليوم/الحارس/الحالة
     if(idx>=0)coverage[idx]=data; else coverage.push(data);
     covApplyAttendance(data);
-    saveCoverage(); renderCoverage(); const makeNew=document.getElementById('coverageForm').dataset.saveNew==='1'; delete document.getElementById('coverageForm').dataset.saveNew; showToast((idx>=0?'تم تحديث التغطية':'تم حفظ التغطية')+' — وسُجّلت الحالة «'+covStatusText(data.status)+'» للحارس الغائب في الحضور والانصراف بتاريخ '+fmtDMY(data.date)); if(makeNew)resetCoverageForm();
+    saveCoverage(); renderCoverage(); const makeNew=document.getElementById('coverageForm').dataset.saveNew==='1'; delete document.getElementById('coverageForm').dataset.saveNew; showToast((idx>=0?'تم تحديث التغطية':'تم حفظ التغطية')+' — وسُجّل في الحضور والانصراف بتاريخ '+fmtDMY(data.date)+': «'+covStatusText(data.status)+'» للغائب و«ط» للمغطّي'); if(makeNew)resetCoverageForm();
   });
   document.getElementById('covExportBtn').addEventListener('click',()=>{
     const headers=['اسم الحارس القائم بالتغطية','الوردية','الموقع','التاريخ','الحارس الغائب','الحالة','المستحق','اسم صاحب الحساب','الآيبان','البنك','رقم الحساب','ملاحظات'];

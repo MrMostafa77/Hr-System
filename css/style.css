@@ -2303,3 +2303,7 @@ html[data-theme="light"] #view-dashboard .stat-card .l{font-size:11px!important;
   #view-dashboard .stat-grid,
   html[data-theme="light"] #view-dashboard .stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
 }
+
+/* ===== حراس التغطيات غير المضافين في الحضور والانصراف ===== */
+.att-cov-badge{display:block;margin-top:2px;font-size:10.5px;font-weight:700;color:#A66F00;}
+tr.att-cov-row td{background:rgba(212,160,23,.07);}
