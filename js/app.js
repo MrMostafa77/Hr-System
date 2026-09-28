@@ -2216,6 +2216,39 @@
     }
   });
 
+  /* ===== الخصومات من لائحة الجزاءات والخصومات الخاصة بكل مشروع ===== */
+  function projectOfEmployee(e){ return projects.find(p=>String(p.name||'')===String(e?.project||'')); }
+  function policyFor(e){
+    const p=projectOfEmployee(e);
+    return (p && Array.isArray(p.penaltiesPolicy) && p.penaltiesPolicy.length) ? p.penaltiesPolicy : projectPenaltyDefaults();
+  }
+  function policyNorm(t){ return String(t||'').replace(/\s+/g,' ').trim(); }
+  function policyItemByName(list,name){ const n=policyNorm(name); if(!n) return null; return (list||[]).find(x=>policyNorm(x.name)===n)||null; }
+  function policyAmount(item,dayRate){ return item ? (item.fixed ? (Number(item.amount)||0) : (Number(item.days)||0)*dayRate) : 0; }
+  function policyDefaultNameForCode(code){ return code==='غ' ? 'يوم الغياب بدون عذر' : (code==='س' ? 'الانسحاب من الموقع' : ''); }
+  function penRecCode(p){ return (p.code && ATT_CODES.includes(p.code)) ? p.code : (/انسحاب/.test(String(p.type||'')) ? 'س' : 'ج'); }
+  // قيمة خصم إجراء واحد: من لائحة المشروع (أيام × أجر اليوم أو مبلغ مقطوع)
+  function recordPolicyAmount(e, rec, code, dayRate, listIn){
+    const list=listIn||policyFor(e);
+    let item=rec ? policyItemByName(list, rec.type) : null;
+    if(!item && policyDefaultNameForCode(code)) item=policyItemByName(list, policyDefaultNameForCode(code));
+    if(item) return {amount:policyAmount(item,dayRate), name:item.name, item};
+    const days = (rec && rec.days!=='' && rec.days!=null) ? (Number(rec.days)||0) : 1;
+    return {amount:days*dayRate, name:(rec&&rec.type)||'', item:null};
+  }
+  function attDeductionsFor(e, cols, dayRate){
+    const list=policyFor(e), out={absence:0,withdrawal:0,penalty:0,items:[]};
+    cols.forEach(c=>{
+      const code=attCodeAt(c.ym, e.id, c.d);
+      if(code!=='غ' && code!=='س' && code!=='ج') return;
+      const recs=(penalties||[]).filter(p=>String(p.empId)===String(e.id) && String(p.date||'').slice(0,10)===c.iso);
+      const rec=recs[recs.length-1];
+      const r=recordPolicyAmount(e, rec, code, dayRate, list);
+      out[code==='غ'?'absence':(code==='س'?'withdrawal':'penalty')]+=r.amount;
+      out.items.push({date:c.iso, code, name:r.name, amount:r.amount});
+    });
+    return out;
+  }
   /* ===== payroll statement ===== */
   function monthCols(ym){
     const cols=[]; for(let d=1; d<=daysInMonth(ym); d++) cols.push({ym, d, iso:`${ym}-${String(d).padStart(2,'0')}`});
@@ -2238,9 +2271,10 @@
     const overtime=(sum['ض']||0)*day*1.5;
     const gross=basic+allowances+overtime;
     const absDay=(sum['غ']||0)*day;
-    const absence=(sum['غ']||0)*day*3.5;
-    const penalty=(sum['ج']||0)*day;
-    const withdrawal=(sum['س']||0)*day*5;
+    const ded=attDeductionsFor(e, cols, day);
+    const absence=ded.absence;
+    const penalty=ded.penalty;
+    const withdrawal=ded.withdrawal;
     const other=0;
     const otherded=Number(e.otherded)||0;
     const project=projects.find(p=>String(p.name||'')===String(e.project||''));
@@ -2248,7 +2282,7 @@
     const gosi=(project?.socialInsurance ? insuranceBase*(Number(project.socialInsuranceRate)||0)/100 : (Number(e.gosi)||0));
     const deduction=absDay+gosi+otherded+absence+penalty+withdrawal+other;
     const net=gross-deduction;
-    return {ym,day,basic,allowances,overtime,gross,deduction,absence,absDay,otherded,penalty,withdrawal,other,net,gosi,insuranceBase,sum,workDays:attWorkDays(cols,e.id)};
+    return {dedItems:ded.items,ym,day,basic,allowances,overtime,gross,deduction,absence,absDay,otherded,penalty,withdrawal,other,net,gosi,insuranceBase,sum,workDays:attWorkDays(cols,e.id)};
   }
   function payrollStatementFor(e){
     const ym=document.getElementById('payrollMonth')?.value || currentMonthStr();
@@ -2569,7 +2603,7 @@
       cells += `<td class="act-col"><div class="att-actions">
         <button type="button" class="btn btn-sm att-daily-edit" data-emp="${e.id}" title="تعديل يومي">${attIcon('edit')}<span>تعديل</span></button>
         <button type="button" class="btn btn-sm btn-primary att-save-btn" data-emp="${e.id}" title="حفظ" disabled>${attIcon('save')}<span>حفظ</span></button>
-        <button type="button" class="btn btn-sm att-payroll-btn" data-emp="${e.id}" title="معاينة المسير">${attIcon('doc')}<span>معاينة المسير</span></button>
+        <button type="button" class="btn btn-sm att-payroll-btn" data-emp="${e.id}" title="معاينة كشف الحضور">${attIcon('doc')}<span>معاينة</span></button>
       </div></td>`;
       return `<tr data-att-row="${e.id}">${cells}</tr>`;
     }).join('');
@@ -2577,7 +2611,7 @@
     body.querySelectorAll('.att-select').forEach(sel=>sel.addEventListener('change',()=>{ sel.className='att-select code-'+sel.value; }));
     body.querySelectorAll('.att-payroll-btn').forEach(btn=>btn.addEventListener('click', ()=>{
       const emp=employees.find(x=>String(x.id)===String(btn.dataset.emp)); if(!emp) return;
-      openPayrollPreview({list:[emp], cols, single:true});
+      openAttendanceSheet({list:[emp], cols, single:true});
     }));
     body.querySelectorAll('.att-daily-edit').forEach(btn=>btn.addEventListener('click', ()=>{
       const row=body.querySelector(`tr[data-att-row="${btn.dataset.emp}"]`); if(!row) return;
@@ -2600,7 +2634,7 @@
       showToast('تم حفظ الحضور للموظف');
     }));
   }
-  document.getElementById('attPayrollAllBtn')?.addEventListener('click', ()=>openPayrollPreview({list:attFilteredList(), cols:attColumns(), single:false}));
+  document.getElementById('attPayrollAllBtn')?.addEventListener('click', ()=>openAttendanceSheet({list:attFilteredList(), cols:attColumns(), single:false}));
   document.getElementById('attMonth').addEventListener('change', renderAttendance);
   document.getElementById('attSearch').addEventListener('input', renderAttendance);
   document.getElementById('attRegionFilter').addEventListener('change', renderAttendance);
@@ -2627,6 +2661,39 @@
   .pp-table td.b{font-weight:700}
   .pp-table tfoot td{background:#eef3f4;font-weight:800}
   .pp-table td.net{font-weight:800;background:#eaf6ef}`;
+  const ATT_SHEET_CSS = `
+  .as-paper{color:#111 !important;background:#fff !important}
+  .as-paper .as-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:2.5px solid #1f4e5a;padding-bottom:8px;margin-bottom:10px}
+  .as-paper .as-title{font-size:23px;font-weight:800;color:#1f4e5a;white-space:nowrap}
+  .as-paper .as-meta{display:flex;flex-wrap:wrap;gap:4px 20px;font-size:11.5px;color:#222;justify-content:flex-end}
+  .as-paper .as-meta b{color:#1f4e5a}
+  .as-paper .as-table{width:100%;min-width:0;border-collapse:collapse;table-layout:fixed;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .as-paper .as-table th,.as-paper .as-table td{border:1px solid #6b7780;padding:4px 1px !important;text-align:center;overflow:hidden;white-space:nowrap;font-size:9px !important;color:#111 !important;background:#fff;background-image:none !important;font-family:inherit}
+  .as-paper .as-table thead{display:table-header-group}
+  .as-paper .as-table tr{page-break-inside:avoid}
+  .as-paper .as-table thead th{background:#dfe9ed !important;font-weight:800;font-size:8.5px !important;white-space:normal;line-height:1.25;padding:5px 1px !important}
+  .as-paper .as-table tbody td{height:24px}
+  .as-paper .as-table td.s{text-align:right;padding:4px 5px !important;font-weight:700;font-size:10px !important}
+  .as-paper .as-table td.j{font-weight:400;font-size:8px !important;color:#333 !important}
+  .as-paper .as-table td.d{font-size:9px !important;font-weight:700}
+  .as-paper .as-table td.sum{background:#f1f5f6 !important;font-weight:800;font-size:10.5px !important}
+  .as-paper .as-table td.h{color:#146B54 !important}
+  .as-paper .as-table td.a{background:#f8d9d5 !important;color:#a3261a !important}
+  .as-paper .as-table td.p{background:#f6e0da !important;color:#8a3a22 !important}
+  .as-paper .as-table td.w{background:#f2e2ee !important;color:#8e3a78 !important}
+  .as-paper .as-table td.r{background:#fbf0d3 !important;color:#7a5c14 !important;font-size:7.5px !important}
+  .as-paper .as-table td.c{background:#e3eaf5 !important;color:#2f5fa8 !important}
+  .as-paper .as-table td.o{background:#ece8f8 !important;color:#5a3e9e !important}
+  .as-paper .as-table td.e{background:#dcf3ee !important;color:#146b54 !important}
+  .as-paper .as-table tr.as-grp td{background:#c9d9df !important;font-weight:800;font-size:11px !important;text-align:right;padding:5px 8px !important}
+  .as-paper .as-table tr.as-tot td{background:#e6edf0 !important;font-weight:800;font-size:10.5px !important}
+  .as-paper .as-table tr.as-leg td{text-align:right;border:none;border-top:1px solid #6b7780;padding:8px 4px 2px !important;font-size:10px !important;color:#333 !important;white-space:normal;background:#fff !important}
+  .as-paper .as-table tr.as-sign td{border:none;padding:14px 4px 4px !important;background:#fff !important}
+  .as-sig{display:flex;justify-content:space-around;gap:30px;font-size:11.5px;font-weight:700}
+  .as-sig div{flex:1;text-align:center}
+  .as-sig i{display:block;margin:34px 16px 0;border-top:1px solid #444}`;
+  const AS_CLS={'ح':'h','غ':'a','ج':'p','س':'w','راحة':'r','ط':'c','ض':'o','عيد':'e'};
+  const AS_SUMS=[['الدوام',null],['حضور','ح'],['غياب','غ'],['تغطية','ط'],['جزاء','ج'],['راحات','راحة'],['إضافي','ض'],['انسحاب','س'],['جمع','جمع']];
   const PP_GROUPS = [['بيانات الموظف',5],['الحضور والانصراف (أيام)',9],['المستحقات (ريال)',5],['الخصومات (ريال)',6],['الصافي',1],['البنك',1]];
   const ppSum = code => r => r.p.sum[code]||0;
   const PP_COLS = [
@@ -2673,6 +2740,7 @@
     } else h+='</tbody></table>';
     return h;
   }
+  function ppHTML(m){ return m.html ? m.html() : ppPaperHTML(m); }
   function ppDownloadBlob(blob,name){
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
     setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
@@ -2681,15 +2749,15 @@
     const f=document.createElement('iframe'); f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
     document.body.appendChild(f);
     const d=f.contentDocument; d.open();
-    d.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${escapeHtml(m.title)}</title><style>${PP_CSS} @page{size:A4 landscape;margin:8mm} html,body{margin:0;background:#fff}</style></head><body><div class="pp-paper">${ppPaperHTML(m)}</div></body></html>`);
+    d.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${escapeHtml(m.title)}</title><style>${PP_CSS}${m.css||''} @page{size:A4 landscape;margin:8mm} html,body{margin:0;background:#fff}</style></head><body><div class="pp-paper ${m.cls||''}">${ppHTML(m)}</div></body></html>`);
     d.close();
     setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>f.remove(),3000); },350);
   }
   async function ppDownloadPdf(m){
     if(!window.html2canvas || !(window.jspdf&&window.jspdf.jsPDF)){ showToast('مكتبة PDF غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
     const PAGE_W=1123, PAGE_H=794, M=14, SC=2;
-    const host=document.createElement('div'); host.className='pp-paper';
-    host.style.cssText=`position:fixed;left:-20000px;top:0;width:${PAGE_W}px;`; host.innerHTML=ppPaperHTML(m); document.body.appendChild(host);
+    const host=document.createElement('div'); host.className='pp-paper '+(m.cls||'');
+    host.style.cssText=`position:fixed;left:-20000px;top:0;width:${PAGE_W}px;`; host.innerHTML=ppHTML(m); document.body.appendChild(host);
     try{
       const canvas=await html2canvas(host,{scale:SC,backgroundColor:'#ffffff',useCORS:true});
       const top0=host.getBoundingClientRect().top, rel=el=>{const r=el.getBoundingClientRect(); return {t:r.top-top0,b:r.bottom-top0};};
@@ -2751,21 +2819,96 @@
     const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     ppDownloadBlob(blob,m.fileBase+'.xlsx');
   }
-  function closePayrollPreview(){ document.getElementById('ppOverlay')?.remove(); document.removeEventListener('keydown',ppEsc); }
+  function closePayrollPreview(){
+    document.getElementById('ppOverlay')?.remove(); document.removeEventListener('keydown',ppEsc);
+    if(window.__ppResize){ window.removeEventListener('resize',window.__ppResize); document.removeEventListener('fullscreenchange',window.__ppResize); window.__ppResize=null; }
+    try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
+  }
+  /* ===== معاينة كشف الحضور والانصراف (للطباعة) ===== */
+  function buildAttendanceSheetModel(list, cols, single){
+    const first=cols[0], last=cols[cols.length-1];
+    const isMonth = first.d===1 && first.ym===last.ym && cols.length===daysInMonth(first.ym);
+    const periodLabel = isMonth ? `شهر ${monthLabel(first.ym)}` : `الفترة من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)}`;
+    const sorted=[...list].sort((a,b)=>String(a.project||'').localeCompare(String(b.project||''),'ar') || String(a.fullname||'').localeCompare(String(b.fullname||''),'ar'));
+    const projs=[...new Set(sorted.map(e=>e.project).filter(Boolean))];
+    const regions=[...new Set(sorted.map(e=>e.region).filter(Boolean))];
+    const rows=sorted.map(e=>({e, project:e.project||'', sum:attSummaryForCols(cols,e.id), work:attWorkDays(cols,e.id), codes:cols.map(c=>attCodeAt(c.ym,e.id,c.d)||'')}));
+    const meta=[['الفترة',`${fmtDMY(first.iso)} ← ${fmtDMY(last.iso)} (${cols.length} يوم)`]];
+    if(single){ meta.unshift(['الحارس',`${sorted[0].fullname||''}${sorted[0].empcode?` (${sorted[0].empcode})`:''}`]); }
+    meta.push(['المشروع', projs.length===1?projs[0]:(projs.length?'كل المشاريع':'—')]);
+    if(regions.length===1) meta.push(['المنطقة',regions[0]]);
+    if(!single) meta.push(['عدد الحراس',String(rows.length)]);
+    meta.push(['تاريخ الإعداد',fmtDMY(todayISO())]);
+    const fileBase=`كشف_حضور_${single?(sorted[0].fullname||'حارس'):(projs.length===1?projs[0]:'كل_المشاريع')}_${isMonth?monthLabel(first.ym):fmtDMY(first.iso)+'_'+fmtDMY(last.iso)}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
+    const m={title:`كشف الحضور والانصراف — ${periodLabel}`, meta, rows, cols, single, multiProj:projs.length>1, fileBase, css:ATT_SHEET_CSS, cls:'as-paper', fit:true};
+    m.html=()=>attSheetHTML(m);
+    return m;
+  }
+  function attSheetHTML(m){
+    const nd=m.cols.length, span=4+nd+AS_SUMS.length;
+    const cross=m.cols.some(c=>c.ym!==m.cols[0].ym);
+    let h=`<div class="as-head"><div class="as-title">${escapeHtml(m.title)}</div><div class="as-meta">${m.meta.map(([k,v])=>`<span><b>${escapeHtml(k)}:</b> ${escapeHtml(v)}</span>`).join('')}</div></div>`;
+    h+=`<table class="as-table"><colgroup><col style="width:22px"><col style="width:112px"><col style="width:44px"><col style="width:52px">${m.cols.map(()=>'<col style="width:18px">').join('')}${AS_SUMS.map(()=>'<col style="width:34px">').join('')}</colgroup>`;
+    h+='<thead><tr><th>م</th><th>اسم الحارس</th><th>الكود</th><th>الوظيفة</th>'
+      + m.cols.map(c=>`<th>${c.d}${cross?`<br><span style="font-weight:400;font-size:7px">${c.ym.slice(5)}</span>`:''}</th>`).join('')
+      + AS_SUMS.map(([t])=>`<th>${t}</th>`).join('')+'</tr></thead><tbody>';
+    let lastProj=null, n=0; const totals=AS_SUMS.map(()=>0);
+    const projCount={}; m.rows.forEach(r=>{ projCount[r.project]=(projCount[r.project]||0)+1; });
+    m.rows.forEach(r=>{
+      if(m.multiProj && r.project!==lastProj){ lastProj=r.project; n=0; h+=`<tr class="as-grp"><td colspan="${span}">المشروع: ${escapeHtml(r.project||'—')} — عدد الحراس: ${projCount[r.project]}</td></tr>`; }
+      n++;
+      h+=`<tr><td>${n}</td><td class="s">${escapeHtml(r.e.fullname||'')}</td><td>${escapeHtml(r.e.empcode||'')}</td><td class="s j">${escapeHtml(r.e.jobtitle||'')}</td>`
+        + r.codes.map(k=>`<td class="d ${AS_CLS[k]||''}">${escapeHtml(k)}</td>`).join('')
+        + AS_SUMS.map(([t,k],i)=>{ const v=k===null?r.work:(r.sum[k]||0); totals[i]+=v; return `<td class="sum">${v}</td>`; }).join('')+'</tr>';
+    });
+    if(!m.single) h+=`<tr class="as-tot"><td colspan="${4+nd}">الإجمالي</td>${totals.map(v=>`<td>${v}</td>`).join('')}</tr>`;
+    h+=`<tr class="as-leg"><td colspan="${span}"><b>دليل الرموز:</b> ح = حضور &nbsp;|&nbsp; غ = غياب &nbsp;|&nbsp; ش = انكشاف &nbsp;|&nbsp; ج = جزاء &nbsp;|&nbsp; راحة &nbsp;|&nbsp; ط = تغطية &nbsp;|&nbsp; ض = إضافي &nbsp;|&nbsp; س = انسحاب &nbsp;|&nbsp; جمع &nbsp;|&nbsp; عيد &nbsp;|&nbsp; ق = تطبيق</td></tr>`;
+    h+=`<tr class="as-sign"><td colspan="${span}"><div class="as-sig"><div>إعداد<i></i></div><div>مراجعة<i></i></div><div>اعتماد<i></i></div></div></td></tr>`;
+    return h+'</tbody></table>';
+  }
+  function ensurePpStyle(){
+    if(document.getElementById('ppStyle')) return;
+    const st=document.createElement('style'); st.id='ppStyle';
+    st.textContent=PP_CSS+ATT_SHEET_CSS+`
+    .pp-overlay{position:fixed;inset:0;z-index:9999;background:#cfd8dc;display:flex;flex-direction:column;}
+    .pp-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:var(--surface,#fff);border-bottom:1px solid var(--border,#ddd);}
+    .pp-bar .pp-name{font-weight:800;margin-inline-end:auto;font-size:14px;}
+    .pp-body{flex:1;overflow:auto;padding:16px;}
+    .pp-body .pp-paper{width:1123px;margin:0 auto;box-shadow:0 8px 30px rgba(0,0,0,.35);border-radius:4px;}`;
+    document.head.appendChild(st);
+  }
+  function ppFit(ov){
+    const body=ov.querySelector('.pp-body'), paper=ov.querySelector('.pp-paper'); if(!body||!paper) return;
+    paper.style.zoom=Math.min(2,Math.max(.45,(body.clientWidth-32)/1123));
+  }
+  function openAttendanceSheet({list, cols, single}){
+    if(!list||!list.length){ showToast('لا يوجد موظفون لعرض الكشف'); return; }
+    if(!cols||!cols.length){ showToast('حدد فترة صحيحة أولاً'); return; }
+    ensurePpStyle(); closePayrollPreview();
+    const m=buildAttendanceSheetModel(list, cols, !!single);
+    const ov=document.createElement('div'); ov.className='pp-overlay'; ov.id='ppOverlay';
+    ov.innerHTML=`<div class="pp-bar"><span class="pp-name">${escapeHtml(m.title)}</span>
+      <button class="btn btn-sm btn-primary" data-pp="print">طباعة</button>
+      <button class="btn btn-sm" data-pp="pdf">تنزيل PDF</button>
+      <button class="btn btn-sm" data-pp="full">ملء الشاشة</button>
+      <button class="btn btn-sm" data-pp="close">إغلاق</button></div>
+      <div class="pp-body"><div class="pp-paper as-paper">${m.html()}</div></div>`;
+    document.body.appendChild(ov);
+    ov.querySelector('[data-pp="print"]').onclick=()=>ppPrint(m);
+    ov.querySelector('[data-pp="pdf"]').onclick=()=>ppDownloadPdf(m);
+    ov.querySelector('[data-pp="close"]').onclick=closePayrollPreview;
+    ov.querySelector('[data-pp="full"]').onclick=()=>{
+      try{ if(document.fullscreenElement) document.exitFullscreen(); else (ov.requestFullscreen||ov.webkitRequestFullscreen).call(ov); }catch(e){}
+    };
+    window.__ppResize=()=>ppFit(ov); window.addEventListener('resize',window.__ppResize); document.addEventListener('fullscreenchange',window.__ppResize);
+    ppFit(ov);
+    document.addEventListener('keydown',ppEsc);
+  }
   function ppEsc(ev){ if(ev.key==='Escape') closePayrollPreview(); }
   function openPayrollPreview({list, cols, single}){
     if(!list||!list.length){ showToast('لا يوجد موظفون لعرض المسير'); return; }
     if(!cols||!cols.length){ showToast('حدد فترة صحيحة أولاً'); return; }
-    if(!document.getElementById('ppStyle')){
-      const st=document.createElement('style'); st.id='ppStyle';
-      st.textContent=PP_CSS+`
-      .pp-overlay{position:fixed;inset:0;z-index:9999;background:rgba(10,14,18,.72);display:flex;flex-direction:column;}
-      .pp-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:var(--surface,#fff);border-bottom:1px solid var(--border,#ddd);}
-      .pp-bar .pp-name{font-weight:800;margin-inline-end:auto;font-size:14px;}
-      .pp-body{flex:1;overflow:auto;padding:16px;}
-      .pp-body .pp-paper{width:1123px;margin:0 auto;box-shadow:0 8px 30px rgba(0,0,0,.35);border-radius:4px;}`;
-      document.head.appendChild(st);
-    }
+    ensurePpStyle();
     closePayrollPreview();
     const m=buildPayrollModel(list, cols, !!single);
     const ov=document.createElement('div'); ov.className='pp-overlay'; ov.id='ppOverlay';
@@ -2788,34 +2931,71 @@
     selectEl.innerHTML = (placeholder ? `<option value="">${placeholder}</option>` : '') +
       employees.map(e=>`<option value="${e.id}">${escapeHtml(e.fullname)}</option>`).join('');
   }
-  document.querySelectorAll('.reason-chip').forEach(chip=>{
-    chip.addEventListener('click', ()=>{
-      document.getElementById('p_type').value = chip.dataset.type;
-      document.getElementById('p_days').value = chip.dataset.days;
-      if(chip.dataset.code) document.getElementById('p_code').value = chip.dataset.code;
-    });
+  function penaltyCodeForName(name){ return /انسحاب/.test(name) ? 'س' : (/غياب/.test(name) ? 'غ' : 'ج'); }
+  function selectedPenaltyEmp(){ const id=document.getElementById('p_emp')?.value; return employees.find(e=>String(e.id)===String(id)); }
+  function renderReasonChips(){
+    const box=document.getElementById('reasonPresets'); if(!box) return;
+    const emp=selectedPenaltyEmp();
+    const dl=document.getElementById('p_type_list');
+    if(!emp){ box.innerHTML='<span class="muted">اختر الموظف لعرض لائحة جزاءات مشروعه</span>'; if(dl) dl.innerHTML=''; return; }
+    const list=policyFor(emp);
+    box.innerHTML=`<span class="muted" style="align-self:center">لائحة مشروع: <b>${escapeHtml(emp.project||'—')}</b></span>`
+      + list.map((x,i)=>`<span class="reason-chip" data-i="${i}">${escapeHtml(x.name)} — ${x.fixed?('خصم '+fmt(x.amount)+' ريال'):('خصم '+x.days+' يوم')}</span>`).join('')
+      + '<span class="reason-chip" data-i="-1">أخرى</span>';
+    if(dl) dl.innerHTML=list.map(x=>`<option value="${escapeAttr(x.name)}"></option>`).join('');
+  }
+  function updatePenaltyAmount(){
+    const out=document.getElementById('p_amount'), daysEl=document.getElementById('p_days'); if(!out) return;
+    const emp=selectedPenaltyEmp(); const type=document.getElementById('p_type')?.value||'';
+    const code=document.getElementById('p_code')?.value||'ج';
+    const day=(Number(emp?.basicsalary)||0)/30;
+    const item=emp ? policyItemByName(policyFor(emp), type) : null;
+    if(item){ if(daysEl){ daysEl.value=item.fixed?'':item.days; daysEl.readOnly=true; } }
+    else if(daysEl){ daysEl.readOnly=false; }
+    if(!emp || !['غ','س','ج'].includes(code)){ out.value='—'; return; }
+    const v=item ? policyAmount(item,day) : (Number(daysEl?.value)||0)*day;
+    out.value=fmt(v)+' ريال'+(item?' (من لائحة المشروع)':'');
+  }
+  document.getElementById('reasonPresets')?.addEventListener('click', ev=>{
+    const chip=ev.target.closest('.reason-chip'); if(!chip) return;
+    const emp=selectedPenaltyEmp(); const i=Number(chip.dataset.i);
+    const item = emp && i>=0 ? policyFor(emp)[i] : null;
+    document.getElementById('p_type').value = item ? item.name : '';
+    document.getElementById('p_code').value = item ? penaltyCodeForName(item.name) : 'ج';
+    document.getElementById('p_days').value = item ? (item.fixed?'':item.days) : '';
+    updatePenaltyAmount();
   });
+  document.getElementById('p_emp')?.addEventListener('change', ()=>{ renderReasonChips(); updatePenaltyAmount(); });
+  ['p_type','p_days'].forEach(id=>document.getElementById(id)?.addEventListener('input', updatePenaltyAmount));
+  document.getElementById('p_code')?.addEventListener('change', updatePenaltyAmount);
   function penCodeText(p){
     const c = (p.code && ATT_CODES.includes(p.code)) ? p.code : (/انسحاب/.test(String(p.type||'')) ? 'س' : 'ج');
     const w = ATT_CODE_LABELS[c]||'';
     return w===c ? c : `${c} — ${w}`;
   }
   function renderPenalties(){
-    refreshEmpSelect(document.getElementById('p_emp'), null);
+    const pEmpEl=document.getElementById('p_emp'), prevEmp=pEmpEl.value;
+    refreshEmpSelect(pEmpEl, null);
+    if(prevEmp && [...pEmpEl.options].some(o=>o.value===prevEmp)) pEmpEl.value=prevEmp;
+    renderReasonChips(); updatePenaltyAmount();
     const body = document.getElementById('penaltyTableBody');
     const sorted = [...penalties].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     body.innerHTML = sorted.map(p=>{
       const emp = employees.find(e=>e.id===p.empId);
+      const pcode = penRecCode(p);
+      const recInfo = emp ? recordPolicyAmount(emp, p, pcode, (Number(emp.basicsalary)||0)/30) : {amount:0,item:null};
+      const penAmount = (emp && ['غ','س','ج'].includes(pcode)) ? recInfo.amount : 0;
       return `<tr>
         <td>${escapeHtml(emp ? emp.fullname : 'موظف محذوف')}</td>
         <td class="mono">${escapeHtml(p.date||'')}</td>
         <td><b>${escapeHtml(penCodeText(p))}</b></td>
         <td>${escapeHtml(p.type||'')}</td>
-        <td class="mono">${escapeHtml(String(p.days??''))}</td>
+        <td class="mono">${escapeHtml(String(recInfo.item ? (recInfo.item.fixed?'مقطوع':recInfo.item.days) : (p.days??'')))}</td>
+        <td class="mono">${penAmount?escapeHtml(fmt(penAmount)):'—'}</td>
         <td>${escapeHtml(p.notes||'')}</td>
         <td><button class="btn icon-btn btn-ghost btn-danger" data-del="${p.id}" title="حذف">✕</button></td>
       </tr>`;
-    }).join('') || '<tr><td colspan="7" class="empty-note">لا توجد جزاءات مسجلة.</td></tr>';
+    }).join('') || '<tr><td colspan="8" class="empty-note">لا توجد جزاءات مسجلة.</td></tr>';
     body.querySelectorAll('[data-del]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         if(confirm('هل تريد حذف هذا الجزاء؟')){
