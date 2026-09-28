@@ -2373,20 +2373,20 @@
   function initAttendanceMonthControls(){
     const hidden = document.getElementById('attMonth');
     const result = document.getElementById('attMonthResult');
-    const select = document.getElementById('attMonthSelect');
-    if(!hidden || !result || !select) return;
+    if(!hidden || !result) return;
     if(!hidden.value) hidden.value = currentMonthStr();
-    const [year, month] = hidden.value.split('-').map(Number);
-    const old = select.value;
-    select.innerHTML = ATT_MONTHS.map((name,i)=>`<option value="${i+1}">${name}</option>`).join('');
-    select.value = old || String(month);
-    result.value = monthLabel(hidden.value);
-    select.onchange = ()=>{
-      const m=String(Number(select.value)).padStart(2,'0');
-      hidden.value=`${year}-${m}`;
-      result.value=monthLabel(hidden.value);
-      renderAttendance();
-    };
+    // قائمة الأشهر: من 24 شهراً سابقاً إلى 6 أشهر قادمة + أي شهر لديه بيانات محفوظة
+    const now = new Date(), set = new Set();
+    for(let k=-24; k<=6; k++){
+      const d = new Date(now.getFullYear(), now.getMonth()+k, 1);
+      set.add(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'));
+    }
+    Object.keys(attendance||{}).forEach(k=>{ if(/^\d{4}-\d{2}$/.test(k)) set.add(k); });
+    set.add(hidden.value);
+    const list = Array.from(set).sort().reverse();
+    result.innerHTML = list.map(ym=>`<option value="${ym}">${monthLabel(ym)}</option>`).join('');
+    result.value = hidden.value;
+    result.onchange = ()=>{ hidden.value = result.value; renderAttendance(); };
   }
   function refreshAttendanceFilters(){
     const region=document.getElementById('attRegionFilter'), project=document.getElementById('attProjectFilter');
@@ -2401,6 +2401,7 @@
   function attIcon(name){
     const icons={
       edit:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z"/></svg>',
+      range:'<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 11h18"/></svg>',
       save:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4L19 6"/></svg>'
     }; return icons[name]||'';
   }
@@ -2450,34 +2451,20 @@
         <td class="sum-col" data-sum="ض" data-emp="${e.id}">${sum['ض']}</td>
         <td class="sum-col" data-sum="س" data-emp="${e.id}">${sum['س']}</td>
         <td class="sum-col" data-sum="جمع" data-emp="${e.id}">${sum['جمع']}</td>`;
-      cells += `<td><div class="att-actions">
-        <div class="att-edit-wrap">
-          <button class="icon-btn att-edit-btn" data-emp="${e.id}" title="تعديل" aria-label="تعديل">${attIcon('edit')}</button>
-          <div class="att-edit-menu">
-            <button type="button" class="att-menu-item att-daily-edit" data-emp="${e.id}">تعديل يومي</button>
-            <button type="button" class="att-menu-item att-range-edit" data-emp="${e.id}">بالتاريخ (من وإلى)</button>
-          </div>
-        </div>
-        <button class="icon-btn btn-primary att-save-btn" data-emp="${e.id}" title="حفظ" aria-label="حفظ" style="display:none">${attIcon('save')}</button>
+      cells += `<td class="act-col"><div class="att-actions">
+        <button type="button" class="btn btn-sm att-daily-edit" data-emp="${e.id}" title="تعديل يومي">${attIcon('edit')}<span>تعديل</span></button>
+        <button type="button" class="btn btn-sm att-range-edit" data-emp="${e.id}" title="تعديل بالتاريخ (من وإلى)">${attIcon('range')}<span>من - إلى</span></button>
+        <button type="button" class="btn btn-sm btn-primary att-save-btn" data-emp="${e.id}" title="حفظ" disabled>${attIcon('save')}<span>حفظ</span></button>
       </div></td>`;
       return `<tr data-att-row="${e.id}">${cells}</tr>`;
     }).join('');
 
-    body.querySelectorAll('.att-edit-btn').forEach(btn=>btn.addEventListener('click', ev=>{
-      ev.stopPropagation();
-      const menu=btn.parentElement.querySelector('.att-edit-menu');
-      closeAttendanceMenus();
-      menu.classList.toggle('open');
-    }));
     body.querySelectorAll('.att-daily-edit').forEach(btn=>btn.addEventListener('click', ()=>{
-      closeAttendanceMenus();
       const row=body.querySelector(`tr[data-att-row="${btn.dataset.emp}"]`); if(!row) return;
       row.querySelectorAll('.att-select').forEach(sel=>sel.disabled=false);
-      row.querySelector('.att-edit-btn').style.display='none';
-      row.querySelector('.att-save-btn').style.display='inline-flex';
+      row.querySelector('.att-save-btn').disabled=false;
     }));
     body.querySelectorAll('.att-range-edit').forEach(btn=>btn.addEventListener('click', ()=>{
-      closeAttendanceMenus();
       const row=body.querySelector(`tr[data-att-row="${btn.dataset.emp}"]`); if(!row) return;
       const first=prompt('أدخل تاريخ البداية داخل الشهر (مثال: 5)');
       if(first===null) return;
@@ -2485,8 +2472,7 @@
       if(last===null) return;
       const from=Math.max(1,Math.min(nDays,Number(first)||1)), to=Math.max(from,Math.min(nDays,Number(last)||from));
       row.querySelectorAll('.att-select').forEach(sel=>{ const d=Number(sel.dataset.day); if(d>=from&&d<=to) sel.disabled=false; });
-      row.querySelector('.att-edit-btn').style.display='none';
-      row.querySelector('.att-save-btn').style.display='inline-flex';
+      row.querySelector('.att-save-btn').disabled=false;
     }));
     body.querySelectorAll('.att-save-btn').forEach(btn=>btn.addEventListener('click', ()=>{
       const row=body.querySelector(`tr[data-att-row="${btn.dataset.emp}"]`); if(!row) return;
@@ -2498,7 +2484,7 @@
         if(code) attendance[ym][empId][day]=code; else delete attendance[ym][empId][day];
         sel.disabled=true;
       });
-      saveAttendance(); btn.style.display='none'; row.querySelector('.att-edit-btn').style.display='inline-flex';
+      saveAttendance(); btn.disabled=true;
       row.querySelectorAll('.sum-col').forEach(cell=>{ const k=cell.dataset.sum; cell.textContent=attSummaryFor(ym,empId)[k]||0; });
       showToast('تم حفظ الحضور للموظف');
     }));

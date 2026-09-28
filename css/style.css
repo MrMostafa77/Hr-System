@@ -2167,3 +2167,29 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 .att-select.code-جمع{background:#B9F0A8!important;color:#245E19!important;border-color:#82CF6F!important;}
 .att-select.code-عيد{background:#F6B6D5!important;color:#7A2452!important;border-color:#DE7EAD!important;}
 @media(max-width:900px){.attendance-filters{grid-template-columns:1fr 1fr;}.att-search-row{margin-top:2px;}}
+
+/* ===== الحضور والانصراف: جدول أوسع وخلايا واضحة + أزرار إجراءات متجاورة ===== */
+#view-attendance .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+#view-attendance .att-table{table-layout:auto!important;width:max-content!important;min-width:100%!important;border-collapse:separate;border-spacing:0;}
+#view-attendance .att-table th,
+#view-attendance .att-table td{padding:8px 8px!important;font-size:13px;white-space:nowrap;vertical-align:middle;}
+#view-attendance .att-table thead th{font-size:12.5px;font-weight:700;}
+#view-attendance .att-table th.name-col,
+#view-attendance .att-table td.name-col{min-width:190px!important;width:190px!important;}
+#view-attendance .att-table th:nth-child(2),#view-attendance .att-table td:nth-child(2){min-width:90px!important;width:90px!important;}
+#view-attendance .att-table th:nth-child(3),#view-attendance .att-table td:nth-child(3){min-width:120px!important;width:120px!important;}
+#view-attendance .att-table th:nth-child(4),#view-attendance .att-table td:nth-child(4){min-width:150px!important;width:150px!important;}
+/* خلايا الأيام */
+#view-attendance .att-table .att-select{width:64px!important;min-width:64px!important;height:34px!important;padding:2px 4px!important;font-size:13px!important;}
+#view-attendance .att-table td:has(> .att-select){min-width:74px;}
+/* أعمدة الملخص */
+#view-attendance .att-table .sum-col{min-width:64px!important;width:64px!important;font-size:13px!important;}
+/* عمود الإجراءات: الأزرار بجوار بعضها */
+#view-attendance .att-table th:last-child,
+#view-attendance .att-table td.act-col{min-width:300px!important;width:300px!important;}
+#view-attendance .att-actions{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;gap:6px!important;justify-content:center;align-items:center;}
+#view-attendance .att-actions .btn{display:inline-flex;align-items:center;gap:5px;height:34px;padding:0 10px!important;font-size:12px;white-space:nowrap;width:auto!important;flex:0 0 auto;}
+#view-attendance .att-actions .btn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto;}
+#view-attendance .att-actions .btn:disabled{opacity:.45;cursor:not-allowed;}
+#view-attendance .attendance-filters{grid-template-columns:1.2fr 1fr 1.3fr!important;}
+@media(max-width:900px){#view-attendance .attendance-filters{grid-template-columns:1fr!important;}}
