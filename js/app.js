@@ -3453,26 +3453,28 @@
   function empCtxAlert(msg){ showToast('⚠ تنبيه: '+msg); try{ alert('تنبيه: '+msg); }catch(_){} }
   function empCtxGo(view, after){ expandParentGroup(view); switchView(view); if(after) setTimeout(after,80); }
   const EMP_CTX = {
-    viewContract(e){
+    // عقد الموظف: لو له عقد يفتح معاينته مباشرة، وإلا يروح لإنشاء عقد له
+    contract(e){
       const c=employeeContractInfo(e.id).contract;
-      if(!c){ empCtxAlert('الموظف بدون عقد'); return; }
-      expandParentGroup('contracts'); openContractForEdit(e.id, c.id);
-    },
-    viewComm(e){
-      const r=employeeCommencementInfo(e);
-      if(!r){ empCtxAlert('الموظف بدون مباشرة'); return; }
-      openCommencementForRecord(r.id);
-    },
-    profile(e){ openProfile(e.id); },
-    makeContract(e){
+      if(c){ expandParentGroup('contracts'); openContractForEdit(e.id, c.id); setTimeout(()=>document.getElementById('contractSheet')?.scrollIntoView({behavior:'smooth',block:'start'}),120); return; }
       empCtxGo('contracts', ()=>{ const sel=document.getElementById('contract_emp'); if(sel){ sel.value=e.id; sel.dispatchEvent(new Event('change')); } });
     },
-    makeComm(e){
+    // مباشرة الموظف: نفس المنطق
+    comm(e){
+      const r=employeeCommencementInfo(e);
+      if(r){ openCommencementForRecord(r.id); return; }
       empCtxGo('commencements', ()=>{
         const ps=document.getElementById('comm_project'), es=document.getElementById('comm_employee');
         if(ps){ ps.value=e.project||''; ps.dispatchEvent(new Event('change')); }
         setTimeout(()=>{ if(es){ es.value=e.id; es.dispatchEvent(new Event('change')); } },60);
       });
+    },
+    profile(e){ openProfile(e.id); },
+    project(e){
+      const p=projects.find(x=>sameProjectName(x.name,e.project));
+      if(!e.project){ empCtxAlert('الموظف غير مسجل على مشروع'); return; }
+      if(!p){ empCtxAlert('لا يوجد مشروع محفوظ باسم «'+e.project+'»'); return; }
+      showProjectView(p);
     },
     makeAction(e){
       empCtxGo('actions', ()=>{
@@ -3485,6 +3487,12 @@
     previewAtt(e){
       renderAttendance();
       openAttendanceSheet({list:[e], cols:attColumns(), single:true});
+    },
+    previewPayroll(e){
+      const months=payrollAvailableMonths(), sel=document.getElementById('payrollMonth')?.value;
+      const ym=months.includes(sel)?sel:months[0];
+      if(!ym){ empCtxAlert('لا يوجد شهر حضور وانصراف متاح لإعداد مسير الرواتب'); return; }
+      openPayrollPreview({list:[e], cols:monthCols(ym), single:true});
     }
   };
   function empCtxShow(x, y, e){
@@ -3492,13 +3500,13 @@
     const hasContract=!!employeeContractInfo(e.id).contract;
     const hasComm=!!employeeCommencementInfo(e);
     const items=[
-      {k:'viewContract', t:'عرض عقد الموظف'},
-      {k:'viewComm', t:'عرض مباشرة الموظف'},
+      {k:'contract', t:hasContract?'عقد الموظف (معاينة)':'عقد الموظف (عمل عقد)'},
+      {k:'comm', t:hasComm?'مباشرة الموظف (معاينة)':'مباشرة الموظف (عمل مباشرة)'},
       {k:'profile', t:'عرض بيانات الموظف'},
-      ...(!hasContract?[{k:'makeContract', t:'عمل عقد'}]:[]),
-      ...(!hasComm?[{k:'makeComm', t:'عمل مباشرة'}]:[]),
+      {k:'project', t:'عرض مشروع الموظف'},
       {k:'makeAction', t:'عمل إجراء'},
-      {k:'previewAtt', t:'معاينة الحضور والانصراف'}
+      {k:'previewAtt', t:'معاينة الحضور والانصراف'},
+      {k:'previewPayroll', t:'معاينة مسير الرواتب'}
     ];
     const m=document.createElement('div'); m.id='empCtxMenu'; m.className='emp-ctx-menu'; m.setAttribute('dir','rtl');
     m.innerHTML=`<div class="emp-ctx-head">${escapeHtml(e.fullname||'الموظف')}</div>`+items.map(i=>`<button type="button" class="emp-ctx-item" data-k="${i.k}">${escapeHtml(i.t)}</button>`).join('');
@@ -3512,9 +3520,9 @@
     });
   }
   document.addEventListener('contextmenu', ev=>{
-    const tr=ev.target.closest?.('#allEmployeesTableBody tr[data-id], #empTableBody tr[data-id], #attBody tr[data-att-row], #penaltyTableBody tr[data-emp]');
+    const tr=ev.target.closest?.('#allEmployeesTableBody tr[data-id], #empTableBody tr[data-id], #attBody tr[data-att-row], #penaltyTableBody tr[data-emp], #reportTableBody tr[data-pay-row]');
     if(!tr) return;
-    const id=tr.dataset.id||tr.dataset.attRow||tr.dataset.emp;
+    const id=tr.dataset.id||tr.dataset.attRow||tr.dataset.emp||tr.dataset.payRow;
     const emp=employees.find(x=>String(x.id)===String(id)); if(!emp) return;
     ev.preventDefault(); empCtxShow(ev.clientX, ev.clientY, emp);
   });
