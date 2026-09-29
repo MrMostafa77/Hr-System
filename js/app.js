@@ -318,22 +318,34 @@
     {name:'مخالفة شرب السجائر', days:1, fixed:false, amount:0, custom:false}
   ];
   function projectPenaltyDefaults(){ return DEFAULT_PROJECT_PENALTIES.map(x=>({...x})); }
-  function projectPenaltyRow(item={}, index=0){
+  function projectPenaltyRow(item={}, index=0, editing=false){
     const fixed=!!item.fixed, days=Math.min(10,Math.max(0,Number(item.days)||0)), pct=Math.max(0,Number(item.pct)||0);
     const options=Array.from({length:21},(_,i)=>`<option value="${i/2}" ${days===i/2?'selected':''}>${i/2}</option>`).join('');
-    return `<tr class="project-penalty-row" data-index="${index}">
-      <td><input class="pp-name" value="${escapeAttr(item.name||'')}" ${item.custom?'':'readonly'}></td>
-      <td><select class="pp-days" ${fixed?'disabled':''}>${options}</select></td>
-      <td><input class="pp-pct" type="number" min="0" max="500" step="5" placeholder="0" title="نسبة إضافية من قيمة اليوم (مثال: 50 = نصف يوم إضافي)" value="${!fixed&&pct?escapeAttr(pct):''}" ${fixed?'disabled':''}></td>
-      <td><label class="project-check pp-fixed-wrap"><input type="checkbox" class="pp-fixed" ${fixed?'checked':''}><span>مبلغ مقطوع</span></label></td>
-      <td><input class="pp-amount" type="number" min="0" step="0.01" placeholder="اكتب المبلغ" value="${fixed?escapeAttr(item.amount||''):''}" ${fixed?'':'disabled'}></td>
-      <td>${item.custom?'<button type="button" class="small-btn danger pp-remove">×</button>':'<span class="muted">افتراضي</span>'}</td>
+    return `<tr class="project-penalty-row" data-index="${index}" data-custom="${item.custom?'1':'0'}" data-editing="${editing?'1':'0'}">
+      <td><input class="pp-name" value="${escapeAttr(item.name||'')}" readonly></td>
+      <td><select class="pp-days">${options}</select></td>
+      <td><input class="pp-pct" type="number" min="0" max="500" step="5" placeholder="0" title="نسبة إضافية من قيمة اليوم (مثال: 50 = نصف يوم إضافي)" value="${!fixed&&pct?escapeAttr(pct):''}"></td>
+      <td class="pp-fixed-cell"><input type="checkbox" class="pp-fixed" title="مبلغ مقطوع" ${fixed?'checked':''}></td>
+      <td><input class="pp-amount" type="number" min="0" step="0.01" placeholder="المبلغ" value="${fixed?escapeAttr(item.amount||''):''}"></td>
+      <td class="pp-actions-cell"><div class="pp-actions"><button type="button" class="small-btn pp-edit">تعديل</button><button type="button" class="small-btn pp-save">حفظ</button>${item.custom?'<button type="button" class="small-btn danger pp-remove" title="حذف">×</button>':''}</div></td>
     </tr>`;
+  }
+  // يطبّق حالة القفل/التعديل على الصف (الحقول تُفتح فقط بعد الضغط على «تعديل»)
+  function applyPenaltyRowState(row){
+    const editing=row.dataset.editing==='1', custom=row.dataset.custom==='1';
+    const fixed=!!row.querySelector('.pp-fixed')?.checked;
+    const set=(sel,dis)=>{const el=row.querySelector(sel); if(el) el.disabled=dis;};
+    const nm=row.querySelector('.pp-name'); if(nm) nm.readOnly=!(editing&&custom);
+    set('.pp-days',!editing||fixed); set('.pp-pct',!editing||fixed);
+    set('.pp-fixed',!editing); set('.pp-amount',!editing||!fixed);
+    set('.pp-edit',editing); set('.pp-save',!editing);
+    row.classList.toggle('is-editing',editing);
   }
   function renderProjectPenalties(items){
     const body=document.getElementById('projectPenaltiesBody'); if(!body)return;
     const list=Array.isArray(items)&&items.length?items:projectPenaltyDefaults();
-    body.innerHTML=list.map((x,i)=>projectPenaltyRow(x,i)).join('');
+    body.innerHTML=list.map((x,i)=>projectPenaltyRow(x,i,false)).join('');
+    body.querySelectorAll('.project-penalty-row').forEach(applyPenaltyRowState);
   }
   function getProjectPenalties(){
     return [...document.querySelectorAll('#projectPenaltiesBody .project-penalty-row')].map(row=>({
@@ -342,7 +354,7 @@
       pct:Math.min(500,Math.max(0,Number(row.querySelector('.pp-pct')?.value)||0)),
       fixed:!!row.querySelector('.pp-fixed')?.checked,
       amount:Number(row.querySelector('.pp-amount')?.value)||0,
-      custom:!row.querySelector('.pp-name')?.readOnly
+      custom:row.dataset.custom==='1'
     })).filter(x=>x.name);
   }
   function bindProjectPenalties(){
@@ -351,20 +363,28 @@
       const row=e.target.closest('.project-penalty-row'); if(!row)return;
       if(e.target.classList.contains('pp-fixed')){
         const fixed=e.target.checked;
-        const days=row.querySelector('.pp-days'), amount=row.querySelector('.pp-amount'), pctEl=row.querySelector('.pp-pct');
-        if(days)days.disabled=fixed;
-        if(pctEl){ pctEl.disabled=fixed; if(fixed) pctEl.value=''; }
-        if(amount)amount.disabled=!fixed;
-        if(!fixed && amount)amount.value='';
+        const pctEl=row.querySelector('.pp-pct'), amount=row.querySelector('.pp-amount');
+        if(fixed && pctEl) pctEl.value='';
+        if(!fixed && amount) amount.value='';
+        applyPenaltyRowState(row);
       }
     };
     body.onclick=e=>{
-      const b=e.target.closest('.pp-remove'); if(!b)return;
-      b.closest('.project-penalty-row')?.remove();
+      const row=e.target.closest('.project-penalty-row'); if(!row)return;
+      if(e.target.closest('.pp-remove')){ row.remove(); return; }
+      if(e.target.closest('.pp-edit')){ row.dataset.editing='1'; applyPenaltyRowState(row); return; }
+      if(e.target.closest('.pp-save')){
+        row.dataset.editing='0'; applyPenaltyRowState(row);
+        // مشروع محفوظ سابقًا: تُحفظ اللائحة مباشرة، وإلا تُحفظ مع زر حفظ المشروع
+        const pid=document.getElementById('projectId')?.value, p=pid&&projects.find(x=>x.id===pid);
+        if(p){ p.penaltiesPolicy=getProjectPenalties(); saveProjects(); showToast('تم حفظ المخالفة'); }
+        else showToast('تم تثبيت المخالفة — تُحفظ اللائحة مع حفظ المشروع');
+      }
     };
     document.getElementById('addProjectPenaltyBtn')?.addEventListener('click',()=>{
       const index=body.querySelectorAll('.project-penalty-row').length;
-      body.insertAdjacentHTML('beforeend',projectPenaltyRow({name:'مخالفة أخرى',days:1,pct:0,fixed:false,amount:0,custom:true},index));
+      body.insertAdjacentHTML('beforeend',projectPenaltyRow({name:'مخالفة أخرى',days:1,pct:0,fixed:false,amount:0,custom:true},index,true));
+      const row=body.lastElementChild; applyPenaltyRowState(row); row.querySelector('.pp-name')?.focus();
     });
   }
   renderProjectPenalties();
@@ -1571,7 +1591,7 @@
   };
 
   const formFields = ['firstname','fathername','grandname','familyname','fullname','idnum','nationality','dob','gender','iddate_issue','iddate_expiry','idplace',
-    'phone','email','address','emname','emphone','empcode','jobtitle','dept','startdate','region','project','basicsalary','housingPct','housing','transportPct','transport','otherallowPct','otherallow','otherded','bankname','iban','accountno','bankcode','bankAccountType','delegate_name','delegate_memo','lastwage','idphoto'];
+    'phone','email','address','emname','emphone','empcode','jobtitle','dept','startdate','region','project','basicsalary','housingPct','housing','transportPct','transport','otherallowPct','otherallow','otherded','bankname','iban','accountno','bankcode','bankAccountType','delegate_name','delegate_memo','lastwage'];
 
   function fillNationalityAndIssueRegion(){
     const n=document.getElementById('f_nationality');
@@ -1638,9 +1658,27 @@
     if(region && (force || !el.value)) el.value=nextEmployeeCode(region,'');
   }
   function syncStartDateAction(){
-    const date=document.getElementById('f_startdate'), btn=document.getElementById('addStartDateBtn');
+    const date=document.getElementById('f_startdate'), btn=document.getElementById('addStartDateBtn'), none=document.getElementById('f_startdate_none');
     if(!date||!btn) return;
-    btn.style.display=date.value?'none':'inline-flex';
+    const has=!!date.value;
+    date.style.display=has?'':'none'; if(none) none.style.display=has?'none':'';
+    btn.style.display=has?'none':'inline-flex';
+    updateEmpAge();
+  }
+  // العمر التلقائي بجانب تاريخ الميلاد
+  function updateEmpAge(){
+    const dob=document.getElementById('f_dob')?.value, out=document.getElementById('f_age'); if(!out) return;
+    const b=dob?new Date(dob+'T00:00:00'):null, t=new Date();
+    if(!b||isNaN(b)||b>t){ out.value=''; return; }
+    let y=t.getFullYear()-b.getFullYear(), m=t.getMonth()-b.getMonth();
+    if(t.getDate()<b.getDate()) m--;
+    if(m<0){ y--; m+=12; }
+    out.value=y+' سنة'+(m?' و '+m+' شهر':'');
+  }
+  // تاريخ المباشرة الفعلي للموظف من سجل المباشرات (أحدث تاريخ)
+  function commencementDateForEmployee(id){
+    const list=(commencements||[]).filter(x=>String(x.empId)===String(id)&&x.startDate).sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate)));
+    return list[0]?.startDate||'';
   }
   function validateSaudiIBAN(value){
     const iban=String(value||'').replace(/\s+/g,'').toUpperCase();
@@ -1816,18 +1854,10 @@
   document.getElementById('delegateMemoBtn')?.addEventListener('click',()=>document.getElementById('f_delegate_memo')?.click());
   document.getElementById('f_delegate_memo')?.addEventListener('change',e=>{ const f=e.target.files?.[0]; if(!f)return; if(f.size>5*1024*1024){showToast('حجم مذكرة التفويض يجب ألا يتجاوز 5 ميجابايت.');return;} const r=new FileReader(); r.onload=()=>{e.target.dataset.value=r.result; const n=document.getElementById('delegateMemoName'); if(n)n.textContent=f.name;}; r.readAsDataURL(f); });
   document.getElementById('delegationNotesBtn')?.addEventListener('click',()=>showToast('سيتم ربط هذا الزر بتبويب مذكرات التفويض عند إضافته.'));
-  document.getElementById('idPhotoBtn')?.addEventListener('click',()=>document.getElementById('f_idphoto')?.click());
-  document.getElementById('f_idphoto')?.addEventListener('change',e=>{
-    const file=e.target.files?.[0]; if(!file) return;
-    if(!file.type.startsWith('image/')){ showToast('يرجى اختيار صورة هوية فقط.'); return; }
-    if(file.size>3*1024*1024){ showToast('حجم صورة الهوية يجب ألا يتجاوز 3 ميجابايت.'); return; }
-    const reader=new FileReader(); reader.onload=()=>{
-      const hidden=document.getElementById('f_idphoto'); hidden.dataset.value=reader.result;
-      const n=document.getElementById('idPhotoName'); if(n) n.textContent=file.name;
-    }; reader.readAsDataURL(file);
-  });
   document.getElementById('addStartDateBtn')?.addEventListener('click',()=>showToast('سيتم ربط إضافة تاريخ المباشرة بتبويب «تاريخ المباشرة» عند إنشائه.'));
   document.getElementById('f_startdate')?.addEventListener('change',syncStartDateAction);
+  document.getElementById('f_dob')?.addEventListener('input',updateEmpAge);
+  document.getElementById('f_dob')?.addEventListener('change',updateEmpAge);
 
   document.querySelectorAll('.tab').forEach(tab=>{
     tab.addEventListener('click', ()=>{
@@ -2044,6 +2074,7 @@
     pendingEmployeeFiles={};
     document.getElementById('f_id').value = '';
     formFields.forEach(f=>{ const el = document.getElementById('f_'+f); if(el) el.value = ''; });
+    syncStartDateAction();
     const statusEl=document.getElementById('f_contractstatus_display'); if(statusEl) statusEl.value='بدون عقد';
     const housingPct=document.getElementById('f_housing_pct'), transportPct=document.getElementById('f_transport_pct'), otherPct=document.getElementById('f_otherallow_pct');
     if(housingPct) housingPct.value='25'; if(transportPct) transportPct.value='38.5'; if(otherPct) otherPct.value='0'; const payHint=document.getElementById('payAutoHint'); if(payHint) payHint.hidden=true;
@@ -2068,6 +2099,7 @@
     syncAllowancePercentagesFromData();
     document.getElementById('formTitle').textContent = 'تعديل بيانات: ' + (e.fullname||'');
     refreshDepartmentJobSelects(e.dept||'', e.jobtitle||''); fillNationalityAndIssueRegion(); refreshEmployeeProjectSelect(e.region||''); const projectEl=document.getElementById('f_project'); if(projectEl) projectEl.value=e.project||''; composeFullName(); updateBankFromIBAN();
+    { const sd=document.getElementById('f_startdate'); if(sd && !sd.value) sd.value=commencementDateForEmployee(e.id); }
     syncStartDateAction();
     pendingEmployeeFiles={};
     loadIbansIntoForm(e);
@@ -2259,7 +2291,7 @@
     data.housing=allowanceAmount(data.basicsalary,data.housingPct);
     data.transport=allowanceAmount(data.basicsalary,data.transportPct);
     data.otherallow=allowanceAmount(data.basicsalary,data.otherallowPct);
-    data.idphoto=document.getElementById('f_idphoto')?.dataset.value || data.idphoto || '';
+    data.idphoto=data.idphoto||'';
     data.bankAccountType=document.querySelector('input[name=bankAccountType]:checked')?.value || data.bankAccountType || 'حساب شخصي';
     data.delegate_name=document.getElementById('f_delegate_name')?.value||'';
     const dm=document.getElementById('f_delegate_memo'); data.delegate_memo=dm?.dataset.value||data.delegate_memo||''; data.delegate_memo_name=dm?.files?.[0]?.name || data.delegate_memo_name || '';
@@ -2429,12 +2461,12 @@
     return Math.min(30, coded);
   }
   function payrollAdjustmentFor(ym, empId){
-    return (payrollRecords?.[ym]?.[empId]) || {bonus:0,uniform:0,newspaper:0,advance:0,internalAction:'',note:''};
+    return (payrollRecords?.[ym]?.[empId]) || {bonus:0,uniform:0,newspaper:0,advance:0,other:0,internalAction:'',note:''};
   }
   function updatePayrollField(empId,field,value){
     const ym=document.getElementById('payrollMonth')?.value; if(!ym)return;
     if(!payrollRecords[ym]) payrollRecords[ym]={};
-    payrollRecords[ym][empId]={...payrollAdjustmentFor(ym,empId),[field]:(['bonus','uniform','newspaper','advance'].includes(field)?(Number(value)||0):value)};
+    payrollRecords[ym][empId]={...payrollAdjustmentFor(ym,empId),[field]:(['bonus','uniform','newspaper','advance','other'].includes(field)?(Number(value)||0):value)};
     persistCloud(); renderReports();
   }
   function payrollAvailableMonths(){
@@ -2456,10 +2488,11 @@
     const absenceDays=ded.absenceCount+(sum['ش']||0), absence=r2(ded.absence+(sum['ش']||0)*day);
     const project=projects.find(p=>String(p.name||'')===String(e.project||''));
     const insuranceBase=basic+housing;
-    const gosi=project?.socialInsurance ? insuranceBase*(Number(project.socialInsuranceRate)||0)/100 : 0;
-    const uniform=Number(a.uniform)||0,newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0;
-    const deduction=nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance;
-    return {ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,deduction,net:totalEarned-deduction,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
+    // التأمينات الاجتماعية: حصة الموظف فقط من (الأساسي + السكن)، وتُخصم إذا كانت مفعّلة في المشروع
+    const gosi=project?.siEnabled ? r2(insuranceBase*(Number(project.siGuardRate)||SI_GUARD_RATE)/100) : 0;
+    const uniform=Number(a.uniform)||0,newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0,other=Number(a.other)||0;
+    const deduction=nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance+other;
+    return {ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,other,deduction,net:totalEarned-deduction,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
   }
   function payrollStatementFor(e){
     const ym=document.getElementById('payrollMonth')?.value||payrollAvailableMonths()[0]||currentMonthStr();
@@ -2485,7 +2518,7 @@
     if(projectMode){renderProjects();renderProjectCapacity();return;}
     refreshPayrollMonthOptions();refreshPayrollFilters();
     const ym=document.getElementById('payrollMonth')?.value,body=document.getElementById('reportTableBody'); if(!body)return;
-    if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="24" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
+    if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="25" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(), pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
     const list=employees.filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
     document.getElementById('payrollCount').textContent=`${list.length} موظف`;
@@ -2493,18 +2526,19 @@
       const p=payrollStatementForCols(e,monthCols(ym)),a=p.adjustment||{},action=a.internalAction||'';
       const red=v=>Number(v)>0?' style="color:#b42318;font-weight:700"':'';
       return `<tr data-pay-row="${escapeAttr(e.id)}">
-      <td class="mono">${i+1}</td><td><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td>${escapeHtml(e.region||e.project||'—')}</td><td>${escapeHtml(e.jobtitle||'—')}</td>
-      <td class="mono">${fmt(p.day)}</td><td class="mono">${fmt(p.basic)}</td><td class="mono">${fmt(p.housing)}</td><td class="mono">${fmt(p.transport)}</td><td class="mono">${fmt(p.otherAllow)}</td><td class="mono">${fmt(p.monthlyGross)}</td>
-      <td class="mono">${fmt(p.overtime)}</td><td class="pay-input-cell"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}"></td><td class="mono">${fmt(p.totalEarned)}</td>
-      <td class="mono" ${red(p.nonWorkDed)}>${fmt(p.nonWorkDed)}${p.nonWorkDays?`<small class="pay-red-note">${p.nonWorkDays} يوم</small>`:''}</td><td class="mono">${fmt(p.gosi)}</td>
-      <td class="mono" ${red(p.absence)}>${fmt(p.absence)}${p.absenceDays?`<small class="pay-red-note">${p.absenceDays} يوم</small>`:''}</td><td class="mono">${fmt(p.penalty)}</td><td class="mono">${fmt(p.withdrawal)}</td>
-      <td class="pay-input-cell"><input type="number" min="0" step=".01" data-pay-field="uniform" data-emp="${escapeAttr(e.id)}" value="${Number(a.uniform)||0}"></td>
-      <td class="pay-input-cell"><input type="number" min="0" step=".01" data-pay-field="newspaper" data-emp="${escapeAttr(e.id)}" value="${Number(a.newspaper)||0}"></td>
-      <td class="pay-input-cell"><input type="number" min="0" step=".01" data-pay-field="advance" data-emp="${escapeAttr(e.id)}" value="${Number(a.advance)||0}"></td>
-      <td class="mono" ${red(p.deduction)}>${fmt(p.deduction)}</td><td class="mono" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
-      <td><select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}"><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
+      <td class="mono g1 st1">${i+1}</td><td class="g1 st2"><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td class="g1">${escapeHtml(e.region||e.project||'—')}</td><td class="g1">${escapeHtml(e.jobtitle||'—')}</td>
+      <td class="mono g2">${fmt(p.day)}</td><td class="mono g2">${fmt(p.basic)}</td><td class="mono g2">${fmt(p.housing)}</td><td class="mono g2">${fmt(p.transport)}</td><td class="mono g2">${fmt(p.otherAllow)}</td><td class="mono g2 tot">${fmt(p.monthlyGross)}</td>
+      <td class="mono g2">${fmt(p.overtime)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}"></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
+      <td class="mono g3" ${red(p.nonWorkDed)}>${fmt(p.nonWorkDed)}${p.nonWorkDays?`<small class="pay-red-note">${p.nonWorkDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.gosi)}</td>
+      <td class="mono g3" ${red(p.absence)}>${fmt(p.absence)}${p.absenceDays?`<small class="pay-red-note">${p.absenceDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.penalty)}</td><td class="mono g3">${fmt(p.withdrawal)}</td>
+      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="uniform" data-emp="${escapeAttr(e.id)}" value="${Number(a.uniform)||0}"></td>
+      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="newspaper" data-emp="${escapeAttr(e.id)}" value="${Number(a.newspaper)||0}"></td>
+      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="advance" data-emp="${escapeAttr(e.id)}" value="${Number(a.advance)||0}"></td>
+      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="other" data-emp="${escapeAttr(e.id)}" value="${Number(a.other)||0}"></td>
+      <td class="mono g3 tot" ${red(p.deduction)}>${fmt(p.deduction)}</td><td class="mono g4 tot" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
+      <td class="g5"><select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}"><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
       </tr>`;
-    }).join('')||'<tr><td colspan="24" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
+    }).join('')||'<tr><td colspan="25" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
   }
   const payrollMonth=document.getElementById('payrollMonth'); if(payrollMonth)payrollMonth.addEventListener('change',renderReports);
@@ -2879,7 +2913,14 @@
   .pp-table td.s{text-align:right}
   .pp-table td.b{font-weight:700}
   .pp-table tfoot td{background:#eef3f4;font-weight:800}
-  .pp-table td.net{font-weight:800;background:#eaf6ef}`;
+  .pp-table td.net{font-weight:800}
+  .pp-table{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pp-table tr.g th.pg1{background:linear-gradient(180deg,#b9cfe8,#a3bedd)}.pp-table tr.g th.pg2{background:linear-gradient(180deg,#a9dccf,#8fcdbd)}.pp-table tr.g th.pg3{background:linear-gradient(180deg,#f2bba9,#e9a48e)}.pp-table tr.g th.pg4{background:linear-gradient(180deg,#a8dcb3,#8ecf9c)}.pp-table tr.g th.pg5{background:linear-gradient(180deg,#d3d5df,#bfc2d0)}
+  .pp-table th.pg1{background:#d5e3f3}.pp-table th.pg2{background:#cfeae2}.pp-table th.pg3{background:#f8d8cd}.pp-table th.pg4{background:#cdebd4}.pp-table th.pg5{background:#e4e5ec}
+  .pp-table td.pg1{background:#e4eef9}.pp-table td.pg2{background:#dff1ec}.pp-table td.pg3{background:#fbe6de}.pp-table td.pg4{background:#e0f2e4}.pp-table td.pg5{background:#efeff4}
+  .pp-table th.ptot,.pp-table td.ptot{background:#fff !important;background-image:none}
+  .pp-table th.ptot.pg2,.pp-table td.ptot.pg2{background:#f4fbf8 !important}.pp-table th.ptot.pg3,.pp-table td.ptot.pg3{background:#fdf4f0 !important}.pp-table th.ptot.pg4,.pp-table td.ptot.pg4{background:#f3fbf5 !important}
+  .pp-table tfoot td.pg1,.pp-table tfoot td.pg2,.pp-table tfoot td.pg3,.pp-table tfoot td.pg4,.pp-table tfoot td.pg5{font-weight:800}`;
   const ATT_SHEET_CSS = `
   .as-paper{color:#111 !important;background:#fff !important}
   .as-paper .as-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:2.5px solid #1f4e5a;padding-bottom:8px;margin-bottom:10px}
@@ -2930,13 +2971,13 @@
   .ac-paper .ac-sign i{display:block;margin-top:44px;border-top:1px solid #444}`;
   const AS_CLS={'ح':'h','غ':'a','ج':'p','س':'w','راحة':'r','ط':'c','ض':'o','عيد':'e'};
   const AS_SUMS=[['الدوام',null],['حضور','ح'],['غياب','غ'],['تغطية','ط'],['جزاء','ج'],['راحات','راحة'],['إضافي','ض'],['انسحاب','س'],['جمع','جمع']];
-  const PP_GROUPS=[['بيانات الموظف',4],['المستحقات (ريال)',9],['الخصومات (ريال)',9],['الصافي',1],['الإجراء الداخلي',1]];
+  const PP_GROUPS=[['بيانات الموظف',4],['المستحقات (ريال)',9],['الخصومات (ريال)',10],['الصافي',1],['الإجراء الداخلي',1]];
   const PP_COLS=[
     {h:'م',k:r=>r.i,t:'i'},{h:'الاسم',k:r=>r.name,t:'s',w:25},{h:'الموقع',k:r=>r.location,t:'s',w:16},{h:'الوظيفة',k:r=>r.job,t:'s',w:16},
     {h:'اليوم',k:r=>r.p.day,t:'n'},{h:'الأساسي',k:r=>r.p.basic,t:'n',sum:1},{h:'بدل السكن',k:r=>r.p.housing,t:'n',sum:1},{h:'بدل المواصلات',k:r=>r.p.transport,t:'n',sum:1},{h:'بدلات أخرى',k:r=>r.p.otherAllow,t:'n',sum:1},
-    {h:'إجمالي الراتب',k:r=>r.p.monthlyGross,t:'n',sum:1,b:1},{h:'إضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'مكافآت',k:r=>r.p.bonus,t:'n',sum:1},{h:'إجمالي الراتب بعد الإضافي والمكافآت',k:r=>r.p.totalEarned,t:'n',sum:1,b:1},
+    {h:'الأجر الأخير',k:r=>r.p.monthlyGross,t:'n',sum:1,b:1,tot:1},{h:'إضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'مكافآت',k:r=>r.p.bonus,t:'n',sum:1},{h:'إجمالي الراتب',k:r=>r.p.totalEarned,t:'n',sum:1,b:1,tot:1},
     {h:'خصم عدم دوام',k:r=>r.p.nonWorkDed,t:'n',sum:1},{h:'تأمينات اجتماعية',k:r=>r.p.gosi,t:'n',sum:1},{h:'غيابات',k:r=>r.p.absence,t:'n',sum:1},{h:'جزاءات',k:r=>r.p.penalty,t:'n',sum:1},{h:'انسحاب',k:r=>r.p.withdrawal,t:'n',sum:1},
-    {h:'البدلة',k:r=>r.p.uniform,t:'n',sum:1},{h:'الصحيفة',k:r=>r.p.newspaper,t:'n',sum:1},{h:'سلف',k:r=>r.p.advance,t:'n',sum:1},{h:'إجمالي الخصومات',k:r=>r.p.deduction,t:'n',sum:1,b:1},{h:'صافي الراتب',k:r=>r.p.net,t:'n',sum:1,b:1,net:1},
+    {h:'البدلة',k:r=>r.p.uniform,t:'n',sum:1},{h:'الصحيفة',k:r=>r.p.newspaper,t:'n',sum:1},{h:'سلف',k:r=>r.p.advance,t:'n',sum:1},{h:'أخرى',k:r=>r.p.other,t:'n',sum:1},{h:'إجمالي الخصومات',k:r=>r.p.deduction,t:'n',sum:1,b:1,tot:1},{h:'صافي الراتب',k:r=>r.p.net,t:'n',sum:1,b:1,net:1,tot:1},
     {h:'إجراء داخلي',k:r=>r.p.adjustment?.internalAction||'',t:'s',w:22}
   ];
   function ppNf(n){return(Math.round((Number(n)||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});}
@@ -2950,13 +2991,16 @@
     const fileBase=`مسير_${single?(list[0].fullname||'موظف'):(projs.length===1?projs[0]:'كل_المشاريع')}_${isMonth?monthLabel(first.ym):fmtDMY(first.iso)+'_'+fmtDMY(last.iso)}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
     return {title,sub,rows,totals,single,fileBase};
   }
+  // رقم مجموعة اللون لكل عمود (تدرج لوني حسب أقسام الجدول)
+  function ppColGroups(){ const g=[]; PP_GROUPS.forEach(([t,n],gi)=>{ for(let k=0;k<n;k++) g.push(gi+1); }); return g; }
   function ppPaperHTML(m){
+    const cg=ppColGroups();
     let h=`<div class="pp-title">${escapeHtml(m.title)}</div><div class="pp-sub">${escapeHtml(m.sub)}</div><table class="pp-table"><thead><tr class="g">`;
-    PP_GROUPS.forEach(([t,n])=>{ h+=`<th colspan="${n}">${escapeHtml(t)}</th>`; });
-    h+='</tr><tr>'+PP_COLS.map(c=>`<th>${escapeHtml(c.h)}</th>`).join('')+'</tr></thead><tbody>';
-    m.rows.forEach(r=>{ h+='<tr>'+PP_COLS.map(c=>`<td class="${c.t==='s'?'s ':''}${c.b?'b ':''}${c.net?'net':''}">${escapeHtml(ppFmt(c,c.k(r)))}</td>`).join('')+'</tr>'; });
+    PP_GROUPS.forEach(([t,n],gi)=>{ h+=`<th class="pg${gi+1}" colspan="${n}">${escapeHtml(t)}</th>`; });
+    h+='</tr><tr>'+PP_COLS.map((c,i)=>`<th class="pg${cg[i]}${c.tot?' ptot':''}">${escapeHtml(c.h)}</th>`).join('')+'</tr></thead><tbody>';
+    m.rows.forEach(r=>{ h+='<tr>'+PP_COLS.map((c,i)=>`<td class="pg${cg[i]} ${c.t==='s'?'s ':''}${c.b?'b ':''}${c.tot?'ptot ':''}${c.net?'net':''}">${escapeHtml(ppFmt(c,c.k(r)))}</td>`).join('')+'</tr>'; });
     if(!m.single){
-      h+='</tbody><tfoot><tr><td colspan="5">الإجمالي</td>'+PP_COLS.slice(5).map((c,i)=>`<td>${m.totals[i+5]==null?'':escapeHtml(ppFmt(c,m.totals[i+5]))}</td>`).join('')+'</tr></tfoot></table>';
+      h+='</tbody><tfoot><tr><td colspan="5">الإجمالي</td>'+PP_COLS.slice(5).map((c,i)=>`<td class="pg${cg[i+5]}${c.tot?' ptot':''}">${m.totals[i+5]==null?'':escapeHtml(ppFmt(c,m.totals[i+5]))}</td>`).join('')+'</tr></tfoot></table>';
     } else h+='</tbody></table>';
     return h;
   }
@@ -3090,17 +3134,17 @@
     if(document.getElementById('ppStyle')) return;
     const st=document.createElement('style'); st.id='ppStyle';
     st.textContent=PP_CSS+ATT_SHEET_CSS+ACT_SHEET_CSS+`
-    .pp-overlay{position:fixed;inset:0;z-index:9999;background:#cfd8dc;display:flex;flex-direction:column;}
+    .pp-overlay{position:fixed;top:0;right:0;bottom:0;left:0;width:100vw;height:100vh;z-index:99999;background:#cfd8dc;display:flex;flex-direction:column;}
     .pp-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;background:var(--surface,#fff);border-bottom:1px solid var(--border,#ddd);}
     .pp-bar .pp-name{font-weight:800;margin-inline-end:auto;font-size:14px;}
-    .pp-body{flex:1;overflow:auto;padding:16px;}
+    .pp-body{flex:1;overflow:auto;padding:8px;}
     .pp-body .pp-paper{width:1123px;margin:0 auto;box-shadow:0 8px 30px rgba(0,0,0,.35);border-radius:4px;}`;
     document.head.appendChild(st);
   }
   function ppFit(ov){
     const body=ov.querySelector('.pp-body'), paper=ov.querySelector('.pp-paper'); if(!body||!paper) return;
     const W=Number(paper.dataset.w)||1123;
-    paper.style.zoom=Math.min(2,Math.max(.45,(body.clientWidth-32)/W));
+    paper.style.zoom=Math.min(2.4,Math.max(.45,(body.clientWidth-16)/W));
   }
   function openAttendanceSheet({list, cols, single}){
     if(!list||!list.length){ showToast('لا يوجد موظفون لعرض الكشف'); return; }
@@ -3137,6 +3181,7 @@
       <button class="btn btn-sm btn-primary" data-pp="print">طباعة</button>
       <button class="btn btn-sm" data-pp="pdf">تنزيل PDF</button>
       <button class="btn btn-sm" data-pp="xlsx">تنزيل Excel</button>
+      <button class="btn btn-sm" data-pp="full">ملء الشاشة</button>
       <button class="btn btn-sm" data-pp="close">إغلاق</button></div>
       <div class="pp-body"><div class="pp-paper">${ppPaperHTML(m)}</div></div>`;
     document.body.appendChild(ov);
@@ -3144,6 +3189,12 @@
     ov.querySelector('[data-pp="pdf"]').onclick=()=>ppDownloadPdf(m);
     ov.querySelector('[data-pp="xlsx"]').onclick=()=>ppDownloadXlsx(m);
     ov.querySelector('[data-pp="close"]').onclick=closePayrollPreview;
+    ov.querySelector('[data-pp="full"]').onclick=()=>{
+      try{ if(document.fullscreenElement) document.exitFullscreen(); else (ov.requestFullscreen||ov.webkitRequestFullscreen).call(ov); }catch(e){}
+    };
+    // المسير يملأ عرض الشاشة كاملًا ويُعاد ضبطه عند تغيير الحجم أو ملء الشاشة
+    window.__ppResize=()=>ppFit(ov); window.addEventListener('resize',window.__ppResize); document.addEventListener('fullscreenchange',window.__ppResize);
+    ppFit(ov);
     document.addEventListener('keydown',ppEsc);
   }
 

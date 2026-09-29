@@ -452,10 +452,9 @@
             <div class="personal-identity-row">
               <div class="field id-field-compact"><label>رقم الهوية / الإقامة <span class="req">*</span></label><input type="text" id="f_idnum" class="mono" inputmode="numeric" maxlength="10" pattern="\d{10}" required></div>
               <div class="field nationality-field-compact"><label>الجنسية <span class="req">*</span></label><select id="f_nationality" required><option value="">اختر الجنسية</option></select></div>
-              <div class="field id-photo-compact"><label>صورة الهوية</label><button type="button" class="btn btn-sm id-photo-btn" id="idPhotoBtn">تحميل الصورة</button><input type="file" id="f_idphoto" accept="image/*" hidden><div class="id-photo-name" id="idPhotoName"></div></div>
               <div class="field gender-field"><label>الجنس</label><select id="f_gender"><option value="">اختر</option><option>ذكر</option><option>أنثى</option></select></div>
             </div>
-            <div class="field"><label>تاريخ الميلاد</label><input type="date" id="f_dob"></div>
+            <div class="field"><label>تاريخ الميلاد</label><div class="derived-action-row dob-age-row"><input type="date" id="f_dob"><input type="text" id="f_age" class="derived-field age-badge" readonly tabindex="-1" placeholder="العمر" title="العمر يُحسب تلقائيًا"></div></div>
             <div class="field"><label>تاريخ إصدار الهوية</label><input type="date" id="f_iddate_issue"></div>
             <div class="field"><label>تاريخ انتهاء الهوية</label><input type="date" id="f_iddate_expiry"></div>
             <div class="field"><label>مكان الإصدار <span class="req">*</span></label><select id="f_idplace" required><option value="">اختر المنطقة</option></select></div>
@@ -472,7 +471,7 @@
             <div class="field"><label>الرقم الوظيفي / كود الموظف</label><input type="text" id="f_empcode" class="mono" readonly placeholder="يُنشأ تلقائياً"></div>
             <div class="field"><label>القسم / الإدارة <span class="req">*</span></label><div class="inline-control"><select id="f_dept" required><option value="">اختر القسم / الإدارة</option></select><button type="button" class="btn btn-sm" id="addDepartmentFromEmployeeBtn" title="إضافة قسم جديد">+</button></div></div>
             <div class="field"><label>المسمى الوظيفي <span class="req">*</span></label><select id="f_jobtitle" required><option value="">اختر الوظيفة</option></select></div>
-            <div class="field start-date-field"><label>تاريخ المباشرة</label><div class="derived-action-row"><input type="date" id="f_startdate" readonly><button type="button" class="btn btn-sm" id="addStartDateBtn">إضافة تاريخ مباشرة</button></div></div>
+            <div class="field start-date-field"><label>تاريخ المباشرة</label><div class="derived-action-row"><input type="date" id="f_startdate" readonly><input type="text" id="f_startdate_none" class="derived-field" readonly tabindex="-1" value="ليس لديه تاريخ مباشرة" style="display:none"><button type="button" class="btn btn-sm" id="addStartDateBtn">إضافة تاريخ مباشرة</button></div></div>
             <div class="field"><label>حالة العقد</label><input type="text" id="f_contractstatus_display" readonly class="derived-field" value="بدون عقد"></div>
             <div class="field"><label>المنطقة / المدينة</label><select id="f_region"></select></div>
             <div class="field"><label>المشروع</label><select id="f_project"></select></div>
@@ -979,7 +978,7 @@
         </div>
         <div class="payroll-info-note">تظهر هنا فقط الأشهر التي يوجد لها حضور وانصراف محفوظ؛ عند إضافة شهر جديد للحضور يظهر تلقائيًا في قائمة الرواتب.</div>
         <div class="table-wrap"><table class="payroll-table payroll-statement-table">
-          <thead><tr><th>م</th><th>الاسم</th><th>الموقع</th><th>الوظيفة</th><th>اليوم</th><th>الأساسي</th><th>بدل سكن</th><th>بدل مواصلات</th><th>بدلات أخرى</th><th>إجمالي الراتب</th><th>إضافي</th><th>مكافآت</th><th>إجمالي الراتب بعد الإضافي والمكافآت</th><th>خصم عدم دوام</th><th>تأمينات اجتماعية</th><th>غيابات</th><th>جزاءات</th><th>انسحاب</th><th>البدلة</th><th>الصحيفة</th><th>سلف</th><th>إجمالي الخصومات</th><th>صافي الراتب</th><th>إجراء داخلي للرواتب</th></tr></thead>
+          <thead><tr class="pay-group-row"><th class="gh g1" colspan="4">بيانات الموظف</th><th class="gh g2" colspan="9">المستحقات</th><th class="gh g3" colspan="10">الخصومات</th><th class="gh g4">الصافي</th><th class="gh g5">الإجراء</th></tr><tr><th class="g1 st1">م</th><th class="g1 st2">الاسم</th><th class="g1">الموقع</th><th class="g1">الوظيفة</th><th class="g2">اليوم</th><th class="g2">الأساسي</th><th class="g2">بدل سكن</th><th class="g2">بدل مواصلات</th><th class="g2">بدلات أخرى</th><th class="g2 tot">الأجر الأخير</th><th class="g2">إضافي</th><th class="g2">مكافآت</th><th class="g2 tot">إجمالي الراتب</th><th class="g3">خصم عدم دوام</th><th class="g3">تأمينات اجتماعية<small class="th-note">حصة الموظف من الأساسي + السكن</small></th><th class="g3">غيابات</th><th class="g3">جزاءات</th><th class="g3">انسحاب</th><th class="g3">البدلة</th><th class="g3">الصحيفة</th><th class="g3">سلف</th><th class="g3">أخرى</th><th class="g3 tot">إجمالي الخصومات</th><th class="g4 tot">صافي الراتب</th><th class="g5">إجراء داخلي للرواتب</th></tr></thead>
           <tbody id="reportTableBody"></tbody>
         </table></div>
       </div>

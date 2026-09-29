@@ -2048,14 +2048,19 @@ html[data-theme="light"] .floating-action::after{background:#12345E;color:#fff}
 
 /* ===== لائحة الجزاءات والخصومات للمشروع ===== */
 .project-penalties-table-wrap{overflow-x:auto;margin-top:4px}
-.project-penalties-table{width:100%;min-width:760px}
+.project-penalties-table{width:100%;min-width:640px}
 .project-penalties-table th,.project-penalties-table td{vertical-align:middle}
 .project-penalties-table .pp-name{width:100%;min-width:220px}
-.project-penalties-table .pp-days{width:100%;min-width:90px}
-.project-penalties-table .pp-amount{width:100%;min-width:150px}
+.project-penalties-table .pp-days{width:74px;min-width:0;margin:0 auto;display:block;text-align:center}
+.project-penalties-table .pp-amount{width:92px;min-width:0;margin:0 auto;display:block;text-align:center}
+.project-penalties-table .pp-pct{width:84px;min-width:0;margin:0 auto;display:block;text-align:center}
 .project-penalties-table input,.project-penalties-table select{box-sizing:border-box}
 .project-penalties-table input:disabled,.project-penalties-table select:disabled{opacity:.58;cursor:not-allowed;background:var(--surface-2,var(--surface))}
-.pp-fixed-wrap{justify-content:center;white-space:nowrap}
+.project-penalties-table th,.project-penalties-table td:not(:first-child){text-align:center}
+.pp-fixed-cell{text-align:center}.pp-fixed-cell .pp-fixed{width:18px;height:18px;accent-color:var(--teal);cursor:pointer;vertical-align:middle}.pp-fixed-cell .pp-fixed:disabled{cursor:not-allowed}
+.pp-actions{display:flex;gap:5px;justify-content:center;align-items:center;white-space:nowrap}
+.pp-actions .small-btn{min-width:52px}.pp-actions .small-btn:disabled{opacity:.45;cursor:not-allowed}
+.project-penalty-row.is-editing td{background:var(--teal-soft)}
 .project-penalties-actions{display:flex;justify-content:flex-start;margin-top:12px}
 @media(max-width:700px){.project-penalties-table{min-width:680px}}
 .all-employees-table td,.all-employees-table th{vertical-align:middle;white-space:nowrap}.all-employees-table .row-actions{justify-content:center}.all-employee-row{cursor:pointer}.all-employee-row:hover{background:rgba(30,64,175,.04)}
@@ -2310,3 +2315,29 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 
 /* ===== payroll report v2 ===== */
 .payroll-toolbar{align-items:flex-end}.payroll-filter-group{display:flex;flex-direction:column;gap:5px;min-width:160px}.payroll-filter-group label{font-size:11px;color:var(--ink-soft);font-weight:700}.payroll-filter-group select,.payroll-filter-group input{min-height:38px}.payroll-search-wide{min-width:280px;flex:1}.payroll-info-note{margin:-2px 0 12px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--border-soft);font-size:12px;color:var(--ink-soft)}.payroll-statement-table{min-width:2450px!important}.payroll-statement-table th,.payroll-statement-table td{white-space:nowrap;text-align:center;vertical-align:middle}.payroll-statement-table th:nth-child(2),.payroll-statement-table td:nth-child(2){text-align:right;min-width:180px}.pay-code{display:block;color:var(--ink-soft);font-size:10px;margin-top:2px}.pay-input-cell input{width:82px;min-height:32px;padding:5px 6px;text-align:center;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink)}.pay-action-select{min-width:160px;min-height:34px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink)}.pay-note-input{display:block;width:160px;margin-top:5px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--ink)}.pay-red-note{display:block;color:#b42318;font-size:10px}
+
+
+/* ===== employee form: age + start date ===== */
+.personal-identity-row{grid-template-columns:minmax(170px,1fr) minmax(180px,1fr) minmax(120px,.65fr)!important}
+.dob-age-row{grid-template-columns:minmax(0,1fr) minmax(120px,.8fr)}
+.age-badge{text-align:center;font-weight:700}
+@media(max-width:600px){.personal-identity-row{grid-template-columns:1fr!important}.dob-age-row{grid-template-columns:1fr}}
+
+/* ===== payroll statement: gradient groups, lighter totals, frozen name column ===== */
+.payroll-statement-table{--c1:37,99,235;--c2:13,148,136;--c3:220,84,52;--c4:22,163,74;--c5:100,116,139;min-width:2650px!important;border-collapse:separate!important;border-spacing:0}
+.payroll-statement-table .g1{--gc:var(--c1)}.payroll-statement-table .g2{--gc:var(--c2)}.payroll-statement-table .g3{--gc:var(--c3)}.payroll-statement-table .g4{--gc:var(--c4)}.payroll-statement-table .g5{--gc:var(--c5)}
+.payroll-statement-table th,.payroll-statement-table td{border-bottom:1px solid var(--border-soft);border-left:1px solid var(--border-soft)}
+.payroll-statement-table thead th{background-color:var(--surface);background-image:linear-gradient(180deg,rgba(var(--gc),.30),rgba(var(--gc),.18));font-size:12px}
+.payroll-statement-table thead th.gh{background-image:linear-gradient(180deg,rgba(var(--gc),.55),rgba(var(--gc),.34));font-size:13px;font-weight:800;letter-spacing:.2px}
+.payroll-statement-table thead th.tot{background-image:linear-gradient(180deg,rgba(var(--gc),.13),rgba(var(--gc),.07))}
+.payroll-statement-table .th-note{display:block;font-weight:400;font-size:9.5px;color:var(--ink-soft);white-space:normal;max-width:130px;margin:2px auto 0;line-height:1.3}
+.payroll-statement-table tbody td{background-color:var(--surface);background-image:linear-gradient(rgba(var(--gc),.12),rgba(var(--gc),.12))}
+.payroll-statement-table tbody td.tot{background-image:linear-gradient(rgba(var(--gc),.045),rgba(var(--gc),.045));font-weight:800}
+.payroll-statement-table tbody tr:hover td{background-image:linear-gradient(rgba(var(--gc),.2),rgba(var(--gc),.2))}
+:root[data-theme="dark"] .payroll-statement-table tbody td.tot,:root[data-theme="dark"] .payroll-statement-table thead th.tot{background-image:linear-gradient(rgba(255,255,255,.09),rgba(255,255,255,.09)),linear-gradient(rgba(var(--gc),.14),rgba(var(--gc),.14))}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .payroll-statement-table tbody td.tot,:root:not([data-theme="light"]) .payroll-statement-table thead th.tot{background-image:linear-gradient(rgba(255,255,255,.09),rgba(255,255,255,.09)),linear-gradient(rgba(var(--gc),.14),rgba(var(--gc),.14))}}
+.payroll-statement-table .st1,.payroll-statement-table .st2{position:sticky;z-index:3}
+.payroll-statement-table .st1{right:0;width:46px;min-width:46px;max-width:46px}
+.payroll-statement-table .st2{right:46px;min-width:200px;text-align:right;box-shadow:-8px 0 10px -8px rgba(0,0,0,.35)}
+.payroll-statement-table thead th.st1,.payroll-statement-table thead th.st2{z-index:5}
+.payroll-statement-table thead th.gh{text-align:center!important;min-width:0!important}
