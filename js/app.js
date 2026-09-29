@@ -4579,6 +4579,11 @@
       });
     }catch(err){
       console.error('Cloud initialization failed:',err);
+      if(err && err.message==='MIGRATION_REQUIRED'){
+        showToast('النظام قيد الترقية لحماية البيانات المالية. يجب أن يسجّل المدير دخوله أولاً ثم أعد المحاولة.');
+        try{ await window.firebaseSignOut(); }catch(e){}
+        return;
+      }
       showToast('تعذر الاتصال بقاعدة البيانات السحابية');
       loadEmployees(); loadAux();
     }

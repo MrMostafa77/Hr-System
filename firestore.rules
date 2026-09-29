@@ -7,11 +7,26 @@ service cloud.firestore {
     function hasProfile() { return signedIn() && exists(userDoc()); }
     function isActive() { return hasProfile() && get(userDoc()).data.get('disabled', false) != true; }
     function isAdmin() { return isActive() && get(userDoc()).data.role == 'admin'; }
+    // صلاحية البيانات المالية: المدير أو مستخدم لديه finance = true
+    function canFinance() { return isAdmin() || (isActive() && get(userDoc()).data.get('finance', false) == true); }
     function noBootstrapYet() { return !exists(/databases/$(database)/documents/hr_meta/access); }
 
-    // بيانات النظام: فقط المستخدمون الذين لهم حساب نشط في hr_users
-    match /hr_system/{document=**} {
+    // الوثيقة العامة (بدون رواتب/بنوك/أسعار): أي مستخدم نشط.
+    // الكتابة تشترط النسق الجديد schema == 2 وعدم احتواء مفاتيح مالية، فيُمنع أي كود قديم مخزّن بالمتصفح من إعادة كتابة كل شيء هنا.
+    match /hr_system/main {
+      allow read: if isActive();
+      allow write: if isActive()
+        && request.resource.data.get('schema', 0) == 2
+        && !request.resource.data.keys().hasAny(['payrollRecords', 'projectAccounts']);
+    }
+    // ملفات الموظفين (مرفقات base64)
+    match /hr_system/main/employee_files/{fileId} {
       allow read, write: if isActive();
+    }
+
+    // البيانات المالية: فقط المدير أو من لديه صلاحية المالية
+    match /hr_finance/{docId} {
+      allow read, write: if canFinance();
     }
 
     // الصلاحيات: المستخدم يقرأ مستنده فقط، والمدير يقرأ ويكتب الكل

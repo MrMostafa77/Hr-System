@@ -4,6 +4,8 @@
   'use strict';
   const REPORTS = ['payroll','employees','projects','coverage'];
   // شاشات ليس لها رابط في القائمة الجانبية وتتبع صلاحية شاشة أخرى
+  // شاشات تعتمد كلياً على بيانات مالية: لا تُفتح إلا لمن لديه صلاحية المالية
+  const FIN_ONLY = ['projectaccounts','reports:payroll'];
   const ALIASES = { employees:['add','all-employees'], allprojects:['projects'], 'commencement-list':['commencements'] };
 
   const HRAuth = {
@@ -11,6 +13,7 @@
     user: null,
 
     isAdmin(){ return !!this.profile && this.profile.role === 'admin'; },
+    canFinance(){ const p = this.profile; return !!p && (p.role === 'admin' || p.finance === true || p.legacy === true); },
 
     // مفتاح الصلاحية لعنصر في القائمة (التقارير لكل نوع مفتاح مستقل)
     keyOf(el){
@@ -21,6 +24,7 @@
       if(this.isAdmin()) return true;
       if(!this.profile) return false;
       if(key === 'users') return false;
+      if(FIN_ONLY.includes(key) && !this.canFinance()) return false;
       if(this.profile.legacy) return true; // قواعد Firestore لم تُنشر بعد: وصول كامل مؤقتاً
       return (this.profile.views || []).includes(key);
     },

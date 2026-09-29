@@ -62,6 +62,11 @@ function formHtml(){
           <select id="u_role"><option value="user">مستخدم بصلاحيات محددة</option><option value="admin">مدير (كل الصلاحيات + إدارة المستخدمين)</option></select>
         </div>
       </div>
+      <div id="u_fin_wrap" style="margin-top:12px">
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer"><input type="checkbox" id="u_finance" style="margin-top:4px">
+          <span><b>صلاحية البيانات المالية</b><br><small>الرواتب والبدلات، الحسابات البنكية والآيبان، أسعار وتكاليف المشاريع، مسيرات الرواتب، حسابات المشاريع، ومبالغ التغطيات. بدونها لا تصل هذه البيانات لجهازه أصلاً (محمية بقواعد قاعدة البيانات)، وتُخفى شاشتا «حسابات المشاريع» و«تقارير الرواتب».</small></span>
+        </label>
+      </div>
       <div id="u_perms_wrap" style="margin-top:12px">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
           <b>التبويبات المسموحة</b>
@@ -79,14 +84,15 @@ function formHtml(){
   </div>
   <div class="card section-card">
     <h3>المستخدمون</h3>
-    <div class="table-wrap"><table class="payroll-table"><thead><tr><th>الاسم</th><th>البريد</th><th>النوع</th><th>الصلاحيات</th><th>الحالة</th><th>إجراءات</th></tr></thead>
-    <tbody id="usersBody"><tr><td colspan="6">جاري التحميل...</td></tr></tbody></table></div>
+    <div class="table-wrap"><table class="payroll-table"><thead><tr><th>الاسم</th><th>البريد</th><th>النوع</th><th>الصلاحيات</th><th>المالية</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+    <tbody id="usersBody"><tr><td colspan="7">جاري التحميل...</td></tr></tbody></table></div>
   </div>`;
 }
 
 function setRoleUi(){
   const isAdmin = document.getElementById('u_role').value === 'admin';
   document.getElementById('u_perms_wrap').style.display = isAdmin ? 'none' : '';
+  document.getElementById('u_fin_wrap').style.display = isAdmin ? 'none' : '';
 }
 function checkedViews(){ return [...document.querySelectorAll('.u-perm:checked')].map(c => c.value); }
 function setChecked(views){ document.querySelectorAll('.u-perm').forEach(c => c.checked = views.includes(c.value)); }
@@ -100,6 +106,7 @@ function resetForm(){
   document.getElementById('uFormTitle').textContent = 'إضافة مستخدم جديد';
   document.getElementById('u_submit').textContent = 'إنشاء المستخدم';
   document.getElementById('u_cancel').style.display = 'none';
+  document.getElementById('u_finance').checked = false;
   setChecked([]); setRoleUi();
 }
 
@@ -116,6 +123,7 @@ async function loadUsers(){
         <td dir="ltr" style="text-align:right">${esc(u.email || '')}</td>
         <td>${u.role === 'admin' ? '<span class="pill pill-blue">مدير</span>' : '<span class="pill pill-gray">مستخدم</span>'}</td>
         <td>${u.role === 'admin' ? 'الكل' : (u.views || []).length + ' تبويب'}</td>
+        <td>${(u.role === 'admin' || u.finance) ? '<span class="pill pill-blue">مسموحة</span>' : '<span class="pill pill-gray">محجوبة</span>'}</td>
         <td>${u.disabled ? '<span class="pill pill-danger">موقوف</span>' : '<span class="pill pill-blue">نشط</span>'}</td>
         <td><div class="row-actions">
           <button class="btn btn-sm" data-u-edit="${esc(u.uid)}">تعديل</button>
@@ -123,10 +131,10 @@ async function loadUsers(){
           <button class="btn btn-sm" data-u-reset="${esc(u.uid)}">إعادة تعيين كلمة المرور</button>
           ${u.uid === me ? '' : `<button class="btn btn-sm btn-danger" data-u-del="${esc(u.uid)}">حذف</button>`}
         </div></td>
-      </tr>`).join('') || '<tr><td colspan="6">لا يوجد مستخدمون.</td></tr>';
+      </tr>`).join('') || '<tr><td colspan="7">لا يوجد مستخدمون.</td></tr>';
   }catch(err){
     console.error(err);
-    body.innerHTML = '<tr><td colspan="6">تعذر تحميل المستخدمين. تأكد من نشر firestore.rules.</td></tr>';
+    body.innerHTML = '<tr><td colspan="7">تعذر تحميل المستخدمين. تأكد من نشر firestore.rules.</td></tr>';
   }
 }
 
@@ -157,6 +165,7 @@ async function onSubmit(ev){
   const password = document.getElementById('u_pass').value;
   const role = document.getElementById('u_role').value;
   const views = role === 'admin' ? [] : checkedViews();
+  const finance = role === 'admin' ? true : document.getElementById('u_finance').checked;
   if(role === 'user' && !views.length){ msg('اختر تبويباً واحداً على الأقل.', 'err'); return; }
   const btn = document.getElementById('u_submit');
   btn.disabled = true; msg('جاري الحفظ...');
@@ -164,12 +173,12 @@ async function onSubmit(ev){
     const fs = window.FB.firestore;
     if(editingUid){
       if(editingUid === window.HRAuth.user?.uid && role !== 'admin'){ msg('لا يمكنك إزالة صلاحية المدير من حسابك.', 'err'); return; }
-      await updateDoc(doc(fs, 'hr_users', editingUid), { name, role, views, updatedAt: new Date().toISOString() });
+      await updateDoc(doc(fs, 'hr_users', editingUid), { name, role, views, finance, updatedAt: new Date().toISOString() });
       msg('تم تحديث المستخدم.', 'ok');
     }else{
       const uid = await createAuthUser(email, password);
       await setDoc(doc(fs, 'hr_users', uid), {
-        email, name, role, views, disabled: false,
+        email, name, role, views, finance, disabled: false,
         createdAt: new Date().toISOString(), createdBy: window.HRAuth.user?.email || ''
       });
       msg('تم إنشاء المستخدم. يمكنه الدخول الآن بالبريد وكلمة المرور.', 'ok');
@@ -197,7 +206,9 @@ async function onTableClick(ev){
       document.getElementById('u_pass_wrap').style.display = 'none';
       document.getElementById('u_pass').required = false;
       document.getElementById('u_role').value = u.role === 'admin' ? 'admin' : 'user';
-      setChecked(u.views || []); setRoleUi();
+      setChecked(u.views || []);
+      document.getElementById('u_finance').checked = !!u.finance;
+      setRoleUi();
       document.getElementById('uFormTitle').textContent = 'تعديل صلاحيات: ' + (u.email || '');
       document.getElementById('u_submit').textContent = 'حفظ التعديلات';
       document.getElementById('u_cancel').style.display = '';
