@@ -756,6 +756,7 @@
   // "إضافة موظف" screen remains reachable even if a later optional
   // initialization step fails.
   function switchView(view){
+    if(!hrSourceReadOnly || !['attendance','reports'].includes(view)) { hrSourceReadOnly=false; hrSourceEmployeeId=''; hrSourceMonth=''; }
     // ===== صلاحيات المستخدم: منع فتح أي شاشة غير مسموحة =====
     if(window.HRAuth && window.HRAuth.profile){
       if(!window.HRAuth.canView(view)){
@@ -772,6 +773,7 @@
     currentView = view;
     try{ pjTabsSync(view); }catch(e){ console.error('tabs',e); }
     document.querySelector('main')?.classList.toggle('wide-data-view', view==='attendance' || view==='reports' || view==='projectaccounts');
+    document.body.classList.toggle('hr-source-readonly', !!hrSourceReadOnly);
     // Printing orientation for wide data screens. Projects, All Contracts and Coverage
     // are intentionally landscape so their full tables/columns fit on the printed page.
     document.body.classList.remove('print-landscape-projects','print-landscape-allprojects','print-landscape-allcontracts','print-landscape-coverage');
@@ -838,6 +840,10 @@
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
   const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn']};
   const pjTabs={open:[],dirty:new Set()};
+  // عند فتح سجل تاريخي من التقارير، نعرض شاشة الإدخال نفسها لكن للقراءة فقط.
+  let hrSourceReadOnly=false;
+  let hrSourceEmployeeId='';
+  let hrSourceMonth='';
   function pjTabOpen(v){return pjTabs.open.includes(v);}
   function pjTitle(v){return v==='reports'?(PJ_REPORTS[window.currentReport||'payroll']||PJ_TITLES.reports):(PJ_TITLES[v]||v);}
   function pjTabsSync(view){ if(!pjTabs.open.includes(view)) pjTabs.open.push(view); pjTabsRender(view); }
@@ -865,6 +871,22 @@
     if(currentView===v){ const next=pjTabs.open[i]||pjTabs.open[i-1]||'dashboard'; expandParentGroup(next); switchView(next); }
     else pjTabsRender();
   }
+  function pjCloseAll(){
+    const dirty=[...pjTabs.dirty].filter(v=>pjTabs.open.includes(v));
+    if(dirty.length){
+      const names=dirty.map(pjTitle).join('، ');
+      if(!confirm(`هناك تبويبات بها بيانات غير محفوظة: ${names}.\n\nهل تريد إغلاق كل التبويبات وتجاهل هذه البيانات؟`)) return;
+    }
+    const opened=[...pjTabs.open];
+    opened.forEach(v=>{ try{ pjResetView(v); }catch(e){} });
+    pjTabs.open=[]; pjTabs.dirty.clear();
+    hrSourceReadOnly=false; hrSourceEmployeeId=''; hrSourceMonth='';
+    pjTabs.open=['dashboard'];
+    expandParentGroup('dashboard');
+    switchView('dashboard');
+  }
+  document.getElementById('pjCloseAllBtn')?.addEventListener('click',pjCloseAll);
+
   document.getElementById('pjTabs')?.addEventListener('click',e=>{
     const sv=e.target.closest('[data-tab-save]'), cl=e.target.closest('[data-tab-close]'), tab=e.target.closest('.pj-tab');
     if(sv){ pjSave(sv.dataset.tabSave); return; }
@@ -2552,6 +2574,38 @@
     const e=r.emp, ci=employeeContractInfo(e.id), c=ci.contract, cm=employeeCommencementInfo(e), cov=(coverage||[]).filter(x=>String(x.guardId||'')===String(e.id)||String(x.absentId||'')===String(e.id)||String(x.guardName||'').trim()===String(e.fullname||'').trim()||String(x.absentName||x.absent||'').trim()===String(e.fullname||'').trim()), pays=payrollAvailableMonths().length;
     return `<div class="employee-report-summary"><div class="employee-summary-grid"><div><small>الاسم</small><b>${escapeHtml(e.fullname||'—')}</b></div><div><small>الكود الوظيفي</small><b>${escapeHtml(e.empcode||'—')}</b></div><div><small>العقد</small><b>${escapeHtml(c?.contractNo||c?.contractCode||c?.code||ci.status||'بدون عقد')}</b></div><div><small>المباشرة</small><b>${cm?`مباشر — ${escapeHtml(fmtDMY(cm.startDate||''))}`:'غير مباشر'}</b></div><div><small>المشروع</small><b>${escapeHtml(e.project||'—')}</b></div><div><small>الوظيفة</small><b>${escapeHtml(e.jobtitle||'—')}</b></div></div><div class="employee-summary-actions"><span class="pill pill-gray">${cov.length} تغطية</span><span class="pill pill-gray">${pays} شهر رواتب متاح</span><button type="button" class="btn btn-sm employee-full-profile" data-full-employee="${escapeAttr(e.id)}">عرض كامل بيانات الموظف <span aria-hidden="true">↗</span></button></div></div>`;
   }
+  function openEmployeeInputFromReport(empId){
+    hrSourceReadOnly=false; hrSourceEmployeeId=''; hrSourceMonth='';
+    loadIntoForm(empId); expandParentGroup('add'); switchView('add');
+  }
+  function openAttendanceFromReport(empId,ym){
+    hrSourceReadOnly=true; hrSourceEmployeeId=String(empId||''); hrSourceMonth=ym||currentMonthStr();
+    const m=document.getElementById('attMonth'); if(m) m.value=hrSourceMonth;
+    attState.mode='month'; attState.calDate=''; attState.from=''; attState.to='';
+    expandParentGroup('attendance'); switchView('attendance');
+    showToast('تم فتح الحضور والانصراف للعرض فقط — لا يمكن تعديل السجل من هنا');
+  }
+  function openPayrollFromReport(empId,ym){
+    hrSourceReadOnly=true; hrSourceEmployeeId=String(empId||''); hrSourceMonth=ym||currentMonthStr();
+    window.currentReport='payroll';
+    expandParentGroup('reports'); switchView('reports');
+    const sel=document.getElementById('payrollMonth'); if(sel){ sel.value=hrSourceMonth; }
+    const search=document.getElementById('payrollSearch'); if(search){ const e=employees.find(x=>String(x.id)===String(empId)); search.value=e?.empcode||e?.fullname||''; }
+    renderReports();
+    showToast('تم فتح المسير للعرض فقط — لا يمكن تعديل بيانات المسير من هنا');
+  }
+  function employeeReportSourceMenu(ev,action,label){
+    ev.preventDefault(); ev.stopPropagation();
+    document.getElementById('employeeReportContextMenu')?.remove();
+    const menu=document.createElement('div'); menu.id='employeeReportContextMenu'; menu.className='employee-report-context-menu';
+    menu.innerHTML=`<button type="button">${escapeHtml(label||'فتح شاشة الإدخال')}</button>`;
+    menu.querySelector('button').onclick=()=>{menu.remove();action();};
+    document.body.appendChild(menu);
+    menu.style.left=Math.max(8,Math.min(ev.clientX,window.innerWidth-270))+'px';
+    menu.style.top=Math.max(8,Math.min(ev.clientY,window.innerHeight-70))+'px';
+    setTimeout(()=>document.addEventListener('click',()=>menu.remove(),{once:true}),0);
+  }
+
   function employeeReportFullProfile(empId){
     const e=employees.find(x=>String(x.id)===String(empId)); if(!e)return;
     const ci=employeeContractInfo(e.id), c=ci.contract, cm=employeeCommencementInfo(e), alerts=employeeAlertList(e), att=reportAttendanceRows(e);
@@ -2564,15 +2618,36 @@
     const personal=[['الاسم الأول',e.firstname],['اسم الأب',e.fathername],['اسم الجد',e.grandname],['اسم العائلة',e.familyname],['الاسم الكامل',e.fullname],['الكود الوظيفي',e.empcode],['رقم الهوية',e.idnum],['الجنسية',e.nationality],['تاريخ الميلاد',e.dob],['الجنس',e.gender],['تاريخ إصدار الهوية',e.iddate_issue],['تاريخ انتهاء الهوية',e.iddate_expiry],['مكان إصدار الهوية',e.idplace],['الجوال',e.phone],['البريد الإلكتروني',e.email],['العنوان',e.address],['اسم جهة الطوارئ',e.emname],['جوال جهة الطوارئ',e.emphone],['المنطقة',e.region],['المشروع',e.project],['القسم',e.dept],['الوظيفة',e.jobtitle],['تاريخ بدء العمل المسجل',e.startdate]];
     const contractFields=c?[['رقم العقد',c.contractNo||c.contractCode||c.code||c.id],['تاريخ البداية',c.startDate||c.startdate],['تاريخ النهاية',c.endDate||c.enddate],['المدة',c.duration||c.period],['الحالة',ci.status],['الراتب الأساسي',fmt(e.basicsalary)],['بدل السكن',fmt(e.housing)],['نسبة بدل السكن',e.housingPct],['بدل المواصلات',fmt(e.transport)],['نسبة بدل المواصلات',e.transportPct],['بدلات أخرى',fmt(e.otherallow)],['نسبة البدلات الأخرى',e.otherallowPct],['خصومات أخرى',fmt(e.otherded)],['إجمالي الراتب',fmt(lastWageTotal(e))],['آخر أجر مسجل',fmt(e.lastwage)]]:[['حالة العقد','بدون عقد'],['الراتب الأساسي',fmt(e.basicsalary)],['بدل السكن',fmt(e.housing)],['بدل المواصلات',fmt(e.transport)],['بدلات أخرى',fmt(e.otherallow)],['خصومات أخرى',fmt(e.otherded)],['إجمالي الراتب',fmt(lastWageTotal(e))]];
     const bankFields=[['اسم البنك',e.bankname],['رقم الآيبان',e.iban],['رقم الحساب',e.accountno],['رمز البنك',e.bankcode],['نوع الحساب',e.bankAccountType],['اسم المفوض',e.delegate_name],['ملاحظات التفويض',e.delegate_memo]];
-    const attendanceRows=att.slice().reverse().map(x=>`<tr><td class="mono">${escapeHtml(fmtDMY(x.date))}</td><td><b>${escapeHtml(x.code)}</b></td><td>${escapeHtml(attCodeLabel(x.code))}</td></tr>`).join('');
-    const payrollRows=months.slice().reverse().map(ym=>{const p=payrollStatementForCols(e,monthCols(ym));return `<tr><td>${escapeHtml(monthLabel(ym))}</td><td class="mono">${fmt(p.monthlyGross)}</td><td class="mono">${fmt(p.deduction)}</td><td class="mono"><b>${fmt(p.net)}</b></td></tr>`;}).join('');
+    const monthNames=months.slice().reverse();
+    const attendanceRows=monthNames.map(ym=>{
+      const mc=att.slice().filter(x=>x.date.slice(0,7)===ym);
+      const counts={}; mc.forEach(x=>counts[x.code]=(counts[x.code]||0)+1);
+      const details=mc.map(x=>`<tr><td class="mono">${escapeHtml(fmtDMY(x.date))}</td><td><b>${escapeHtml(x.code)}</b></td><td>${escapeHtml(attCodeLabel(x.code))}</td></tr>`).join('');
+      return `<tr class="employee-history-month" data-history-kind="attendance" data-history-month="${escapeAttr(ym)}"><td><span class="employee-row-chevron">▸</span><b>${escapeHtml(monthLabel(ym))}</b></td><td>${mc.length} يوم</td><td>${Object.entries(counts).map(([k,v])=>`${v} ${escapeHtml(attCodeLabel(k))}`).join('، ')||'لا توجد سجلات'}</td></tr><tr class="employee-history-detail" style="display:none"><td colspan="3">${table(['التاريخ','الرمز','الحالة'],details,'لا توجد سجلات لهذا الشهر')}</td></tr>`;
+    }).join('');
+    const payrollRows=monthNames.map(ym=>{const p=payrollStatementForCols(e,monthCols(ym));return `<tr class="employee-history-month" data-history-kind="payroll" data-history-month="${escapeAttr(ym)}"><td><span class="employee-row-chevron">▸</span><b>${escapeHtml(monthLabel(ym))}</b></td><td class="mono">${fmt(p.monthlyGross)}</td><td class="mono">${fmt(p.deduction)}</td><td class="mono"><b>${fmt(p.net)}</b></td></tr>`;}).join('');
     const covRows=empCov.map(x=>`<tr><td class="mono">${escapeHtml(x.date||'—')}</td><td>${escapeHtml(x.guardName||'—')}</td><td>${escapeHtml(x.absentName||x.absent||'—')}</td><td>${escapeHtml(x.location||x.project||'—')}</td><td>${escapeHtml(covStatusText(x.status)||'—')}</td><td class="mono">${fmt(x.amount)}</td><td>${escapeHtml(x.notes||'—')}</td></tr>`).join('');
     const actRows=empActs.map(x=>`<tr><td class="mono">${escapeHtml(x.date||'—')}</td><td>${escapeHtml(penCodeText(x)||'—')}</td><td>${escapeHtml(x.type||'—')}</td><td>${escapeHtml(String(x.days??'—'))}</td><td>${escapeHtml(x.notes||'—')}</td></tr>`).join('');
     const alertHtml=alerts.length?alerts.map(a=>`<span class="employee-alert-chip">⚠ ${escapeHtml(a)}</span>`).join(''):'<span class="employee-ok-chip">لا توجد تنبيهات مسجلة حاليًا</span>';
     document.getElementById('employeeProfileModal')?.remove();
     const modal=document.createElement('div'); modal.id='employeeProfileModal'; modal.className='employee-profile-modal';
-    modal.innerHTML=`<div class="employee-profile-backdrop" data-profile-close></div><article class="employee-profile-dialog" role="dialog" aria-modal="true" aria-label="الملف الشامل للموظف"><header class="employee-profile-header"><div><span class="employee-profile-kicker">ملف الموظف الشامل</span><h2>${escapeHtml(e.fullname||'—')}</h2><p>${escapeHtml(e.empcode||'—')} · ${escapeHtml(e.jobtitle||'—')} · ${escapeHtml(e.project||'—')}</p></div><button type="button" class="btn icon-btn" data-profile-close aria-label="إغلاق">✕</button></header><div class="employee-profile-content"><section class="employee-profile-section"><h3>البيانات الشخصية والوظيفية</h3><div class="employee-profile-fields">${personal.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section"><h3>العقد والراتب</h3><div class="employee-profile-fields">${contractFields.map(x=>kv(x[0],x[1])).join('')}${kv('تاريخ المباشرة',cm?.startDate?fmtDMY(cm.startDate):'لا توجد مباشرة')}${kv('المشروع في المباشرة',cm?.project||'—')}</div></section><section class="employee-profile-section"><h3>البيانات البنكية والتفويض</h3><div class="employee-profile-fields">${bankFields.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section"><h3>الحضور والانصراف منذ المباشرة <span class="employee-section-count">${att.length} يوم</span></h3><div class="employee-attendance-summary">${Object.entries(attendanceCounts).map(([code,count])=>`<span><b>${count}</b> ${escapeHtml(attCodeLabel(code)||code)}</span>`).join('')||'لا توجد سجلات ضمن الفترة'}</div>${table(['التاريخ','الرمز','الحالة'],attendanceRows,'لا توجد سجلات حضور من تاريخ المباشرة حتى اليوم')}</section><section class="employee-profile-section"><h3>مسيرات الرواتب <span class="employee-section-count">${months.length} شهر</span></h3>${table(['الشهر','إجمالي المستحقات','إجمالي الخصومات','صافي الراتب'],payrollRows,'لا توجد أشهر رواتب ضمن الفترة')}</section><section class="employee-profile-section"><h3>سجل التغطيات <span class="employee-section-count">${empCov.length} سجل</span></h3>${table(['التاريخ','المغطّي','الغائب','الموقع / المشروع','الحالة','المستحق','ملاحظات'],covRows,'لا توجد تغطيات مرتبطة بهذا الموظف')}</section><section class="employee-profile-section"><h3>إجراءات الموظف <span class="employee-section-count">${empActs.length} إجراء</span></h3>${table(['التاريخ','الرمز','الإجراء','الأيام','ملاحظات'],actRows,'لا توجد إجراءات مسجلة')}</section><section class="employee-profile-section"><h3>التنبيهات والملاحظات</h3><div class="employee-alert-list">${alertHtml}</div>${e.notes?`<p class="employee-profile-notes">${escapeHtml(e.notes)}</p>`:''}</section></div></article>`;
+    modal.innerHTML=`<div class="employee-profile-backdrop" data-profile-close></div><article class="employee-profile-dialog" role="dialog" aria-modal="true" aria-label="الملف الشامل للموظف"><header class="employee-profile-header"><div><span class="employee-profile-kicker">ملف الموظف الشامل</span><h2>${escapeHtml(e.fullname||'—')}</h2><p>${escapeHtml(e.empcode||'—')} · ${escapeHtml(e.jobtitle||'—')} · ${escapeHtml(e.project||'—')}</p></div><button type="button" class="btn icon-btn" data-profile-close aria-label="إغلاق">✕</button></header><div class="employee-profile-content"><section class="employee-profile-section employee-source-section" data-source-action="personal" title="كليك يمين لفتح شاشة إدخال الموظف"><div class="employee-profile-fields">${personal.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section employee-source-section" data-source-action="contract" title="كليك يمين لفتح بيانات العقد"><div class="employee-profile-fields">${contractFields.map(x=>kv(x[0],x[1])).join('')}${kv('تاريخ المباشرة',cm?.startDate?fmtDMY(cm.startDate):'لا توجد مباشرة')}${kv('المشروع في المباشرة',cm?.project||'—')}</div></section><section class="employee-profile-section employee-source-section" data-source-action="personal" title="كليك يمين لفتح شاشة إدخال الموظف"><div class="employee-profile-fields">${bankFields.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section"><h3>الحضور والانصراف <span class="employee-section-count">${monthNames.length} شهر</span></h3><div class="employee-attendance-summary">${Object.entries(attendanceCounts).map(([code,count])=>`<span><b>${count}</b> ${escapeHtml(attCodeLabel(code)||code)}</span>`).join('')||'لا توجد سجلات ضمن الفترة'}</div>${table(['الشهر','عدد الأيام المسجلة','التفصيل'],attendanceRows,'لا توجد سجلات حضور من تاريخ المباشرة حتى اليوم')}</section><section class="employee-profile-section"><h3>مسيرات الرواتب <span class="employee-section-count">${months.length} شهر</span></h3><p class="employee-history-hint">اضغط على الشهر لعرض المسير، أو كليك يمين لفتح مسير الإدخال للعرض فقط.</p>${table(['الشهر','إجمالي المستحقات','إجمالي الخصومات','صافي الراتب'],payrollRows,'لا توجد أشهر رواتب ضمن الفترة')}</section><section class="employee-profile-section"><h3>سجل التغطيات <span class="employee-section-count">${empCov.length} سجل</span></h3>${table(['التاريخ','المغطّي','الغائب','الموقع / المشروع','الحالة','المستحق','ملاحظات'],covRows,'لا توجد تغطيات مرتبطة بهذا الموظف')}</section><section class="employee-profile-section"><h3>إجراءات الموظف <span class="employee-section-count">${empActs.length} إجراء</span></h3>${table(['التاريخ','الرمز','الإجراء','الأيام','ملاحظات'],actRows,'لا توجد إجراءات مسجلة')}</section><section class="employee-profile-section"><h3>التنبيهات والملاحظات</h3><div class="employee-alert-list">${alertHtml}</div>${e.notes?`<p class="employee-profile-notes">${escapeHtml(e.notes)}</p>`:''}</section></div></article>`;
     document.body.appendChild(modal); document.body.classList.add('employee-profile-open');
+    modal.querySelectorAll('.employee-source-section').forEach(sec=>sec.addEventListener('contextmenu',ev=>{
+      const action=sec.dataset.sourceAction;
+      employeeReportSourceMenu(ev,()=>{ if(action==='contract' && c?.id){ openContractForEdit(e.id,c.id); } else { openEmployeeInputFromReport(e.id); } },action==='contract'?'فتح شاشة العقد':'فتح شاشة بيانات الموظف');
+    }));
+    modal.querySelectorAll('.employee-history-month').forEach(row=>row.addEventListener('click',()=>{
+      const detail=row.nextElementSibling; if(!detail)return;
+      const open=detail.style.display!=='none'; detail.style.display=open?'none':'';
+      row.querySelector('.employee-row-chevron').textContent=open?'▸':'▾';
+    }));
+    modal.querySelectorAll('.employee-history-month[data-history-kind="attendance"]').forEach(row=>row.addEventListener('contextmenu',ev=>{
+      employeeReportSourceMenu(ev,()=>openAttendanceFromReport(e.id,row.dataset.historyMonth),'فتح صفحة الحضور والانصراف للعرض فقط');
+    }));
+    modal.querySelectorAll('.employee-history-month[data-history-kind="payroll"]').forEach(row=>row.addEventListener('contextmenu',ev=>{
+      employeeReportSourceMenu(ev,()=>openPayrollFromReport(e.id,row.dataset.historyMonth),'فتح صفحة المسير للعرض فقط');
+    }));
     modal.querySelectorAll('[data-profile-close]').forEach(el=>el.addEventListener('click',()=>{modal.remove();document.body.classList.remove('employee-profile-open');}));
     const escClose=ev=>{if(ev.key==='Escape'){modal.remove();document.body.classList.remove('employee-profile-open');document.removeEventListener('keydown',escClose);}};document.addEventListener('keydown',escClose);
   }
@@ -2607,15 +2682,15 @@
       return `<tr data-pay-row="${escapeAttr(e.id)}">
       <td class="mono g1 st1">${i+1}</td><td class="g1 st2"><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td class="g1">${escapeHtml(e.region||e.project||'—')}</td><td class="g1">${escapeHtml(e.jobtitle||'—')}</td>
       <td class="mono g2">${fmt(p.day)}</td><td class="mono g2">${fmt(p.basic)}</td><td class="mono g2">${fmt(p.housing)}</td><td class="mono g2">${fmt(p.transport)}</td><td class="mono g2">${fmt(p.otherAllow)}</td><td class="mono g2 tot">${fmt(p.monthlyGross)}</td>
-      <td class="mono g2">${fmt(p.overtime)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}"></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
+      <td class="mono g2">${fmt(p.overtime)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
       <td class="mono g3" ${red(p.nonWorkDed)}>${fmt(p.nonWorkDed)}${p.nonWorkDays?`<small class="pay-red-note">${p.nonWorkDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.gosi)}</td>
       <td class="mono g3" ${red(p.absence)}>${fmt(p.absence)}${p.absenceDays?`<small class="pay-red-note">${p.absenceDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.penalty)}</td><td class="mono g3">${fmt(p.withdrawal)}</td>
-      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="uniform" data-emp="${escapeAttr(e.id)}" value="${Number(a.uniform)||0}"></td>
-      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="newspaper" data-emp="${escapeAttr(e.id)}" value="${Number(a.newspaper)||0}"></td>
-      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="advance" data-emp="${escapeAttr(e.id)}" value="${Number(a.advance)||0}"></td>
-      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="other" data-emp="${escapeAttr(e.id)}" value="${Number(a.other)||0}"></td>
+      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="uniform" data-emp="${escapeAttr(e.id)}" value="${Number(a.uniform)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
+      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="newspaper" data-emp="${escapeAttr(e.id)}" value="${Number(a.newspaper)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
+      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="advance" data-emp="${escapeAttr(e.id)}" value="${Number(a.advance)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
+      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="other" data-emp="${escapeAttr(e.id)}" value="${Number(a.other)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="mono g3 tot" ${red(p.deduction)}>${fmt(p.deduction)}</td><td class="mono g4 tot" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
-      <td class="g5"><select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}"><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
+      <td class="g5"><select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
       </tr>`;
     }).join('')||'<tr><td colspan="25" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
@@ -2924,8 +2999,8 @@
       cells += `<td class="status-col" data-status-emp="${e.id}">${escapeHtml(attStatusFor(anchorYm, e.id))}</td>`;
       if(e.isCov){ cells += `<td class="act-col"><span class="pill pill-gray">تغطيات</span></td>`; return `<tr data-att-cov="${escapeAttr(e.id)}" class="att-cov-row">${cells}</tr>`; }
       cells += `<td class="act-col"><div class="att-actions">
-        <button type="button" class="btn btn-sm att-daily-edit" data-emp="${e.id}" title="تعديل يومي">${attIcon('edit')}<span>تعديل</span></button>
-        <button type="button" class="btn btn-sm btn-primary att-save-btn" data-emp="${e.id}" title="حفظ" disabled>${attIcon('save')}<span>حفظ</span></button>
+        <button type="button" class="btn btn-sm att-daily-edit" data-emp="${e.id}" title="تعديل يومي" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}>${attIcon('edit')}<span>تعديل</span></button>
+        <button type="button" class="btn btn-sm btn-primary att-save-btn" data-emp="${e.id}" title="حفظ" disabled ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}>${attIcon('save')}<span>حفظ</span></button>
         <button type="button" class="btn btn-sm att-payroll-btn" data-emp="${e.id}" title="معاينة كشف الحضور">${attIcon('doc')}<span>معاينة</span></button>
       </div></td>`;
       return `<tr data-att-row="${e.id}">${cells}</tr>`;
