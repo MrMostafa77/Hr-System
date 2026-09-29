@@ -2374,3 +2374,12 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 .hr-source-readonly #view-attendance .att-select{pointer-events:none;}
 .hr-source-readonly #view-reports .payroll-info-note::after{content:' — وضع العرض فقط';font-weight:800;color:#d99a35;}
 @media(max-width:700px){.pj-tabs-wrap{align-items:stretch;flex-direction:column}.pj-close-all{width:100%}}
+
+/* تفاصيل مسير الموظف داخل التقرير */
+.employee-payroll-detail{padding:12px;background:var(--surface);border:1px solid var(--border-soft);border-radius:8px}
+.employee-payroll-detail-grid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:8px}
+.employee-payroll-detail-grid>div{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid var(--border-soft);border-radius:7px;background:var(--gold-soft)}
+.employee-payroll-detail-grid small{color:var(--ink-soft);font-weight:700}.employee-payroll-detail-grid b{color:var(--ink)}
+.employee-payroll-note{margin-top:10px;padding:8px 10px;border-top:1px dashed var(--border);font-weight:700;color:var(--ink-soft)}
+@media(max-width:900px){.employee-payroll-detail-grid{grid-template-columns:repeat(2,minmax(130px,1fr));}}
+@media(max-width:560px){.employee-payroll-detail-grid{grid-template-columns:1fr;}}

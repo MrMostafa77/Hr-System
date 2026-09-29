@@ -2574,11 +2574,20 @@
     const e=r.emp, ci=employeeContractInfo(e.id), c=ci.contract, cm=employeeCommencementInfo(e), cov=(coverage||[]).filter(x=>String(x.guardId||'')===String(e.id)||String(x.absentId||'')===String(e.id)||String(x.guardName||'').trim()===String(e.fullname||'').trim()||String(x.absentName||x.absent||'').trim()===String(e.fullname||'').trim()), pays=payrollAvailableMonths().length;
     return `<div class="employee-report-summary"><div class="employee-summary-grid"><div><small>الاسم</small><b>${escapeHtml(e.fullname||'—')}</b></div><div><small>الكود الوظيفي</small><b>${escapeHtml(e.empcode||'—')}</b></div><div><small>العقد</small><b>${escapeHtml(c?.contractNo||c?.contractCode||c?.code||ci.status||'بدون عقد')}</b></div><div><small>المباشرة</small><b>${cm?`مباشر — ${escapeHtml(fmtDMY(cm.startDate||''))}`:'غير مباشر'}</b></div><div><small>المشروع</small><b>${escapeHtml(e.project||'—')}</b></div><div><small>الوظيفة</small><b>${escapeHtml(e.jobtitle||'—')}</b></div></div><div class="employee-summary-actions"><span class="pill pill-gray">${cov.length} تغطية</span><span class="pill pill-gray">${pays} شهر رواتب متاح</span><button type="button" class="btn btn-sm employee-full-profile" data-full-employee="${escapeAttr(e.id)}">عرض كامل بيانات الموظف <span aria-hidden="true">↗</span></button></div></div>`;
   }
+  function closeEmployeeReportOverlayForSource(){
+    // عند فتح شاشة المصدر من داخل الملف الشامل، أغلق النافذة العائمة تلقائيًا
+    // حتى لا تبقى فوق الشاشة وتمنع رؤية التبويب الذي تم فتحه.
+    document.getElementById('employeeProfileModal')?.remove();
+    document.body.classList.remove('employee-profile-open');
+    document.getElementById('employeeReportContextMenu')?.remove();
+  }
   function openEmployeeInputFromReport(empId){
+    closeEmployeeReportOverlayForSource();
     hrSourceReadOnly=false; hrSourceEmployeeId=''; hrSourceMonth='';
     loadIntoForm(empId); expandParentGroup('add'); switchView('add');
   }
   function openAttendanceFromReport(empId,ym){
+    closeEmployeeReportOverlayForSource();
     hrSourceReadOnly=true; hrSourceEmployeeId=String(empId||''); hrSourceMonth=ym||currentMonthStr();
     const m=document.getElementById('attMonth'); if(m) m.value=hrSourceMonth;
     attState.mode='month'; attState.calDate=''; attState.from=''; attState.to='';
@@ -2586,12 +2595,15 @@
     showToast('تم فتح الحضور والانصراف للعرض فقط — لا يمكن تعديل السجل من هنا');
   }
   function openPayrollFromReport(empId,ym){
+    closeEmployeeReportOverlayForSource();
     hrSourceReadOnly=true; hrSourceEmployeeId=String(empId||''); hrSourceMonth=ym||currentMonthStr();
     window.currentReport='payroll';
     expandParentGroup('reports'); switchView('reports');
-    const sel=document.getElementById('payrollMonth'); if(sel){ sel.value=hrSourceMonth; }
-    const search=document.getElementById('payrollSearch'); if(search){ const e=employees.find(x=>String(x.id)===String(empId)); search.value=e?.empcode||e?.fullname||''; }
-    renderReports();
+    setTimeout(()=>{
+      const sel=document.getElementById('payrollMonth'); if(sel){ sel.value=hrSourceMonth; }
+      const search=document.getElementById('payrollSearch'); if(search){ const e=employees.find(x=>String(x.id)===String(empId)); search.value=e?.empcode||e?.fullname||''; }
+      renderReports();
+    },0);
     showToast('تم فتح المسير للعرض فقط — لا يمكن تعديل بيانات المسير من هنا');
   }
   function employeeReportSourceMenu(ev,action,label){
@@ -2625,7 +2637,18 @@
       const details=mc.map(x=>`<tr><td class="mono">${escapeHtml(fmtDMY(x.date))}</td><td><b>${escapeHtml(x.code)}</b></td><td>${escapeHtml(attCodeLabel(x.code))}</td></tr>`).join('');
       return `<tr class="employee-history-month" data-history-kind="attendance" data-history-month="${escapeAttr(ym)}"><td><span class="employee-row-chevron">▸</span><b>${escapeHtml(monthLabel(ym))}</b></td><td>${mc.length} يوم</td><td>${Object.entries(counts).map(([k,v])=>`${v} ${escapeHtml(attCodeLabel(k))}`).join('، ')||'لا توجد سجلات'}</td></tr><tr class="employee-history-detail" style="display:none"><td colspan="3">${table(['التاريخ','الرمز','الحالة'],details,'لا توجد سجلات لهذا الشهر')}</td></tr>`;
     }).join('');
-    const payrollRows=monthNames.map(ym=>{const p=payrollStatementForCols(e,monthCols(ym));return `<tr class="employee-history-month" data-history-kind="payroll" data-history-month="${escapeAttr(ym)}"><td><span class="employee-row-chevron">▸</span><b>${escapeHtml(monthLabel(ym))}</b></td><td class="mono">${fmt(p.monthlyGross)}</td><td class="mono">${fmt(p.deduction)}</td><td class="mono"><b>${fmt(p.net)}</b></td></tr>`;}).join('');
+    const payrollRows=monthNames.map(ym=>{
+      const p=payrollStatementForCols(e,monthCols(ym));
+      const a=p.adjustment||{};
+      const detail=`<div class="employee-payroll-detail"><div class="employee-payroll-detail-grid">${[
+        ['الأجر اليومي',fmt(p.day)],['الأساسي',fmt(p.basic)],['بدل السكن',fmt(p.housing)],['بدل المواصلات',fmt(p.transport)],
+        ['بدلات أخرى',fmt(p.otherAllow)],['إضافي',fmt(p.overtime)],['مكافآت',fmt(a.bonus)],['إجمالي المستحقات',fmt(p.totalEarned)],
+        ['خصم عدم المباشرة',fmt(p.nonWorkDed)],['التأمينات',fmt(p.gosi)],['خصم الغياب',fmt(p.absence)],['الجزاءات',fmt(p.penalty)],
+        ['الانسحاب',fmt(p.withdrawal)],['السلف',fmt(a.advance)],['خصومات أخرى',fmt((Number(a.uniform)||0)+(Number(a.newspaper)||0)+(Number(a.other)||0))],['إجمالي الخصومات',fmt(p.deduction)],
+        ['صافي الراتب',fmt(p.net)]
+      ].map(x=>`<div><small>${escapeHtml(x[0])}</small><b class="mono">${escapeHtml(x[1])}</b></div>`).join('')}</div><div class="employee-payroll-note">${escapeHtml(a.internalAction||a.note||'لا توجد ملاحظات على المسير')}</div></div>`;
+      return `<tr class="employee-history-month" data-history-kind="payroll" data-history-month="${escapeAttr(ym)}"><td><span class="employee-row-chevron">▸</span><b>${escapeHtml(monthLabel(ym))}</b></td><td class="mono">${fmt(p.monthlyGross)}</td><td class="mono">${fmt(p.deduction)}</td><td class="mono"><b>${fmt(p.net)}</b></td></tr><tr class="employee-history-detail employee-payroll-history-detail" style="display:none"><td colspan="4">${detail}</td></tr>`;
+    }).join('');
     const covRows=empCov.map(x=>`<tr><td class="mono">${escapeHtml(x.date||'—')}</td><td>${escapeHtml(x.guardName||'—')}</td><td>${escapeHtml(x.absentName||x.absent||'—')}</td><td>${escapeHtml(x.location||x.project||'—')}</td><td>${escapeHtml(covStatusText(x.status)||'—')}</td><td class="mono">${fmt(x.amount)}</td><td>${escapeHtml(x.notes||'—')}</td></tr>`).join('');
     const actRows=empActs.map(x=>`<tr><td class="mono">${escapeHtml(x.date||'—')}</td><td>${escapeHtml(penCodeText(x)||'—')}</td><td>${escapeHtml(x.type||'—')}</td><td>${escapeHtml(String(x.days??'—'))}</td><td>${escapeHtml(x.notes||'—')}</td></tr>`).join('');
     const alertHtml=alerts.length?alerts.map(a=>`<span class="employee-alert-chip">⚠ ${escapeHtml(a)}</span>`).join(''):'<span class="employee-ok-chip">لا توجد تنبيهات مسجلة حاليًا</span>';
