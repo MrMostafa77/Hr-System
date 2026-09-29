@@ -2902,25 +2902,29 @@
   /* ===== معاينة المسير (شاشة + طباعة + PDF + Excel) ===== */
   const PP_CSS = `
   .pp-paper{background:#fff;color:#111;direction:rtl;box-sizing:border-box;padding:16px 18px;font-family:'JF Flat Regular','JF Flat','Segoe UI',Tahoma,Arial,sans-serif;}
-  .pp-title{font-size:19px;font-weight:800;text-align:center;margin:0}
-  .pp-sub{font-size:11.5px;text-align:center;color:#444;margin:5px 0 12px}
-  .pp-table{width:100%;border-collapse:collapse;font-size:9.5px}
-  .pp-table th,.pp-table td{border:1px solid #6b7780;padding:3px 4px;text-align:center;white-space:nowrap}
+  .pp-paper.pay-paper{padding:8px 10px}
+  .pp-title{font-size:17px;font-weight:800;text-align:center;margin:0;color:#0b2444}
+  .pp-sub{font-size:10px;text-align:center;color:#333;margin:3px 0 8px}
+  .pp-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:7.2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pp-table th,.pp-table td{border:1px solid #3d6aa3;padding:3px 1px;text-align:center;white-space:normal;overflow-wrap:anywhere;color:#fff;line-height:1.25;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .pp-table thead{display:table-header-group}
   .pp-table tr{page-break-inside:avoid}
-  .pp-table th{background:#e6edf0;font-weight:700}
-  .pp-table tr.g th{background:#c9d9df}
-  .pp-table td.s{text-align:right}
+  .pp-table .pg1{--g:#2c6db8;--h:#1f5596;--hl:#2b68b0;--b:#12335e;--t:#1c4a80}
+  .pp-table .pg2{--g:#245ea6;--h:#194a86;--hl:#2360a0;--b:#0f2c53;--t:#18406f}
+  .pp-table .pg3{--g:#1c4f8f;--h:#143f75;--hl:#1d5089;--b:#0c2444;--t:#15355e}
+  .pp-table .pg4{--g:#174580;--h:#10366a;--hl:#184880;--b:#0a2140;--t:#143a68}
+  .pp-table .pg5{--g:#133a6b;--h:#0d2d57;--hl:#0d2d57;--b:#081b36;--t:#081b36}
+  .pp-table thead tr.g th{background:var(--g);font-size:9px;font-weight:800;padding:4px 1px}
+  .pp-table thead tr:not(.g) th{background:var(--h);font-weight:700}
+  .pp-table thead tr:not(.g) th.ptot{background:var(--hl)}
+  .pp-table tbody td{background:var(--b);font-weight:600}
+  .pp-table tbody td.ptot{background:var(--t);font-weight:800}
+  .pp-table td.s{text-align:right;padding:3px 4px}
   .pp-table td.b{font-weight:700}
-  .pp-table tfoot td{background:#eef3f4;font-weight:800}
   .pp-table td.net{font-weight:800}
-  .pp-table{-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .pp-table tr.g th.pg1{background:linear-gradient(180deg,#b9cfe8,#a3bedd)}.pp-table tr.g th.pg2{background:linear-gradient(180deg,#a9dccf,#8fcdbd)}.pp-table tr.g th.pg3{background:linear-gradient(180deg,#f2bba9,#e9a48e)}.pp-table tr.g th.pg4{background:linear-gradient(180deg,#a8dcb3,#8ecf9c)}.pp-table tr.g th.pg5{background:linear-gradient(180deg,#d3d5df,#bfc2d0)}
-  .pp-table th.pg1{background:#d5e3f3}.pp-table th.pg2{background:#cfeae2}.pp-table th.pg3{background:#f8d8cd}.pp-table th.pg4{background:#cdebd4}.pp-table th.pg5{background:#e4e5ec}
-  .pp-table td.pg1{background:#e4eef9}.pp-table td.pg2{background:#dff1ec}.pp-table td.pg3{background:#fbe6de}.pp-table td.pg4{background:#e0f2e4}.pp-table td.pg5{background:#efeff4}
-  .pp-table th.ptot,.pp-table td.ptot{background:#fff !important;background-image:none}
-  .pp-table th.ptot.pg2,.pp-table td.ptot.pg2{background:#f4fbf8 !important}.pp-table th.ptot.pg3,.pp-table td.ptot.pg3{background:#fdf4f0 !important}.pp-table th.ptot.pg4,.pp-table td.ptot.pg4{background:#f3fbf5 !important}
-  .pp-table tfoot td.pg1,.pp-table tfoot td.pg2,.pp-table tfoot td.pg3,.pp-table tfoot td.pg4,.pp-table tfoot td.pg5{font-weight:800}`;
+  .pp-table td.pg3{color:#ff6b6b;font-weight:700}
+  .pp-table tfoot td{background:var(--t);font-weight:800;font-size:7.6px}
+  .pp-table tfoot td[colspan]{background:#1c4a80;color:#fff}`;
   const ATT_SHEET_CSS = `
   .as-paper{color:#111 !important;background:#fff !important}
   .as-paper .as-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:2.5px solid #1f4e5a;padding-bottom:8px;margin-bottom:10px}
@@ -2989,13 +2993,17 @@
     const totals=PP_COLS.map(c=>c.sum?rows.reduce((a,r)=>a+(Number(c.k(r))||0),0):null);
     const title=`${single?'مسير راتب':'مسير رواتب'} ${periodLabel}`,sub=`${scope} — من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)} — أساس الحساب 30 يوم${single?'':` — عدد الموظفين: ${rows.length}`} — تاريخ الإعداد: ${fmtDMY(todayISO())}`;
     const fileBase=`مسير_${single?(list[0].fullname||'موظف'):(projs.length===1?projs[0]:'كل_المشاريع')}_${isMonth?monthLabel(first.ym):fmtDMY(first.iso)+'_'+fmtDMY(last.iso)}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
-    return {title,sub,rows,totals,single,fileBase};
+    return {title,sub,rows,totals,single,fileBase,cls:'pay-paper'};
   }
   // رقم مجموعة اللون لكل عمود (تدرج لوني حسب أقسام الجدول)
   function ppColGroups(){ const g=[]; PP_GROUPS.forEach(([t,n],gi)=>{ for(let k=0;k<n;k++) g.push(gi+1); }); return g; }
+  function ppColgroup(){
+    const n=PP_COLS.length, w=PP_COLS.map((c,i)=>i===0?2:i===1?10:(i===2||i===3)?6:i===n-1?7:(c.tot?4:3.5)), s=w.reduce((a,b)=>a+b,0);
+    return '<colgroup>'+w.map(x=>`<col style="width:${(x/s*100).toFixed(3)}%">`).join('')+'</colgroup>';
+  }
   function ppPaperHTML(m){
     const cg=ppColGroups();
-    let h=`<div class="pp-title">${escapeHtml(m.title)}</div><div class="pp-sub">${escapeHtml(m.sub)}</div><table class="pp-table"><thead><tr class="g">`;
+    let h=`<div class="pp-title">${escapeHtml(m.title)}</div><div class="pp-sub">${escapeHtml(m.sub)}</div><table class="pp-table">${ppColgroup()}<thead><tr class="g">`;
     PP_GROUPS.forEach(([t,n],gi)=>{ h+=`<th class="pg${gi+1}" colspan="${n}">${escapeHtml(t)}</th>`; });
     h+='</tr><tr>'+PP_COLS.map((c,i)=>`<th class="pg${cg[i]}${c.tot?' ptot':''}">${escapeHtml(c.h)}</th>`).join('')+'</tr></thead><tbody>';
     m.rows.forEach(r=>{ h+='<tr>'+PP_COLS.map((c,i)=>`<td class="pg${cg[i]} ${c.t==='s'?'s ':''}${c.b?'b ':''}${c.tot?'ptot ':''}${c.net?'net':''}">${escapeHtml(ppFmt(c,c.k(r)))}</td>`).join('')+'</tr>'; });
@@ -3013,7 +3021,7 @@
     const f=document.createElement('iframe'); f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
     document.body.appendChild(f);
     const d=f.contentDocument; d.open();
-    d.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${escapeHtml(m.title)}</title><style>${PP_CSS}${m.css||''} @page{size:${m.page||'A4 landscape'};margin:8mm} html,body{margin:0;background:#fff}</style></head><body><div class="pp-paper ${m.cls||''}">${ppHTML(m)}</div></body></html>`);
+    d.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${escapeHtml(m.title)}</title><style>${PP_CSS}${m.css||''} @page{size:${m.page||'A4 landscape'};margin:6mm} html,body{margin:0;background:#fff}</style></head><body><div class="pp-paper ${m.cls||''}">${ppHTML(m)}</div></body></html>`);
     d.close();
     setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>f.remove(),3000); },350);
   }
@@ -3183,7 +3191,7 @@
       <button class="btn btn-sm" data-pp="xlsx">تنزيل Excel</button>
       <button class="btn btn-sm" data-pp="full">ملء الشاشة</button>
       <button class="btn btn-sm" data-pp="close">إغلاق</button></div>
-      <div class="pp-body"><div class="pp-paper">${ppPaperHTML(m)}</div></div>`;
+      <div class="pp-body"><div class="pp-paper ${m.cls||''}">${ppPaperHTML(m)}</div></div>`;
     document.body.appendChild(ov);
     ov.querySelector('[data-pp="print"]').onclick=()=>ppPrint(m);
     ov.querySelector('[data-pp="pdf"]').onclick=()=>ppDownloadPdf(m);
