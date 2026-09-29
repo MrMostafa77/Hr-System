@@ -2549,7 +2549,15 @@
     const list=employees.filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
     openPayrollPreview({list,cols:monthCols(ym),single:false});
   });
-  document.getElementById('printReportBtn')?.addEventListener('click',()=>window.print());
+  document.getElementById('printReportBtn')?.addEventListener('click',()=>{
+    const ym=document.getElementById('payrollMonth')?.value;
+    if(!ym){showToast('لا يوجد شهر حضور وانصراف متاح');return;}
+    const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(),pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
+    const list=employees.filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    if(!list.length){showToast('لا يوجد موظفون مطابقون للطباعة');return;}
+    const model=buildPayrollModel(list,monthCols(ym),false);
+    ppPrint(model);
+  });
 
   /* ===== export / import ===== */
   document.getElementById('exportBtn')?.addEventListener('click', ()=>{
@@ -2902,7 +2910,26 @@
   /* ===== معاينة المسير (شاشة + طباعة + PDF + Excel) ===== */
   const PP_CSS = `
   .pp-paper{background:#fff;color:#111;direction:rtl;box-sizing:border-box;padding:16px 18px;font-family:'JF Flat Regular','JF Flat','Segoe UI',Tahoma,Arial,sans-serif;}
-  .pp-paper.pay-paper{padding:8px 10px}
+  .pp-paper.pay-paper{padding:16px 18px;font-family:'JF Flat Regular','JF Flat','Segoe UI',Tahoma,Arial,sans-serif;direction:rtl;color:#111;background:#fff}
+  .pay-paper .pay-head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;border-bottom:2.5px solid #1f4e5a;padding-bottom:8px;margin-bottom:10px}
+  .pay-paper .pay-title{font-size:23px;font-weight:800;color:#1f4e5a;white-space:nowrap;line-height:1.35}
+  .pay-paper .pay-meta{display:flex;flex-wrap:wrap;gap:4px 18px;justify-content:flex-start;align-items:center;font-size:11.5px;color:#222;line-height:1.6}
+  .pay-paper .pay-meta span{white-space:nowrap}
+  .pay-paper .pay-table{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:9px}
+  .pay-paper .pay-table th,.pay-paper .pay-table td{border:1px solid #6b7780;padding:4px 2px;text-align:center;white-space:normal;overflow-wrap:anywhere;font-family:inherit;line-height:1.25;color:#111;background:#fff}
+  .pay-paper .pay-table thead{display:table-header-group}
+  .pay-paper .pay-table tr{page-break-inside:avoid}
+  .pay-paper .pay-table thead tr.g th{background:#dfe9ed;color:#111;font-size:9px;font-weight:800;padding:5px 2px}
+  .pay-paper .pay-table thead tr:not(.g) th{background:#dfe9ed;color:#111;font-size:8.5px;font-weight:800;line-height:1.25;padding:5px 2px}
+  .pay-paper .pay-table tbody td{font-size:9px;height:24px}
+  .pay-paper .pay-table tbody td.s{text-align:right;padding:4px 5px;font-weight:700;font-size:10px}
+  .pay-paper .pay-table tbody td.ptot,.pay-paper .pay-table tfoot td{background:#f1f5f6;font-weight:800}
+  .pay-paper .pay-table tbody td.net{font-weight:800}
+  .pay-paper .pay-table tfoot td{font-size:9px;padding:5px 2px}
+  .pay-paper .pay-footnote{border-top:1px solid #6b7780;margin-top:8px;padding:7px 4px 0;font-size:10px;color:#333}
+  .pay-paper .pay-signatures{display:flex;justify-content:space-around;gap:30px;margin-top:18px;font-size:11.5px;font-weight:700;text-align:center}
+  .pay-paper .pay-signatures>div{flex:1}
+  .pay-paper .pay-signatures i{display:block;margin:34px 16px 0;border-top:1px solid #444}
   .pp-title{font-size:17px;font-weight:800;text-align:center;margin:0;color:#0b2444}
   .pp-sub{font-size:10px;text-align:center;color:#333;margin:3px 0 8px}
   .pp-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:7.2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -3003,13 +3030,15 @@
   }
   function ppPaperHTML(m){
     const cg=ppColGroups();
-    let h=`<div class="pp-title">${escapeHtml(m.title)}</div><div class="pp-sub">${escapeHtml(m.sub)}</div><table class="pp-table">${ppColgroup()}<thead><tr class="g">`;
+    const meta=String(m.sub||'').split(' — ').map(x=>`<span>${escapeHtml(x)}</span>`).join('');
+    let h=`<div class="pay-head"><div class="pay-title">${escapeHtml(m.title)}</div><div class="pay-meta">${meta}</div></div><table class="pp-table pay-table">${ppColgroup()}<thead><tr class="g">`;
     PP_GROUPS.forEach(([t,n],gi)=>{ h+=`<th class="pg${gi+1}" colspan="${n}">${escapeHtml(t)}</th>`; });
     h+='</tr><tr>'+PP_COLS.map((c,i)=>`<th class="pg${cg[i]}${c.tot?' ptot':''}">${escapeHtml(c.h)}</th>`).join('')+'</tr></thead><tbody>';
     m.rows.forEach(r=>{ h+='<tr>'+PP_COLS.map((c,i)=>`<td class="pg${cg[i]} ${c.t==='s'?'s ':''}${c.b?'b ':''}${c.tot?'ptot ':''}${c.net?'net':''}">${escapeHtml(ppFmt(c,c.k(r)))}</td>`).join('')+'</tr>'; });
     if(!m.single){
-      h+='</tbody><tfoot><tr><td colspan="5">الإجمالي</td>'+PP_COLS.slice(5).map((c,i)=>`<td class="pg${cg[i+5]}${c.tot?' ptot':''}">${m.totals[i+5]==null?'':escapeHtml(ppFmt(c,m.totals[i+5]))}</td>`).join('')+'</tr></tfoot></table>';
-    } else h+='</tbody></table>';
+      h+='</tbody><tfoot><tr><td colspan="5">الإجمالي</td>'+PP_COLS.slice(5).map((c,i)=>`<td class="pg${cg[i+5]}${c.tot?' ptot':''}">${m.totals[i+5]==null?'':escapeHtml(ppFmt(c,m.totals[i+5]))}</td>`).join('')+'</tr></tfoot>';
+    } else h+='</tbody>';
+    h+='</table><div class="pay-footnote"><b>ملاحظات:</b> جميع المبالغ بالريال السعودي — أساس احتساب الشهر 30 يومًا.</div><div class="pay-signatures"><div>إعداد<i></i></div><div>مراجعة<i></i></div><div>اعتماد<i></i></div></div>';
     return h;
   }
   function ppHTML(m){ return m.html ? m.html() : ppPaperHTML(m); }
