@@ -87,6 +87,13 @@
         </div>
       </div>
 
+      <div class="nav-group" data-group="system" data-admin-only>
+        <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>إدارة النظام</span><b>⌄</b></button>
+        <div class="nav-submenu">
+          <a class="navlink nav-child" data-view="users" data-admin-only><span>المستخدمون والصلاحيات</span></a>
+        </div>
+      </div>
+
     </nav>
     <div class="sidebar-foot">
       البيانات محفوظة ومزامنة عبر النظام.
@@ -993,7 +1000,12 @@
         <div class="card section-card full-page-card"><div class="filters" style="margin:0 0 16px"><div class="search-box" style="max-width:420px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg><input type="search" id="projectSearch" placeholder="بحث باسم المشروع"></div><span class="pill pill-gray" id="projectCount">0 مشروع</span></div><h3>قائمة المشاريع</h3><div class="table-wrap"><table class="payroll-table projects-table"><colgroup><col class="col-project"><col class="col-region"><col class="col-guards"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-money"><col class="col-action"></colgroup><thead><tr><th>المشروع</th><th>المنطقة</th><th>الحراس</th><th>إيرادات الحراس</th><th>تكاليف الحراس</th><th>إجمالي الإيرادات</th><th>إجمالي التكاليف</th><th>الإجراء</th></tr></thead><tbody id="projectsTableBody"></tbody></table></div></div>
       </div>
     </section>
-  </main>
+      <section id="view-users" style="display:none">
+      <div class="topbar"><div class="pagetitle"><h1>المستخدمون والصلاحيات</h1><p>إنشاء مستخدمين بإيميل وكلمة مرور وتحديد التبويبات المسموحة لكل مستخدم</p></div></div>
+      <div id="usersRoot"></div>
+    </section>
+
+</main>
 </div>
 
 <!-- profile drawer -->
@@ -1041,7 +1053,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="js/permissions.js" defer></script>
 <script src="js/firebase-init.js" type="module"></script>
+<script src="js/access.js" type="module"></script>
 <script src="js/data.js" defer></script>
 <script src="js/app.js" defer></script>
 <script>

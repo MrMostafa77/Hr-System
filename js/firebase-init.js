@@ -2,7 +2,7 @@
 // No npm/build step is required; this project is static and GitHub/Firebase Hosting ready.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, writeBatch } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 
 const firebaseConfig = {
@@ -129,11 +129,51 @@ function showApp(user){
 }
 window.firebaseSignOut=async()=>{ await signOut(auth); location.reload(); };
 
+// تحميل صلاحيات المستخدم من hr_users/{uid}.
+// أول مستخدم يسجل دخوله بعد تفعيل النظام يصبح مديراً تلقائياً (مرة واحدة فقط عبر hr_meta/access).
+async function loadProfile(user){
+  const meRef = doc(firestore,'hr_users',user.uid);
+  const markerRef = doc(firestore,'hr_meta','access');
+  try{
+    const snap = await getDoc(meRef);
+    if(snap.exists()) return { ...snap.data() };
+    const marker = await getDoc(markerRef);
+    if(!marker.exists()){
+      const now = new Date().toISOString();
+      const profile = { email:user.email||'', name:'', role:'admin', views:[], disabled:false, createdAt:now };
+      const batch = writeBatch(firestore);
+      batch.set(meRef, profile);
+      batch.set(markerRef, { firstAdminUid:user.uid, createdAt:now });
+      await batch.commit();
+      return profile;
+    }
+    return { role:'none' };
+  }catch(err){
+    console.warn('تعذر قراءة صلاحيات المستخدم (هل نُشرت firestore.rules الجديدة؟):', err);
+    if(err && err.code==='permission-denied') return { role:'user', legacy:true, views:[] };
+    throw err;
+  }
+}
+
 window.firebaseUserReady = new Promise(resolve=>{
   let resolved=false;
-  onAuthStateChanged(auth,user=>{
-    if(user){ showApp(user); if(!resolved){resolved=true;resolve(user);} }
-    else showLogin();
+  onAuthStateChanged(auth, async user=>{
+    if(!user){ showLogin(); return; }
+    let profile;
+    try{ profile = await loadProfile(user); }
+    catch(err){ profile = { role:'none', error:true }; }
+    if(profile.role==='none' || profile.disabled){
+      const why = profile.disabled ? 'هذا الحساب موقوف. تواصل مع مدير النظام.'
+        : (profile.error ? 'تعذر التحقق من صلاحيات الحساب. حاول مرة أخرى.' : 'هذا الحساب غير مصرح له بدخول النظام. تواصل مع مدير النظام.');
+      await signOut(auth).catch(()=>{});
+      showLogin();
+      const errEl=document.getElementById('firebaseLoginError'); if(errEl) errEl.textContent=why;
+      return;
+    }
+    showApp(user);
+    if(profile.legacy){ const b=document.getElementById('firebaseUserEmail'); if(b) b.textContent+=' (قواعد Firestore غير محدّثة)'; }
+    window.HRAuth?.setSession(profile,user);
+    if(!resolved){resolved=true;resolve(user);}
   });
 });
 

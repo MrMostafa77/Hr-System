@@ -733,6 +733,19 @@
   // "إضافة موظف" screen remains reachable even if a later optional
   // initialization step fails.
   function switchView(view){
+    // ===== صلاحيات المستخدم: منع فتح أي شاشة غير مسموحة =====
+    if(window.HRAuth && window.HRAuth.profile){
+      if(!window.HRAuth.canView(view)){
+        const f=window.HRAuth.firstAllowed();
+        try{ showToast('ليس لديك صلاحية لفتح هذه الشاشة'); }catch(e){}
+        if(!f) return;
+        if(f.report) window.currentReport=f.report;
+        view=f.view;
+      }
+      if(view==='reports' && !window.HRAuth.canReport(window.currentReport||'payroll')){
+        const r=window.HRAuth.firstReport(); if(r) window.currentReport=r;
+      }
+    }
     currentView = view;
     try{ pjTabsSync(view); }catch(e){ console.error('tabs',e); }
     document.querySelector('main')?.classList.toggle('wide-data-view', view==='attendance' || view==='reports' || view==='projectaccounts');
@@ -752,7 +765,7 @@
     const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(view);
     st.textContent=`@media print { @page { size: A4 ${isLandscape?'landscape':'portrait'} !important; margin: ${isLandscape?'8mm':'10mm'} !important; } }`;
     document.head.appendChild(st);
-    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports'].forEach(v=>{
+    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports','users'].forEach(v=>{
       document.getElementById('view-'+v).style.display = (v===view)?'':'none';
     });
     document.querySelectorAll('.navlink[data-view]').forEach(a=>{
@@ -785,6 +798,7 @@
     if(view==='commencement-list') renderCommencementList();
     if(view==='projectaccounts') renderProjectAccount();
     if(view==='reports') renderReports();
+    if(view==='users') window.HRUsers?.render();
     if(view==='reports'){
       const activeReport=document.querySelector('.nav-child[data-view="reports"].active');
       const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
@@ -797,7 +811,7 @@
   window.switchView = switchView;
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
-  const PJ_TITLES={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
+  const PJ_TITLES={users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
   const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn']};
   const pjTabs={open:[],dirty:new Set()};
