@@ -319,11 +319,12 @@
   ];
   function projectPenaltyDefaults(){ return DEFAULT_PROJECT_PENALTIES.map(x=>({...x})); }
   function projectPenaltyRow(item={}, index=0){
-    const fixed=!!item.fixed, days=Math.min(10,Math.max(1,Number(item.days)||1));
-    const options=Array.from({length:10},(_,i)=>`<option value="${i+1}" ${days===i+1?'selected':''}>${i+1}</option>`).join('');
+    const fixed=!!item.fixed, days=Math.min(10,Math.max(0,Number(item.days)||0)), pct=Math.max(0,Number(item.pct)||0);
+    const options=Array.from({length:21},(_,i)=>`<option value="${i/2}" ${days===i/2?'selected':''}>${i/2}</option>`).join('');
     return `<tr class="project-penalty-row" data-index="${index}">
       <td><input class="pp-name" value="${escapeAttr(item.name||'')}" ${item.custom?'':'readonly'}></td>
       <td><select class="pp-days" ${fixed?'disabled':''}>${options}</select></td>
+      <td><input class="pp-pct" type="number" min="0" max="500" step="5" placeholder="0" title="نسبة إضافية من قيمة اليوم (مثال: 50 = نصف يوم إضافي)" value="${!fixed&&pct?escapeAttr(pct):''}" ${fixed?'disabled':''}></td>
       <td><label class="project-check pp-fixed-wrap"><input type="checkbox" class="pp-fixed" ${fixed?'checked':''}><span>مبلغ مقطوع</span></label></td>
       <td><input class="pp-amount" type="number" min="0" step="0.01" placeholder="اكتب المبلغ" value="${fixed?escapeAttr(item.amount||''):''}" ${fixed?'':'disabled'}></td>
       <td>${item.custom?'<button type="button" class="small-btn danger pp-remove">×</button>':'<span class="muted">افتراضي</span>'}</td>
@@ -337,7 +338,8 @@
   function getProjectPenalties(){
     return [...document.querySelectorAll('#projectPenaltiesBody .project-penalty-row')].map(row=>({
       name:row.querySelector('.pp-name')?.value.trim()||'مخالفة أخرى',
-      days:Math.min(10,Math.max(1,Number(row.querySelector('.pp-days')?.value)||1)),
+      days:Math.min(10,Math.max(0,Number(row.querySelector('.pp-days')?.value)||0)),
+      pct:Math.min(500,Math.max(0,Number(row.querySelector('.pp-pct')?.value)||0)),
       fixed:!!row.querySelector('.pp-fixed')?.checked,
       amount:Number(row.querySelector('.pp-amount')?.value)||0,
       custom:!row.querySelector('.pp-name')?.readOnly
@@ -349,8 +351,9 @@
       const row=e.target.closest('.project-penalty-row'); if(!row)return;
       if(e.target.classList.contains('pp-fixed')){
         const fixed=e.target.checked;
-        const days=row.querySelector('.pp-days'), amount=row.querySelector('.pp-amount');
+        const days=row.querySelector('.pp-days'), amount=row.querySelector('.pp-amount'), pctEl=row.querySelector('.pp-pct');
         if(days)days.disabled=fixed;
+        if(pctEl){ pctEl.disabled=fixed; if(fixed) pctEl.value=''; }
         if(amount)amount.disabled=!fixed;
         if(!fixed && amount)amount.value='';
       }
@@ -361,7 +364,7 @@
     };
     document.getElementById('addProjectPenaltyBtn')?.addEventListener('click',()=>{
       const index=body.querySelectorAll('.project-penalty-row').length;
-      body.insertAdjacentHTML('beforeend',projectPenaltyRow({name:'مخالفة أخرى',days:1,fixed:false,amount:0,custom:true},index));
+      body.insertAdjacentHTML('beforeend',projectPenaltyRow({name:'مخالفة أخرى',days:1,pct:0,fixed:false,amount:0,custom:true},index));
     });
   }
   renderProjectPenalties();
@@ -2354,7 +2357,7 @@
   // أجر اليوم للخصومات = (الأساسي + السكن + المواصلات + بدلات أخرى) ÷ 30
   function empDayRate(e){
     const g=(Number(e?.basicsalary)||0)+(Number(e?.housing)||0)+(Number(e?.transport)||0)+(Number(e?.otherallow)||0);
-    return g/30;
+    return g/PAY_MONTH_DAYS;
   }
   function projectOfEmployee(e){ return projects.find(p=>String(p.name||'')===String(e?.project||'')); }
   function policyForProjectName(name){
@@ -2364,19 +2367,32 @@
   function policyFor(e){ return policyForProjectName(e?.project); }
   function policyNorm(t){ return String(t||'').replace(/\s+/g,' ').trim(); }
   function policyItemByName(list,name){ const n=policyNorm(name); if(!n) return null; return (list||[]).find(x=>policyNorm(x.name)===n)||null; }
-  function policyAmount(item,dayRate){ return item ? (item.fixed ? (Number(item.amount)||0) : (Number(item.days)||0)*dayRate) : 0; }
+  const PAY_MONTH_DAYS = 30;          // الشهر عندنا دائماً 30 يوم (حتى لو الشهر 28/29/31)
+  const OVERTIME_FACTOR = 1.5;        // معامل الإضافي (يوم الإضافي = أجر اليوم × 1.5)
+  function r2(n){ return Math.round((Number(n)||0)*100)/100; }
+  // عدد أيام الخصم الفعلي للبند = أيام اللائحة + (النسبة الإضافية ÷ 100). مثال: يومين + 50% = 2.5 يوم
+  function policyEffDays(item){ return (Number(item?.days)||0) + (Number(item?.pct)||0)/100; }
+  function policyDaysText(item){
+    if(!item) return '—';
+    if(item.fixed) return 'مبلغ مقطوع';
+    const d=Number(item.days)||0, pc=Number(item.pct)||0;
+    if(d>0 && pc>0) return `${d} يوم + ${pc}% من قيمة اليوم`;
+    if(pc>0) return `${pc}% من قيمة اليوم`;
+    return `${d} يوم`;
+  }
+  function policyAmount(item,dayRate){ return item ? r2(item.fixed ? (Number(item.amount)||0) : policyEffDays(item)*dayRate) : 0; }
   function policyDefaultNameForCode(code){ return code==='غ' ? 'يوم الغياب بدون عذر' : (code==='س' ? 'الانسحاب من الموقع' : ''); }
   function penRecCode(p){ return (p.code && ATT_CODES.includes(p.code)) ? p.code : (/انسحاب/.test(String(p.type||'')) ? 'س' : 'ج'); }
   // قيمة خصم إجراء واحد: من لائحة المشروع (أيام × أجر اليوم أو مبلغ مقطوع)
   function recordPolicyAmount(e, rec, code, dayRate, listIn){
     const list=listIn||policyFor(e);
-    if(rec && rec.manualAmount!=null && rec.manualAmount!=='') return {amount:Number(rec.manualAmount)||0, name:rec.type||'', item:null};
-    if(rec && rec.manualDays) return {amount:(Number(rec.days)||0)*dayRate, name:rec.type||'', item:null};
+    if(rec && rec.manualAmount!=null && rec.manualAmount!=='') return {amount:r2(rec.manualAmount), name:rec.type||'', item:null};
+    if(rec && rec.manualDays) return {amount:r2((Number(rec.days)||0)*dayRate), name:rec.type||'', item:null};
     let item=rec ? policyItemByName(list, rec.type) : null;
     if(!item && policyDefaultNameForCode(code)) item=policyItemByName(list, policyDefaultNameForCode(code));
     if(item) return {amount:policyAmount(item,dayRate), name:item.name, item};
     const days = (rec && rec.days!=='' && rec.days!=null) ? (Number(rec.days)||0) : 1;
-    return {amount:days*dayRate, name:(rec&&rec.type)||'', item:null};
+    return {amount:r2(days*dayRate), name:(rec&&rec.type)||'', item:null};
   }
   function attDeductionsFor(e, cols, dayRate){
     const list=policyFor(e), out={absence:0,withdrawal:0,penalty:0,absenceCount:0,items:[]};
@@ -2432,12 +2448,12 @@
   function payrollStatementForCols(e,cols,sumIn){
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
     const basic=Number(e.basicsalary)||0,housing=Number(e.housing)||0,transport=Number(e.transport)||0,otherAllow=Number(e.otherallow)||0;
-    const monthlyGross=basic+housing+transport+otherAllow, day=monthlyGross/30;
-    const overtime=(sum['ض']||0)*(basic/30)*1.5, bonus=Number(a.bonus)||0, totalEarned=monthlyGross+overtime+bonus;
-    const nonWorkDays=nonAttendanceDaysFor(e,ym), nonWorkDed=nonWorkDays*day;
+    const monthlyGross=basic+housing+transport+otherAllow, day=empDayRate(e);
+    const overtime=r2((sum['ض']||0)*day*OVERTIME_FACTOR), bonus=Number(a.bonus)||0, totalEarned=monthlyGross+overtime+bonus;
+    const nonWorkDays=nonAttendanceDaysFor(e,ym), nonWorkDed=r2(nonWorkDays*day);
     const ded=attDeductionsFor(e,cols,day), penalty=ded.penalty, withdrawal=ded.withdrawal;
     // الغياب (غ) حسب لائحة المشروع، والانكشاف (ش) يوم بأجر اليوم الإجمالي
-    const absenceDays=ded.absenceCount+(sum['ش']||0), absence=ded.absence+(sum['ش']||0)*day;
+    const absenceDays=ded.absenceCount+(sum['ش']||0), absence=r2(ded.absence+(sum['ش']||0)*day);
     const project=projects.find(p=>String(p.name||'')===String(e.project||''));
     const insuranceBase=basic+housing;
     const gosi=project?.socialInsurance ? insuranceBase*(Number(project.socialInsuranceRate)||0)/100 : 0;
@@ -3177,7 +3193,7 @@
     if(!proj){ box.innerHTML='<div class="act-policy-head">لائحة الجزاءات والخصومات<small>اختر المشروع لعرض لائحته</small></div>'; return; }
     const cur=actTypeName();
     box.innerHTML=`<div class="act-policy-head">${escapeHtml(proj)}<small>لائحة الجزاءات والخصومات</small></div>`
-      + policyForProjectName(proj).map((x,i)=>`<div class="act-policy-row${x.name===cur?' active':''}" data-i="${i}"><span>${escapeHtml(x.name)}</span><b>${x.fixed?escapeHtml(ppNf(x.amount))+' ريال':escapeHtml(String(x.days))+' يوم'}</b></div>`).join('');
+      + policyForProjectName(proj).map((x,i)=>`<div class="act-policy-row${x.name===cur?' active':''}" data-i="${i}"><span>${escapeHtml(x.name)}</span><b>${x.fixed?escapeHtml(ppNf(x.amount))+' ريال':escapeHtml(policyDaysText(x))}</b></div>`).join('');
   }
   function actSyncButtons(){
     const isOther=($a('p_type')?.value||'')===ACT_OTHER;
@@ -3201,7 +3217,7 @@
     const hasD=rec.days!=='' && rec.days!=null;
     if(rec.manualAmount!=null && rec.manualAmount!==''){ amount=Number(rec.manualAmount)||0; days=hasD?Number(rec.days):''; source='مبلغ محدد يدويًا'; }
     else if(rec.manualDays || !item){ days=hasD?(Number(rec.days)||0):(rec.id?1:0); amount=days*day; source=item?'عدد أيام محدد يدويًا':'تحديد يدوي'; }
-    else { days=item.fixed?'':item.days; amount=policyAmount(item,day); source='لائحة الجزاءات والخصومات لمشروع '+(rec.project||emp?.project||''); }
+    else { days=item.fixed?'':policyEffDays(item); amount=policyAmount(item,day); source='لائحة الجزاءات والخصومات لمشروع '+(rec.project||emp?.project||''); }
     return {days, amount:isDed?Math.round(amount*100)/100:0, item, source, isDed};
   }
   function actUpdateCalc(){
@@ -3212,7 +3228,7 @@
     const item=name?policyItemByName(policyForProjectName(proj),name):null;
     const dEdit=actState.daysManual||isOther;
     daysEl.readOnly=!dEdit;
-    if(!dEdit) daysEl.value=item?(item.fixed?'':item.days):'';
+    if(!dEdit) daysEl.value=item?(item.fixed?'':String(policyEffDays(item))):'';
     amtEl.readOnly=!actState.amountManual;
     if(!actState.amountManual){
       const code=$a('p_code')?.value||'ج', isDed=['غ','س','ج'].includes(code);
@@ -3222,7 +3238,7 @@
     }
     const note=$a('p_calcNote');
     if(note){
-      note.textContent = !proj ? '' : (actState.amountManual ? 'المبلغ محدد يدويًا' : (dEdit ? 'عدد الأيام محدد يدويًا — المبلغ = الأيام × أجر اليوم' : (item ? 'محسوب من لائحة مشروع '+proj : 'اختر الإجراء لتحديد أيام الخصم')));
+      note.textContent = !proj ? '' : (actState.amountManual ? 'المبلغ محدد يدويًا' : (dEdit ? 'عدد الأيام محدد يدويًا — المبلغ = الأيام × أجر اليوم' : (item ? 'محسوب من لائحة مشروع '+proj : 'اختر الإجراء لتحديد أيام الخصم')))+(emp?` — أجر اليوم ${r2(empDayRate(emp))} ريال (الراتب الإجمالي ÷ 30)`:'');
     }
     actSyncButtons(); actRenderPolicyPanel();
   }
@@ -3256,7 +3272,7 @@
     const calc=actionCalc(emp, rec);
     const proj=rec.project||emp.project||'';
     const codeTxt=penCodeText(rec.code?rec:{...rec,code:'ج'});
-    const daysTxt = calc.item && !rec.manualDays && !(rec.manualAmount!=null&&rec.manualAmount!=='') && calc.item.fixed ? 'مبلغ مقطوع' : (calc.days===''||calc.days==null ? '—' : String(calc.days)+' يوم');
+    const daysTxt = calc.item && !rec.manualDays && !(rec.manualAmount!=null&&rec.manualAmount!=='') ? policyDaysText(calc.item) : (calc.days===''||calc.days==null ? '—' : String(calc.days)+' يوم');
     const amtTxt = calc.isDed ? ppNf(calc.amount)+' ريال' : '—';
     const cells=[
       ['اسم الحارس',emp.fullname||'—'],['الرقم الوظيفي',emp.empcode||'—'],
@@ -3458,7 +3474,7 @@
       const recInfo = emp ? recordPolicyAmount(emp, p, pcode, empDayRate(emp), policyForProjectName(p.project||emp.project)) : {amount:0,item:null};
       const penAmount = (emp && ['غ','س','ج'].includes(pcode)) ? recInfo.amount : 0;
       const manual = (p.manualAmount!=null && p.manualAmount!=='') || p.manualDays;
-      const daysText = (!manual && recInfo.item) ? (recInfo.item.fixed?'مقطوع':recInfo.item.days) : (p.days??'');
+      const daysText = (!manual && recInfo.item) ? policyDaysText(recInfo.item) : (p.days??'');
       return `<tr data-emp="${escapeAttr(p.empId)}">
         <td>${escapeHtml(emp ? emp.fullname : 'موظف محذوف')}</td>
         <td>${escapeHtml(p.project||emp?.project||'—')}</td>
