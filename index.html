@@ -983,6 +983,17 @@
         </table></div>
       </div>
 
+      <div id="employeeReportsPanel" class="employee-reports-panel" style="display:none">
+        <div class="card section-card employee-report-card">
+          <div class="employee-report-toolbar">
+            <div><h2>سجل الموظفين الشامل</h2><p>الموظفون المسجلون، بالإضافة إلى الأسماء المدخلة يدويًا في التغطيات</p></div>
+            <div class="employee-report-tools"><input type="search" id="employeeReportSearch" placeholder="بحث بالاسم أو الكود أو المشروع"><span class="pill pill-gray" id="employeeReportCount">0 سجل</span></div>
+          </div>
+          <div class="employee-report-list-wrap"><table class="employee-report-table"><thead><tr><th>م</th><th>اسم الموظف / الحارس</th><th>الكود الوظيفي</th><th>المشروع</th><th>العقد</th><th>المباشرة</th><th>السجلات</th></tr></thead><tbody id="employeeReportBody"></tbody></table></div>
+          <div class="employee-report-footnote">اضغط على أي سطر لعرض ملخص سريع، ثم اختر «عرض كامل البيانات» لفتح الملف الشامل.</div>
+        </div>
+      </div>
+
       <div id="projectReportsPanel" class="project-reports-panel" style="display:none">
         <div class="topbar"><div class="pagetitle"><h2>تقارير المشاريع</h2><p>ملخص المشاريع وقائمة المشاريع</p></div></div>
         <div class="card section-card project-summary-card">

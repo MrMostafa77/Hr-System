@@ -2511,11 +2511,90 @@
     rf.innerHTML='<option value="">كل المناطق</option>'+rs.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join('');
     pf.value=ps.includes(pv)?pv:''; rf.value=rs.includes(rv)?rv:'';
   }
+  const employeeReportOpen = new Set();
+  function employeeReportRecords(){
+    const rows=employees.map(e=>({key:'emp:'+e.id,emp:e,name:e.fullname||'—',code:e.empcode||'',project:e.project||'',isEmployee:true}));
+    const norm=s=>String(s||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('ar');
+    const known=new Set(rows.map(r=>norm(r.name)));
+    (coverage||[]).forEach(c=>{
+      const candidates=[
+        {name:c.guardName||'',code:'',project:c.location||c.project||'',role:'حارس تغطية',kind:'guard'},
+        {name:c.absentName||c.absent||'',code:'',project:c.location||c.project||'',role:'اسم الغائب في التغطية',kind:'absent'}
+      ];
+      candidates.forEach(x=>{
+        const name=String(x.name||'').trim(); if(!name||known.has(norm(name)))return;
+        const key='covname:'+norm(name); if(rows.some(r=>r.key===key))return;
+        rows.push({key,name,code:'—',project:x.project,isEmployee:false,coverageRole:x.role});
+      });
+    });
+    return rows.sort((a,b)=>a.name.localeCompare(b.name,'ar'));
+  }
+  function reportAttendanceRows(emp){
+    const start=attStartDateFor(emp.id)||String(emp.startdate||'').slice(0,10), end=todayISO();
+    if(!start)return [];
+    const out=[]; let cursor=start.slice(0,7), last=end.slice(0,7);
+    while(cursor<=last){
+      const rec=effectiveAttendanceRecord(cursor,emp.id), max=Math.min(daysInMonth(cursor),Number(cursor===last?end.slice(8,10):daysInMonth(cursor)));
+      for(let d=1;d<=max;d++){
+        const date=`${cursor}-${String(d).padStart(2,'0')}`; if(date<start||date>end)continue;
+        const code=rec[d]||''; if(!code)continue;
+        out.push({date,code});
+      }
+      const [y,m]=cursor.split('-').map(Number); cursor=m===12?`${y+1}-01`:`${y}-${String(m+1).padStart(2,'0')}`;
+    }
+    return out;
+  }
+  function employeeReportSummary(r){
+    if(!r.isEmployee){
+      const related=(coverage||[]).filter(c=>[c.guardName,c.absentName,c.absent].some(n=>String(n||'').trim()===r.name));
+      return `<div class="employee-report-summary"><div class="employee-summary-grid"><div><small>نوع السجل</small><b>اسم وارد في التغطيات فقط</b></div><div><small>المشروع / الموقع</small><b>${escapeHtml(r.project||'—')}</b></div><div><small>عدد سجلات التغطية</small><b>${related.length}</b></div></div><div class="employee-summary-actions"><span class="pill pill-amber">لا يوجد ملف موظف مرتبط</span></div></div>`;
+    }
+    const e=r.emp, ci=employeeContractInfo(e.id), c=ci.contract, cm=employeeCommencementInfo(e), cov=(coverage||[]).filter(x=>String(x.guardId||'')===String(e.id)||String(x.absentId||'')===String(e.id)||String(x.guardName||'').trim()===String(e.fullname||'').trim()||String(x.absentName||x.absent||'').trim()===String(e.fullname||'').trim()), pays=payrollAvailableMonths().length;
+    return `<div class="employee-report-summary"><div class="employee-summary-grid"><div><small>الاسم</small><b>${escapeHtml(e.fullname||'—')}</b></div><div><small>الكود الوظيفي</small><b>${escapeHtml(e.empcode||'—')}</b></div><div><small>العقد</small><b>${escapeHtml(c?.contractNo||c?.contractCode||c?.code||ci.status||'بدون عقد')}</b></div><div><small>المباشرة</small><b>${cm?`مباشر — ${escapeHtml(fmtDMY(cm.startDate||''))}`:'غير مباشر'}</b></div><div><small>المشروع</small><b>${escapeHtml(e.project||'—')}</b></div><div><small>الوظيفة</small><b>${escapeHtml(e.jobtitle||'—')}</b></div></div><div class="employee-summary-actions"><span class="pill pill-gray">${cov.length} تغطية</span><span class="pill pill-gray">${pays} شهر رواتب متاح</span><button type="button" class="btn btn-sm employee-full-profile" data-full-employee="${escapeAttr(e.id)}">عرض كامل بيانات الموظف <span aria-hidden="true">↗</span></button></div></div>`;
+  }
+  function employeeReportFullProfile(empId){
+    const e=employees.find(x=>String(x.id)===String(empId)); if(!e)return;
+    const ci=employeeContractInfo(e.id), c=ci.contract, cm=employeeCommencementInfo(e), alerts=employeeAlertList(e), att=reportAttendanceRows(e);
+    const empCov=(coverage||[]).filter(x=>String(x.guardId||'')===String(e.id)||String(x.absentId||'')===String(e.id)||String(x.guardName||'').trim()===String(e.fullname||'').trim()||String(x.absentName||x.absent||'').trim()===String(e.fullname||'').trim()).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    const empActs=(penalties||[]).filter(x=>String(x.empId||'')===String(e.id)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+    const months=[]; const start=attStartDateFor(e.id); if(start){let m=start.slice(0,7),last=todayISO().slice(0,7);while(m<=last){months.push(m);const [y,n]=m.split('-').map(Number);m=n===12?`${y+1}-01`:`${y}-${String(n+1).padStart(2,'0')}`;}}
+    const attendanceCounts={}; att.forEach(x=>attendanceCounts[x.code]=(attendanceCounts[x.code]||0)+1);
+    const kv=(label,value)=>`<div class="employee-profile-field"><small>${escapeHtml(label)}</small><b>${escapeHtml(value==null||value===''?'—':String(value))}</b></div>`;
+    const table=(heads,rows,empty)=>`<div class="employee-profile-table-wrap"><table class="employee-profile-table"><thead><tr>${heads.map(h=>`<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${rows||`<tr><td colspan="${heads.length}" class="empty-note">${escapeHtml(empty)}</td></tr>`}</tbody></table></div>`;
+    const personal=[['الاسم الأول',e.firstname],['اسم الأب',e.fathername],['اسم الجد',e.grandname],['اسم العائلة',e.familyname],['الاسم الكامل',e.fullname],['الكود الوظيفي',e.empcode],['رقم الهوية',e.idnum],['الجنسية',e.nationality],['تاريخ الميلاد',e.dob],['الجنس',e.gender],['تاريخ إصدار الهوية',e.iddate_issue],['تاريخ انتهاء الهوية',e.iddate_expiry],['مكان إصدار الهوية',e.idplace],['الجوال',e.phone],['البريد الإلكتروني',e.email],['العنوان',e.address],['اسم جهة الطوارئ',e.emname],['جوال جهة الطوارئ',e.emphone],['المنطقة',e.region],['المشروع',e.project],['القسم',e.dept],['الوظيفة',e.jobtitle],['تاريخ بدء العمل المسجل',e.startdate]];
+    const contractFields=c?[['رقم العقد',c.contractNo||c.contractCode||c.code||c.id],['تاريخ البداية',c.startDate||c.startdate],['تاريخ النهاية',c.endDate||c.enddate],['المدة',c.duration||c.period],['الحالة',ci.status],['الراتب الأساسي',fmt(e.basicsalary)],['بدل السكن',fmt(e.housing)],['نسبة بدل السكن',e.housingPct],['بدل المواصلات',fmt(e.transport)],['نسبة بدل المواصلات',e.transportPct],['بدلات أخرى',fmt(e.otherallow)],['نسبة البدلات الأخرى',e.otherallowPct],['خصومات أخرى',fmt(e.otherded)],['إجمالي الراتب',fmt(lastWageTotal(e))],['آخر أجر مسجل',fmt(e.lastwage)]]:[['حالة العقد','بدون عقد'],['الراتب الأساسي',fmt(e.basicsalary)],['بدل السكن',fmt(e.housing)],['بدل المواصلات',fmt(e.transport)],['بدلات أخرى',fmt(e.otherallow)],['خصومات أخرى',fmt(e.otherded)],['إجمالي الراتب',fmt(lastWageTotal(e))]];
+    const bankFields=[['اسم البنك',e.bankname],['رقم الآيبان',e.iban],['رقم الحساب',e.accountno],['رمز البنك',e.bankcode],['نوع الحساب',e.bankAccountType],['اسم المفوض',e.delegate_name],['ملاحظات التفويض',e.delegate_memo]];
+    const attendanceRows=att.slice().reverse().map(x=>`<tr><td class="mono">${escapeHtml(fmtDMY(x.date))}</td><td><b>${escapeHtml(x.code)}</b></td><td>${escapeHtml(attCodeLabel(x.code))}</td></tr>`).join('');
+    const payrollRows=months.slice().reverse().map(ym=>{const p=payrollStatementForCols(e,monthCols(ym));return `<tr><td>${escapeHtml(monthLabel(ym))}</td><td class="mono">${fmt(p.monthlyGross)}</td><td class="mono">${fmt(p.deduction)}</td><td class="mono"><b>${fmt(p.net)}</b></td></tr>`;}).join('');
+    const covRows=empCov.map(x=>`<tr><td class="mono">${escapeHtml(x.date||'—')}</td><td>${escapeHtml(x.guardName||'—')}</td><td>${escapeHtml(x.absentName||x.absent||'—')}</td><td>${escapeHtml(x.location||x.project||'—')}</td><td>${escapeHtml(covStatusText(x.status)||'—')}</td><td class="mono">${fmt(x.amount)}</td><td>${escapeHtml(x.notes||'—')}</td></tr>`).join('');
+    const actRows=empActs.map(x=>`<tr><td class="mono">${escapeHtml(x.date||'—')}</td><td>${escapeHtml(penCodeText(x)||'—')}</td><td>${escapeHtml(x.type||'—')}</td><td>${escapeHtml(String(x.days??'—'))}</td><td>${escapeHtml(x.notes||'—')}</td></tr>`).join('');
+    const alertHtml=alerts.length?alerts.map(a=>`<span class="employee-alert-chip">⚠ ${escapeHtml(a)}</span>`).join(''):'<span class="employee-ok-chip">لا توجد تنبيهات مسجلة حاليًا</span>';
+    document.getElementById('employeeProfileModal')?.remove();
+    const modal=document.createElement('div'); modal.id='employeeProfileModal'; modal.className='employee-profile-modal';
+    modal.innerHTML=`<div class="employee-profile-backdrop" data-profile-close></div><article class="employee-profile-dialog" role="dialog" aria-modal="true" aria-label="الملف الشامل للموظف"><header class="employee-profile-header"><div><span class="employee-profile-kicker">ملف الموظف الشامل</span><h2>${escapeHtml(e.fullname||'—')}</h2><p>${escapeHtml(e.empcode||'—')} · ${escapeHtml(e.jobtitle||'—')} · ${escapeHtml(e.project||'—')}</p></div><button type="button" class="btn icon-btn" data-profile-close aria-label="إغلاق">✕</button></header><div class="employee-profile-content"><section class="employee-profile-section"><h3>البيانات الشخصية والوظيفية</h3><div class="employee-profile-fields">${personal.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section"><h3>العقد والراتب</h3><div class="employee-profile-fields">${contractFields.map(x=>kv(x[0],x[1])).join('')}${kv('تاريخ المباشرة',cm?.startDate?fmtDMY(cm.startDate):'لا توجد مباشرة')}${kv('المشروع في المباشرة',cm?.project||'—')}</div></section><section class="employee-profile-section"><h3>البيانات البنكية والتفويض</h3><div class="employee-profile-fields">${bankFields.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section"><h3>الحضور والانصراف منذ المباشرة <span class="employee-section-count">${att.length} يوم</span></h3><div class="employee-attendance-summary">${Object.entries(attendanceCounts).map(([code,count])=>`<span><b>${count}</b> ${escapeHtml(attCodeLabel(code)||code)}</span>`).join('')||'لا توجد سجلات ضمن الفترة'}</div>${table(['التاريخ','الرمز','الحالة'],attendanceRows,'لا توجد سجلات حضور من تاريخ المباشرة حتى اليوم')}</section><section class="employee-profile-section"><h3>مسيرات الرواتب <span class="employee-section-count">${months.length} شهر</span></h3>${table(['الشهر','إجمالي المستحقات','إجمالي الخصومات','صافي الراتب'],payrollRows,'لا توجد أشهر رواتب ضمن الفترة')}</section><section class="employee-profile-section"><h3>سجل التغطيات <span class="employee-section-count">${empCov.length} سجل</span></h3>${table(['التاريخ','المغطّي','الغائب','الموقع / المشروع','الحالة','المستحق','ملاحظات'],covRows,'لا توجد تغطيات مرتبطة بهذا الموظف')}</section><section class="employee-profile-section"><h3>إجراءات الموظف <span class="employee-section-count">${empActs.length} إجراء</span></h3>${table(['التاريخ','الرمز','الإجراء','الأيام','ملاحظات'],actRows,'لا توجد إجراءات مسجلة')}</section><section class="employee-profile-section"><h3>التنبيهات والملاحظات</h3><div class="employee-alert-list">${alertHtml}</div>${e.notes?`<p class="employee-profile-notes">${escapeHtml(e.notes)}</p>`:''}</section></div></article>`;
+    document.body.appendChild(modal); document.body.classList.add('employee-profile-open');
+    modal.querySelectorAll('[data-profile-close]').forEach(el=>el.addEventListener('click',()=>{modal.remove();document.body.classList.remove('employee-profile-open');}));
+    const escClose=ev=>{if(ev.key==='Escape'){modal.remove();document.body.classList.remove('employee-profile-open');document.removeEventListener('keydown',escClose);}};document.addEventListener('keydown',escClose);
+  }
+  function attCodeLabel(code){const map={'ح':'حضور','غ':'غياب','ش':'انكشاف','ج':'جزاء','راحة':'راحة','ط':'تغطية','ض':'إضافي','س':'انسحاب','جمع':'إجازة جمع','عيد':'إجازة عيد','ق':'إجازة'};return map[String(code||'')]||String(code||'—');}
+  function renderEmployeeReports(){
+    const body=document.getElementById('employeeReportBody'); if(!body)return;
+    const q=(document.getElementById('employeeReportSearch')?.value||'').trim().toLocaleLowerCase('ar');
+    const list=employeeReportRecords().filter(r=>!q||[r.name,r.code,r.project,r.coverageRole].some(v=>String(v||'').toLocaleLowerCase('ar').includes(q)));
+    document.getElementById('employeeReportCount').textContent=`${list.length} سجل`;
+    body.innerHTML=list.map((r,i)=>`<tr class="employee-report-main-row ${employeeReportOpen.has(r.key)?'is-open':''}" data-employee-report-row="${escapeAttr(r.key)}"><td>${i+1}</td><td><span class="employee-row-chevron">${employeeReportOpen.has(r.key)?'▾':'▸'}</span><b>${escapeHtml(r.name)}</b>${r.isEmployee?'':` <span class="pill pill-amber">تغطية فقط</span>`}</td><td class="mono">${escapeHtml(r.code||'—')}</td><td>${escapeHtml(r.project||'—')}</td><td>${r.isEmployee?escapeHtml(employeeContractInfo(r.emp.id).status):'—'}</td><td>${r.isEmployee?escapeHtml(employeeCommencementStatus(r.emp)):'—'}</td><td>${r.isEmployee?`${(coverage||[]).filter(c=>String(c.guardId||'')===String(r.emp.id)||String(c.absentId||'')===String(r.emp.id)).length} تغطية`:'تغطيات'}</td></tr>${employeeReportOpen.has(r.key)?`<tr class="employee-report-detail-row"><td colspan="7">${employeeReportSummary(r)}</td></tr>`:''}`).join('')||'<tr><td colspan="7" class="empty-note">لا توجد سجلات مطابقة.</td></tr>';
+    body.querySelectorAll('[data-employee-report-row]').forEach(row=>row.addEventListener('click',()=>{const key=row.dataset.employeeReportRow;employeeReportOpen.has(key)?employeeReportOpen.delete(key):employeeReportOpen.add(key);renderEmployeeReports();}));
+    body.querySelectorAll('[data-full-employee]').forEach(btn=>btn.addEventListener('click',ev=>{ev.stopPropagation();employeeReportFullProfile(btn.dataset.fullEmployee);}));
+  }
+  document.getElementById('employeeReportSearch')?.addEventListener('input',renderEmployeeReports);
+
   function renderReports(){
-    const projectMode=window.currentReport==='projects', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel');
-    if(card)card.style.display=projectMode?'none':'';
+    const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel');
+    if(card)card.style.display=(projectMode||employeeMode)?'none':'';
     if(panel)panel.style.display=projectMode?'':'none';
+    if(employeePanel)employeePanel.style.display=employeeMode?'':'none';
     if(projectMode){renderProjects();renderProjectCapacity();return;}
+    if(employeeMode){renderEmployeeReports();return;}
     refreshPayrollMonthOptions();refreshPayrollFilters();
     const ym=document.getElementById('payrollMonth')?.value,body=document.getElementById('reportTableBody'); if(!body)return;
     if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="25" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
