@@ -2,7 +2,7 @@
 // المستخدمون يُنشؤون في Firebase Authentication، وصلاحياتهم تُحفظ في hr_users/{uid}.
 import { initializeApp, deleteApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let users = [];
@@ -86,7 +86,7 @@ function formHtml(){
     <h3>المستخدمون</h3>
     <div class="table-wrap"><table class="payroll-table"><thead><tr><th>الاسم</th><th>البريد</th><th>النوع</th><th>الصلاحيات</th><th>المالية</th><th>الحالة</th><th>إجراءات</th></tr></thead>
     <tbody id="usersBody"><tr><td colspan="7">جاري التحميل...</td></tr></tbody></table></div>
-  </div>`;
+  </div>${backupHtml()}`;
 }
 
 function setRoleUi(){
@@ -233,6 +233,145 @@ async function onTableClick(ev){
   }
 }
 
+// ===== النسخ الاحتياطي والاسترجاع (للمدير فقط) =====
+const DOC_LIMIT = 1048576; // الحد الأقصى لمستند Firestore الواحد (1 MiB)
+const fmtKB = n => Math.round(n / 1024).toLocaleString('en-US') + ' KB';
+const bytesOf = o => new Blob([JSON.stringify(o ?? null)]).size;
+
+function bkMsg(text, kind){
+  const el = document.getElementById('bk_msg');
+  if(!el) return;
+  el.textContent = text || '';
+  el.style.color = kind === 'err' ? '#e25555' : (kind === 'ok' ? '#2e9e5b' : '');
+}
+
+function backupHtml(){
+  return `
+  <div class="card section-card" style="margin-top:16px">
+    <h3>النسخ الاحتياطي والاسترجاع</h3>
+    <p class="field-note">ينزّل ملف JSON فيه كل بيانات النظام: العامة والمالية وملفات الموظفين وقائمة المستخدمين. الملف يحتوي رواتب وآيبانات وهويات، فاحفظه في مكان آمن ولا ترفعه على GitHub. يُنصح بنسخة أسبوعية على الأقل، وقبل أي تعديل كبير.</p>
+    <div class="action-row" style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:10px 0">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="bk_files" checked> تضمين ملفات الموظفين (قد يكبر حجم الملف)</label>
+      <button class="btn btn-primary" type="button" id="bk_download">تنزيل نسخة احتياطية</button>
+      <button class="btn" type="button" id="bk_restore_btn">استرجاع من ملف</button>
+      <input type="file" id="bk_restore_file" accept=".json,application/json" style="display:none">
+    </div>
+    <div id="bk_meter" class="field-note">جاري قياس حجم البيانات...</div>
+    <div id="bk_msg" class="field-note" role="status"></div>
+  </div>`;
+}
+
+async function readAllForBackup(includeFiles){
+  const fs = window.FB.firestore;
+  const out = {
+    format: 'hr-backup', version: 1,
+    createdAt: new Date().toISOString(),
+    projectId: window.FB.app.options.projectId || '',
+    createdBy: window.HRAuth.user?.email || '',
+    docs: {}
+  };
+  const g = await getDoc(doc(fs, 'hr_system', 'main'));
+  out.docs.general = g.exists() ? g.data() : null;
+  const f = await getDoc(doc(fs, 'hr_finance', 'main'));
+  out.docs.finance = f.exists() ? f.data() : null;
+  const u = await getDocs(collection(fs, 'hr_users'));
+  out.docs.users = u.docs.map(d => ({ id: d.id, data: d.data() }));
+  if(includeFiles){
+    const e = await getDocs(collection(fs, 'hr_system', 'main', 'employee_files'));
+    out.docs.employeeFiles = e.docs.map(d => ({ id: d.id, data: d.data() }));
+  }
+  return out;
+}
+
+function downloadJson(obj, name){
+  const blob = new Blob([JSON.stringify(obj)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+const stampName = tag => `hr-backup${tag ? '-' + tag : ''}-${(window.FB.app.options.projectId || 'project')}-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.json`;
+
+async function onBackupDownload(){
+  const btn = document.getElementById('bk_download');
+  btn.disabled = true; bkMsg('جاري تجهيز النسخة الاحتياطية...');
+  try{
+    const inc = document.getElementById('bk_files').checked;
+    const data = await readAllForBackup(inc);
+    downloadJson(data, stampName(''));
+    const nEmp = Array.isArray(data.docs.general?.employees) ? data.docs.general.employees.length : 0;
+    bkMsg(`تم تنزيل النسخة: ${nEmp} موظف، ${(data.docs.employeeFiles || []).length} ملف مرفق. احفظ الملف في مكان آمن.`, 'ok');
+  }catch(err){
+    console.error(err);
+    bkMsg('تعذر إنشاء النسخة الاحتياطية: ' + (err.code || err.message), 'err');
+  }finally{ btn.disabled = false; }
+}
+
+async function onRestoreFile(ev){
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = '';
+  if(!file) return;
+  try{
+    let b;
+    try{ b = JSON.parse(await file.text()); }catch(e){ bkMsg('الملف غير صالح (ليس JSON سليماً).', 'err'); return; }
+    const g = b && b.docs && b.docs.general, f = b && b.docs && b.docs.finance;
+    if(!b || b.format !== 'hr-backup' || !g){ bkMsg('هذا الملف ليس نسخة احتياطية من هذا النظام.', 'err'); return; }
+    if(g.schema !== 2 || 'payrollRecords' in g || 'projectAccounts' in g){ bkMsg('نسق الملف غير مدعوم. استخدم نسخة تم تنزيلها من هذه الشاشة.', 'err'); return; }
+    const nEmp = Array.isArray(g.employees) ? g.employees.length : 0;
+    const nFiles = (b.docs.employeeFiles || []).length;
+    const summary = `سيتم استبدال بيانات النظام الحالية بمحتوى النسخة:\n- تاريخ النسخة: ${b.createdAt || '؟'}\n- المشروع: ${b.projectId || '؟'}\n- الموظفون: ${nEmp}\n- ملفات الموظفين: ${nFiles}\n- البيانات المالية: ${f ? 'موجودة' : 'غير موجودة'}\n\nلن تتأثر حسابات المستخدمين وصلاحياتهم.\nسيتم تنزيل نسخة من الوضع الحالي تلقائياً قبل الاستبدال.\n\nاكتب كلمة: استرجاع   للتأكيد`;
+    const answer = prompt(summary);
+    if(!answer || answer.trim() !== 'استرجاع'){ bkMsg('تم إلغاء الاسترجاع.'); return; }
+
+    bkMsg('جاري أخذ نسخة أمان من الوضع الحالي...');
+    const current = await readAllForBackup(true);
+    downloadJson(current, stampName('BEFORE-RESTORE'));
+
+    bkMsg('جاري الاسترجاع...');
+    const fs = window.FB.firestore;
+    if(f) await setDoc(doc(fs, 'hr_finance', 'main'), f);
+    await setDoc(doc(fs, 'hr_system', 'main'), g);
+    for(const item of (b.docs.employeeFiles || [])){
+      await setDoc(doc(fs, 'hr_system', 'main', 'employee_files', item.id), item.data);
+    }
+    bkMsg('تم الاسترجاع بنجاح. جاري إعادة تحميل الصفحة...', 'ok');
+    setTimeout(() => location.reload(), 1500);
+  }catch(err){
+    console.error(err);
+    bkMsg('فشل الاسترجاع: ' + (err.code || err.message) + '. نسخة الأمان التي نُزّلت تحفظ وضعك السابق.', 'err');
+  }
+}
+
+async function renderMeter(){
+  const el = document.getElementById('bk_meter');
+  if(!el) return;
+  try{
+    const fs = window.FB.firestore;
+    const [g, f, e] = await Promise.all([
+      getDoc(doc(fs, 'hr_system', 'main')),
+      getDoc(doc(fs, 'hr_finance', 'main')),
+      getDocs(collection(fs, 'hr_system', 'main', 'employee_files'))
+    ]);
+    const gs = g.exists() ? bytesOf(g.data()) : 0;
+    const fsz = f.exists() ? bytesOf(f.data()) : 0;
+    let filesTotal = 0; e.docs.forEach(d => { filesTotal += bytesOf(d.data()); });
+    const line = (label, n) => {
+      const pct = n / DOC_LIMIT * 100;
+      const color = pct >= 90 ? '#e25555' : (pct >= 70 ? '#d9822b' : '#2e9e5b');
+      return `<div>${label}: <b style="color:${color}">${fmtKB(n)}</b> من 1,024 KB (${pct.toFixed(0)}%)</div>`;
+    };
+    const worst = Math.max(gs, fsz) / DOC_LIMIT;
+    el.innerHTML = `<b>حجم البيانات (تقريبي):</b>` + line('البيانات العامة', gs) + line('البيانات المالية', fsz)
+      + `<div>ملفات الموظفين: ${e.size} ملف (${fmtKB(filesTotal)})</div>`
+      + (worst >= 0.7 ? `<div style="color:#d9822b;margin-top:6px"><b>تنبيه:</b> أحد المستندين اقترب من الحد الأقصى في Firestore (1 MB). عند تجاوزه يفشل الحفظ في السحابة. خذ نسخة احتياطية الآن وتواصل مع المطوّر لتقسيم البيانات.</div>` : '');
+  }catch(err){
+    console.error(err);
+    el.textContent = 'تعذر قياس حجم البيانات.';
+  }
+}
+
 async function render(){
   const root = document.getElementById('usersRoot');
   if(!root) return;
@@ -245,6 +384,10 @@ async function render(){
   document.getElementById('u_cancel').onclick = resetForm;
   document.getElementById('usersBody').addEventListener('click', onTableClick);
   setRoleUi();
+  document.getElementById('bk_download').onclick = onBackupDownload;
+  document.getElementById('bk_restore_btn').onclick = () => document.getElementById('bk_restore_file').click();
+  document.getElementById('bk_restore_file').addEventListener('change', onRestoreFile);
+  renderMeter();
   await loadUsers();
 }
 

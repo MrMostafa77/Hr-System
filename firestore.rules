@@ -7,21 +7,34 @@ service cloud.firestore {
     function hasProfile() { return signedIn() && exists(userDoc()); }
     function isActive() { return hasProfile() && get(userDoc()).data.get('disabled', false) != true; }
     function isAdmin() { return isActive() && get(userDoc()).data.role == 'admin'; }
+    function viewsOf() { return get(userDoc()).data.get('views', []); }
+    function hasAnyView(keys) { return isActive() && viewsOf().hasAny(keys); }
     // صلاحية البيانات المالية: المدير أو مستخدم لديه finance = true
     function canFinance() { return isAdmin() || (isActive() && get(userDoc()).data.get('finance', false) == true); }
+    // ملفات الموظفين (هويات/عقود/مرفقات): المدير أو المالية أو من لديه تبويب من تبويبات شؤون الموظفين
+    function canEmployeeFiles() {
+      return isAdmin() || canFinance()
+        || hasAnyView(['employees', 'add', 'all-employees', 'documents', 'contracts', 'allcontracts', 'commencements']);
+    }
     function noBootstrapYet() { return !exists(/databases/$(database)/documents/hr_meta/access); }
+    // أول مدير: مسموح فقط لبريد محدد مسبقاً (غيّره قبل النشر لكل عميل، بحروف صغيرة).
+    // لو تُرك كما هو فلن يستطيع أحد إنشاء المدير الأول (وهذا أأمن من تركه مفتوحاً).
+    function bootstrapAllowed() {
+      return signedIn() && noBootstrapYet()
+        && request.auth.token.email in ['mostafamester777@gmail.com'];
+    }
 
-    // الوثيقة العامة (بدون رواتب/بنوك/أسعار): أي مستخدم نشط.
+    // الوثيقة العامة (بدون رواتب/بنوك/أسعار): مدير أو مستخدم نشط لديه تبويب واحد على الأقل.
     // الكتابة تشترط النسق الجديد schema == 2 وعدم احتواء مفاتيح مالية، فيُمنع أي كود قديم مخزّن بالمتصفح من إعادة كتابة كل شيء هنا.
     match /hr_system/main {
       allow read: if isActive();
-      allow write: if isActive()
+      allow write: if (isAdmin() || (isActive() && viewsOf().size() > 0))
         && request.resource.data.get('schema', 0) == 2
         && !request.resource.data.keys().hasAny(['payrollRecords', 'projectAccounts']);
     }
     // ملفات الموظفين (مرفقات base64)
     match /hr_system/main/employee_files/{fileId} {
-      allow read, write: if isActive();
+      allow read, write: if canEmployeeFiles();
     }
 
     // البيانات المالية: فقط المدير أو من لديه صلاحية المالية
@@ -32,16 +45,16 @@ service cloud.firestore {
     // الصلاحيات: المستخدم يقرأ مستنده فقط، والمدير يقرأ ويكتب الكل
     match /hr_users/{uid} {
       allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
-      // أول مدير فقط (قبل وجود hr_meta/access) يستطيع إنشاء مستند لنفسه
+      // أول مدير فقط (قبل وجود hr_meta/access) وببريد محدد يستطيع إنشاء مستند لنفسه
       allow create: if isAdmin()
-        || (signedIn() && request.auth.uid == uid && request.resource.data.role == 'admin' && noBootstrapYet());
+        || (bootstrapAllowed() && request.auth.uid == uid && request.resource.data.role == 'admin');
       allow update, delete: if isAdmin();
     }
 
     // علامة أن أول مدير تم إنشاؤه (تُكتب مرة واحدة)
     match /hr_meta/{docId} {
       allow read: if signedIn();
-      allow create: if signedIn() && noBootstrapYet();
+      allow create: if bootstrapAllowed();
       allow update, delete: if false;
     }
   }

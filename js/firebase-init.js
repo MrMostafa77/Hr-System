@@ -3,18 +3,17 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
 import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, writeBatch } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { firebaseConfig, APP_CHECK_SITE_KEY } from './firebase-config.js';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 
-const firebaseConfig = {
-  apiKey: 'AIzaSyCnUTSCdtYjQg-OIH8D9GwdKjcow_LTK-k',
-  authDomain: 'mostafa-s-myth-hr.firebaseapp.com',
-  projectId: 'mostafa-s-myth-hr',
-  storageBucket: 'mostafa-s-myth-hr.firebasestorage.app',
-  messagingSenderId: '518432597475',
-  appId: '1:518432597475:web:890fe91da72c7ea1aeecd6'
-};
-
 const app = initializeApp(firebaseConfig);
+// App Check اختياري: يُفعَّل فقط لو وُضع مفتاح في firebase-config.js
+if(APP_CHECK_SITE_KEY){
+  try{
+    const ac = await import('https://www.gstatic.com/firebasejs/12.19.0/firebase-app-check.js');
+    ac.initializeAppCheck(app, { provider: new ac.ReCaptchaV3Provider(APP_CHECK_SITE_KEY), isTokenAutoRefreshEnabled: true });
+  }catch(e){ console.warn('App Check init failed:', e); }
+}
 const auth = getAuth(app);
 const firestore = getFirestore(app);
 const storage = getStorage(app);
