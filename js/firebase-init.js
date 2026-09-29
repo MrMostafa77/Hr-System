@@ -193,7 +193,7 @@ function showLogin(){
   document.getElementById('firebaseLogin').classList.add('show');
 }
 function installUserBar(user){
-  const side=document.querySelector('.side-bottom');
+  const side=document.querySelector('.side-bottom')||document.querySelector('.sidebar-foot');
   if(!side || document.getElementById('firebaseUserBar')) return;
   const wrap=document.createElement('div');
   wrap.id='firebaseUserBar'; wrap.className='firebase-user-bar';
@@ -253,7 +253,13 @@ window.firebaseUserReady = new Promise(resolve=>{
       return;
     }
     showApp(user);
-    if(profile.legacy){ const b=document.getElementById('firebaseUserEmail'); if(b) b.textContent+=' (قواعد Firestore غير محدّثة)'; }
+    document.getElementById('hrLegacyBanner')?.remove();
+    if(profile.legacy){
+      const bar=document.createElement('div'); bar.id='hrLegacyBanner';
+      bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#b42318;color:#fff;padding:10px 16px;text-align:center;font-weight:700;font-size:14px';
+      bar.textContent='قواعد Firestore الجديدة غير منشورة، لذلك الصلاحيات وقسم "إدارة النظام" غير مفعّلين. نفّذ: firebase deploy --only firestore:rules ثم حدّث الصفحة.';
+      document.body.appendChild(bar);
+    }
     window.HRAuth?.setSession(profile,user);
     if(!resolved){resolved=true;resolve(user);}
   });
