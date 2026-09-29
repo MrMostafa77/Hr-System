@@ -2351,6 +2351,11 @@
   });
 
   /* ===== الخصومات من لائحة الجزاءات والخصومات الخاصة بكل مشروع ===== */
+  // أجر اليوم للخصومات = (الأساسي + السكن + المواصلات + بدلات أخرى) ÷ 30
+  function empDayRate(e){
+    const g=(Number(e?.basicsalary)||0)+(Number(e?.housing)||0)+(Number(e?.transport)||0)+(Number(e?.otherallow)||0);
+    return g/30;
+  }
   function projectOfEmployee(e){ return projects.find(p=>String(p.name||'')===String(e?.project||'')); }
   function policyForProjectName(name){
     const p=projects.find(x=>String(x.name||'')===String(name||''));
@@ -2374,15 +2379,23 @@
     return {amount:days*dayRate, name:(rec&&rec.type)||'', item:null};
   }
   function attDeductionsFor(e, cols, dayRate){
-    const list=policyFor(e), out={absence:0,withdrawal:0,penalty:0,items:[]};
-    cols.forEach(c=>{
-      const code=attCodeAt(c.ym, e.id, c.d);
-      if(code!=='غ' && code!=='س' && code!=='ج') return;
-      const recs=(penalties||[]).filter(p=>String(p.empId)===String(e.id) && String(p.date||'').slice(0,10)===c.iso);
-      const rec=recs[recs.length-1];
-      const r=recordPolicyAmount(e, rec, code, dayRate, list);
+    const list=policyFor(e), out={absence:0,withdrawal:0,penalty:0,absenceCount:0,items:[]};
+    const DED=['غ','س','ج'];
+    const add=(code,r,iso)=>{
       out[code==='غ'?'absence':(code==='س'?'withdrawal':'penalty')]+=r.amount;
-      out.items.push({date:c.iso, code, name:r.name, amount:r.amount});
+      if(code==='غ') out.absenceCount++;
+      out.items.push({date:iso, code, name:r.name, amount:r.amount});
+    };
+    cols.forEach(c=>{
+      // كل إجراء مسجل في هذا اليوم يُخصم حسب لائحة المشروع، بغض النظر عن خانة الحضور
+      const recs=(penalties||[]).filter(p=>String(p.empId)===String(e.id) && String(p.date||'').slice(0,10)===c.iso && DED.includes(penRecCode(p)));
+      if(recs.length){
+        recs.forEach(rec=>{ const code=penRecCode(rec); add(code, recordPolicyAmount(e, rec, code, dayRate, list), c.iso); });
+        return;
+      }
+      // لا يوجد إجراء مسجل لكن الحضور مسجل غ/س/ج: الخصم الافتراضي من اللائحة
+      const code=attCodeAt(c.ym, e.id, c.d);
+      if(DED.includes(code)) add(code, recordPolicyAmount(e, null, code, dayRate, list), c.iso);
     });
     return out;
   }
@@ -2422,8 +2435,9 @@
     const monthlyGross=basic+housing+transport+otherAllow, day=monthlyGross/30;
     const overtime=(sum['ض']||0)*(basic/30)*1.5, bonus=Number(a.bonus)||0, totalEarned=monthlyGross+overtime+bonus;
     const nonWorkDays=nonAttendanceDaysFor(e,ym), nonWorkDed=nonWorkDays*day;
-    const absenceDays=(sum['غ']||0)+(sum['ش']||0), absence=absenceDays*day;
-    const ded=attDeductionsFor(e,cols,basic/30), penalty=ded.penalty, withdrawal=ded.withdrawal;
+    const ded=attDeductionsFor(e,cols,day), penalty=ded.penalty, withdrawal=ded.withdrawal;
+    // الغياب (غ) حسب لائحة المشروع، والانكشاف (ش) يوم بأجر اليوم الإجمالي
+    const absenceDays=ded.absenceCount+(sum['ش']||0), absence=ded.absence+(sum['ش']||0)*day;
     const project=projects.find(p=>String(p.name||'')===String(e.project||''));
     const insuranceBase=basic+housing;
     const gosi=project?.socialInsurance ? insuranceBase*(Number(project.socialInsuranceRate)||0)/100 : 0;
@@ -3181,7 +3195,7 @@
   }
   function actionCalc(emp, rec){
     const code=rec.code||'ج', isDed=['غ','س','ج'].includes(code);
-    const day=(Number(emp?.basicsalary)||0)/30;
+    const day=empDayRate(emp);
     const item=policyItemByName(policyForProjectName(rec.project||emp?.project), rec.type);
     let days, amount, source;
     const hasD=rec.days!=='' && rec.days!=null;
@@ -3202,7 +3216,7 @@
     amtEl.readOnly=!actState.amountManual;
     if(!actState.amountManual){
       const code=$a('p_code')?.value||'ج', isDed=['غ','س','ج'].includes(code);
-      const day=(Number(emp?.basicsalary)||0)/30;
+      const day=empDayRate(emp);
       let amt=0; if(item && !dEdit) amt=policyAmount(item,day); else amt=(Number(daysEl.value)||0)*day;
       amtEl.value=(isDed && emp && (item||dEdit)) ? String(Math.round(amt*100)/100) : '';
     }
@@ -3441,7 +3455,7 @@
     body.innerHTML = sorted.map(p=>{
       const emp = employees.find(e=>e.id===p.empId);
       const pcode = penRecCode(p);
-      const recInfo = emp ? recordPolicyAmount(emp, p, pcode, (Number(emp.basicsalary)||0)/30, policyForProjectName(p.project||emp.project)) : {amount:0,item:null};
+      const recInfo = emp ? recordPolicyAmount(emp, p, pcode, empDayRate(emp), policyForProjectName(p.project||emp.project)) : {amount:0,item:null};
       const penAmount = (emp && ['غ','س','ج'].includes(pcode)) ? recInfo.amount : 0;
       const manual = (p.manualAmount!=null && p.manualAmount!=='') || p.manualDays;
       const daysText = (!manual && recInfo.item) ? (recInfo.item.fixed?'مقطوع':recInfo.item.days) : (p.days??'');
