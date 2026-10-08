@@ -2492,7 +2492,17 @@
     persistCloud(); renderReports();
   }
   function payrollAvailableMonths(){
-    return Object.keys(attendance||{}).filter(ym=>attendance[ym] && Object.values(attendance[ym]).some(r=>r&&typeof r==='object'&&Object.keys(r).length)).sort().reverse();
+    // الأشهر التي فيها حضور محفوظ يدويًا (استثناءات)
+    const set=new Set(Object.keys(attendance||{}).filter(ym=>/^\d{4}-\d{2}$/.test(ym) && attendance[ym] && Object.values(attendance[ym]).some(r=>r&&typeof r==='object'&&Object.keys(r).length)));
+    // + الأشهر التي يُحتسب فيها الحضور تلقائيًا (ح) من تاريخ المباشرة حتى الشهر الحالي
+    // (الحضور التلقائي لا يُخزَّن في البيانات، فبدون هذا السطر لا يظهر أي شهر في المسير)
+    let earliest='';
+    (employees||[]).forEach(e=>{ const st=attStartDateFor(e.id); if(st && (!earliest||st<earliest)) earliest=st; });
+    if(earliest){
+      const cur=currentMonthStr(); let y=Number(earliest.slice(0,4)), m=Number(earliest.slice(5,7)), guard=0;
+      while(`${y}-${String(m).padStart(2,'0')}`<=cur && guard++<120){ set.add(`${y}-${String(m).padStart(2,'0')}`); m++; if(m>12){m=1;y++;} }
+    }
+    return [...set].sort().reverse();
   }
   function nonAttendanceDaysFor(e,ym){
     const start=attStartDateFor(e.id);
