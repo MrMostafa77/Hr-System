@@ -2704,6 +2704,14 @@
     if(projectMode){renderProjects();renderProjectCapacity();return;}
     if(employeeMode){renderEmployeeReports();return;}
     refreshPayrollMonthOptions();refreshPayrollFilters();
+    try{
+      const dg=document.getElementById('payrollDiag');
+      if(dg){
+        const withSal=employees.filter(e=>(Number(e.basicsalary)||0)>0).length, withStart=employees.filter(e=>attStartDateFor(e.id)).length;
+        const fin=(window.HRAuth&&window.HRAuth.canFinance&&window.HRAuth.canFinance())?'نعم':'لا';
+        dg.textContent=`تشخيص: عدد الموظفين ${employees.length} | عندهم راتب أساسي ${withSal} | عندهم تاريخ مباشرة ${withStart} | الشهور المتاحة ${payrollAvailableMonths().length} | صلاحية المالية: ${fin} | إصدار الإصلاح: 2`;
+      }
+    }catch(err){ console.error(err); }
     const ym=document.getElementById('payrollMonth')?.value,body=document.getElementById('reportTableBody'); if(!body)return;
     if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="25" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(), pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
