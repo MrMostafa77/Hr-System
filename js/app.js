@@ -4349,7 +4349,7 @@
     return html.split('\n').map(line=>{
       const m=line.match(/^\s*(\d{1,2})-\s*(.*)$/);
       if(m){
-        return `<div class="contract-numbered-line" dir="rtl"><span class="contract-line-number" dir="ltr">${m[1]}-</span><span class="contract-line-text" dir="rtl">${m[2]}</span></div>`;
+        return `<div class="contract-numbered-line" dir="rtl"><span class="contract-line-number" dir="ltr"><span class="contract-line-number-digits">${m[1]}</span><span class="contract-line-number-dash">-</span></span><span class="contract-line-text" dir="rtl">${m[2]}</span></div>`;
       }
       return line;
     }).join('\n');
