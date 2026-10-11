@@ -4332,32 +4332,8 @@
       '{{CONTRACTCODE}}':c.contractCode||''
     };
   }
-  function fillContractText(text,e,c){
-    const r=contractReplacements(e,c);
-    const ltr=new Set(['{{IDNUM}}','{{PHONE}}']);
-    const html=String(text||'')
-      .replace(/\{\{[A-Z_]+\}\}/g,m=>{
-        const v=escapeHtml(r[m]??m);
-        return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v;
-      })
-      .replace(/\s*المبلغ كتابة \(\s*\)/g,'');
-
-    // مهم: لا نعتمد على bidi للنص "1- ..." داخل سطر عربي.
-    // في بعض المتصفحات/html2canvas يتم قلبه بصريًا إلى "-1".
-    // نفصل رقم البند في عنصر LTR مستقل، ثم نضعه قبل النص العربي داخل
-    // حاوية RTL ذات ترتيب ثابت، وبذلك تكون النتيجة دائمًا: 1- يحق ...
-    return html.split('\n').map(line=>{
-      const m=line.match(/^\s*(\d{1,2})-\s*(.*)$/);
-      if(m){
-        return `<div class="contract-numbered-line" dir="rtl"><span class="contract-line-number" dir="ltr"><span class="contract-line-number-digits">${m[1]}</span><span class="contract-line-number-dash">-</span></span><span class="contract-line-text" dir="rtl">${m[2]}</span></div>`;
-      }
-      return line;
-    }).join('\n');
-  }
-  function renderContractText(text,e,c){
-    return fillContractText(text,e,c).split('\n').map((line,i,arr)=>line+(i<arr.length-1?'<br>':'')).join('');
-  }
-  function editableBlock(title,key,text,e,c){ return `<section class="contract-edit-block" data-contract-key="${key}"><h3>${title}</h3><div class="contract-editable" contenteditable="true" spellcheck="false">${renderContractText(text,e,c)}</div></section>`; }
+  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,'').replace(/(^|\n)(?:-(\d{1,2})|(\d{1,2})-)(?=\s)/g,(m0,pre,a,b)=>`${pre}<span class="num-rtl" dir="rtl" style="display:inline-block;direction:rtl;unicode-bidi:isolate;white-space:nowrap">${a||b}-\u200F</span>`); }
+  function editableBlock(title,key,text,e,c){ return `<section class="contract-edit-block" data-contract-key="${key}"><h3>${title}</h3><div class="contract-editable" contenteditable="true" spellcheck="false">${fillContractText(text,e,c).replace(/\n/g,'<br>')}</div></section>`; }
   const ART9_SPLIT_AT=9; /* البنود 1-8 في الصفحة الثانية والباقي في الثالثة */
   function splitArt9(){ const L=contractSource.art9.split('\n'); return [L.slice(0,ART9_SPLIT_AT).join('\n'),L.slice(ART9_SPLIT_AT).join('\n')]; }
   /* يصغّر الخط تلقائيًا عند الحاجة حتى لا يُقص أي نص من الصفحة (3 صفحات A4) */
@@ -4372,7 +4348,7 @@
   }
   function buildContractHtml(e,c){
     const num=escapeHtml(c.contractCode||'');
-    const block=(title,key,text,extraClass='')=>`<section class="contract-edit-block new-contract-block ${extraClass}" data-contract-key="${key}">${title?`<h3>${title}</h3>`:''}<div class="contract-editable" contenteditable="true" spellcheck="false">${renderContractText(text,e,c)}</div></section>`;
+    const block=(title,key,text,extraClass='')=>`<section class="contract-edit-block new-contract-block ${extraClass}" data-contract-key="${key}">${title?`<h3>${title}</h3>`:''}<div class="contract-editable" contenteditable="true" spellcheck="false">${fillContractText(text,e,c).replace(/\n/g,'<br>')}</div></section>`;
     const header=`<div class="new-contract-header"><div class="new-contract-number">رقم العقد: ${num}</div><div class="new-contract-title">عقد عمل</div></div>`;
     const p1=`<div class="contract-page new-contract-page page-1"><div class="contract-page-content">${header}${block('البيانات التمهيدية','intro',contractSource.intro)}${block('المادة الأولى','art1',contractSource.art1)}${block('المادة الثانية','art2',contractSource.art2)}${block('المادة الثالثة','art3',contractSource.art3)}${block('المادة الرابعة','art4',contractSource.art4)}${block('المادة الخامسة','art5',contractSource.art5)}${block('المادة السادسة','art6',contractSource.art6)}</div></div>`;
     const [art9a,art9b]=splitArt9();
@@ -4394,7 +4370,7 @@
     const c={...contractDataFromEmployee(e),...currentContractForm()};
     const rebuildBlock=(key,source)=>{
       const el=sheet.querySelector(`.contract-edit-block[data-contract-key="${key}"] .contract-editable`);
-      if(el) el.innerHTML=renderContractText(source,e,c);
+      if(el) el.innerHTML=fillContractText(source,e,c).replace(/\n/g,'<br>');
     };
     // Dynamic contract fields must always reflect the current form values, even for previously saved contracts.
     rebuildBlock('art2',contractSource.art2);

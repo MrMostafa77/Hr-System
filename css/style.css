@@ -2385,8 +2385,6 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 @media(max-width:560px){.employee-payroll-detail-grid{grid-template-columns:1fr;}}
 
 
-.num-ltr{direction:ltr!important;unicode-bidi:isolate-override!important;display:inline-block!important;white-space:nowrap!important;}
-
 /* ===== Contract final layout (screen = print = PDF) =====
    Content starts below the letterhead logo, wider line spacing, signatures side by side. */
 .new-contract-page .contract-page-content{padding:40mm 17mm 20mm !important;font-size:13.2px !important;line-height:1.6 !important;}
@@ -2413,47 +2411,3 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
   .new-contract-page .contract-editable{font-size:var(--cfs,12.8px) !important;line-height:1.5 !important;}
   .new-contract-signatures{margin-top:6mm !important;}
 }
-
-/* تثبيت ترقيم البنود العربية: الرقم والشرطة منفصلان تمامًا عن bidi للنص العربي */
-.new-contract-page .contract-numbered-line{
-  position:relative!important;
-  display:block!important;
-  direction:rtl!important;
-  text-align:right!important;
-  width:100%!important;
-  margin:0!important;
-  padding:0!important;
-  unicode-bidi:normal!important;
-}
-.new-contract-page .contract-line-number{
-  position:absolute!important;
-  top:0!important;
-  right:0!important;
-  display:flex!important;
-  flex-direction:row!important;
-  align-items:baseline!important;
-  justify-content:flex-start!important;
-  direction:ltr!important;
-  unicode-bidi:isolate!important;
-  white-space:nowrap!important;
-  width:2.25em!important;
-  text-align:left!important;
-  z-index:2!important;
-}
-.new-contract-page .contract-line-number-digits,
-.new-contract-page .contract-line-number-dash{
-  display:inline-block!important;
-  direction:ltr!important;
-  unicode-bidi:isolate!important;
-  white-space:nowrap!important;
-}
-.new-contract-page .contract-line-text{
-  display:block!important;
-  direction:rtl!important;
-  unicode-bidi:plaintext!important;
-  text-align:right!important;
-  min-width:0!important;
-  padding-right:2.35em!important;
-  box-sizing:border-box!important;
-}
-
