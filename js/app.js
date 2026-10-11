@@ -2528,14 +2528,21 @@
     const basic=Number(e.basicsalary)||0,housing=Number(e.housing)||0,transport=Number(e.transport)||0,otherAllow=Number(e.otherallow)||0;
     const monthlyGross=basic+housing+transport+otherAllow, day=empDayRate(e);
     const overtime=r2((sum['ض']||0)*day*OVERTIME_FACTOR), bonus=Number(a.bonus)||0, totalEarned=r2(monthlyGross+overtime+bonus);
-    const notStarted=employeeNotStartedFor(e,cols), nonWorkDays=notStarted?PAY_MONTH_DAYS:nonAttendanceDaysForCols(e,cols), nonWorkDed=notStarted?r2(monthlyGross):r2(nonWorkDays*day);
+    const notStarted=employeeNotStartedFor(e,cols);
+    // فترة لم تنتهِ بعد (الشهر الجاري): يُستحق الراتب بعدد الأيام المنقضية فقط (من المباشرة حتى اليوم) ويزيد يوميًا تلقائيًا حتى اكتمال الشهر
+    const periodOpen=cols.length>0 && cols[cols.length-1].iso>todayISO();
+    let nonWorkDays;
+    if(notStarted) nonWorkDays=PAY_MONTH_DAYS;
+    else if(periodOpen){ const st=attStartDateFor(e.id)||'', td=todayISO(); let el=0; cols.forEach(c=>{ if(c.iso<=td && (!st||c.iso>=st)) el++; }); nonWorkDays=PAY_MONTH_DAYS-Math.min(PAY_MONTH_DAYS,el); }
+    else nonWorkDays=nonAttendanceDaysForCols(e,cols);
+    const paidDays=PAY_MONTH_DAYS-nonWorkDays, nonWorkDed=notStarted?r2(monthlyGross):r2(nonWorkDays*day);
     const ded=attDeductionsFor(e,cols,day), penalty=ded.penalty, withdrawal=ded.withdrawal;
     // الغياب (غ) حسب لائحة المشروع، والانكشاف (ش) يوم بأجر اليوم الإجمالي
     const absenceDays=ded.absenceCount+(sum['ش']||0), absence=r2(ded.absence+(sum['ش']||0)*day);
     const project=projects.find(p=>String(p.name||'')===String(e.project||''));
     const insuranceBase=basic+housing;
     // التأمينات الاجتماعية: حصة الموظف فقط من (الأساسي + السكن)، وتُخصم إذا كانت مفعّلة في المشروع
-    const gosi=(project?.siEnabled && !notStarted) ? r2(insuranceBase*(Number(project.siGuardRate)||SI_GUARD_RATE)/100) : 0;
+    const gosi=(project?.siEnabled && !notStarted) ? r2(insuranceBase*(Number(project.siGuardRate)||SI_GUARD_RATE)/100*paidDays/PAY_MONTH_DAYS) : 0;
     const uniform=Number(a.uniform)||0,newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0,other=Number(a.other)||0;
     const deduction=r2(nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance+other);
     return {ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
