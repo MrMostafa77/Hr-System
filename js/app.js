@@ -818,7 +818,7 @@
     if(view==='actions'){ renderPenalties(); }
     if(view==='coverage') renderCoverage();
     if(view==='documents') renderDocuments();
-    if(view==='contracts') renderContracts();
+    if(view==='contracts'){ renderContracts(); setTimeout(fitContractPages,60); }
     if(view==='allcontracts') renderAllContracts();
     if(view==='commencements') renderCommencements();
     if(view==='commencement-list') renderCommencementList();
@@ -4262,7 +4262,7 @@
     art6:`المادة السادسة : فترة التجربة-:\nيعتبر الطرف الثاني تحت التجربة طوال مدة {{PROBATION}} أشهر الأولى لهذا العقد والتي تبدأ من تاريخ مباشرته الفعلية للعمل لدى الطرف الأول، فإذا ثبت عدم صلاحية الطرف الثاني خلال هذه الفترة فيحق للطرف الأول إنهاء خدمته دون إنذار أو مكافئة أو تعويض حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (53).`,
     art7:`المادة السابعة : الأجر:-\nيدفع الطرف الأول للطرف الثاني مقابل عمله حسب كشف الحضور والانصراف المعتمد من قبل الطرف الأول.\nراتب شهري أساسي قدره ( {{SALARY}} ريال ) المبلغ كتابة ( {{SALARY_WORDS}} ).\nبدل سكن قدره ( {{HOUSING}} ريال ) المبلغ كتابة ( {{HOUSING_WORDS}} ).\nبدلات أخرى قدره ( {{OTHER}} ريال ) المبلغ كتابة ( {{OTHER_WORDS}} ).\nاجمالي الراتب ( {{TOTAL}} ريال ) المبلغ كتابة ( {{TOTAL_WORDS}} ) حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (90).`,
     art8:`المادة الثامنة :انهاء العقد:-\n1- يحق لأي طرف من الطرفين انهاء هذا العقد بإرادته المنفردة بشرط اخطار الطرف الآخر كتابيًا قبل التاريخ المحدد للإنهاء بثلاثين يومًا، وفي حالة عدم التزام أي من الطرفين بالمدة المشار اليها يدفع الطرف المخل للطرف الآخر تعويضًا معادلًا بقيمة ({{NOTICE_COMP}}) ريال عن كل يوم لمدة الاخطار أو المتبقي منها حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (74).\n2- ينتهي هذا العقد بانتهاء مدته أو بانتهاء المشروع أو عند طلب العميل من الطرف الأول استبعاد الطرف الثاني من المشروع، ويحق للطرف الأول أيضًا إنهاءه فورًا وبدون إشعار مسبق أو مكافأة أو تعويض في أي من الحالات الواردة حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (80).\n3- يلتزم الطرف الأول بتعويض الطرف الثاني بأجر شهرين فقط عن هذا العقد في حال قيام الطرف الأول بإنهاء هذا العقد لأي سبب غير مشروع حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (77).\n4- يلتزم الطرف الثاني في حال طلب الاستقالة أن يتم إشعار الطرف الأول في مدة أقصاها ({{RESIGN_NOTICE}}) يوم حتى يتم التعامل معه في إجراءات الاستقالة النظامية وفي حال عدم الالتزام والغياب قبل انتهى المدة يدفع الطرف الثاني تعويضًا للطرف الأول (300) ريال عن كل يوم غياب.`,
-    art9:`المادة التاسعة : التزامات الطرف الثاني-:\n-1 أن يباشر مهام وظيفته في المقر الذي يحدده الطرف الأول بما يعادل {{HOURS}} ساعات يوميًا وفي الأسبوع {{WEEK_HOURS}} ساعة وأن يتم منحه إجازة من كل أسبوع حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (98).\n-2 أن يلتزم بعدم العمل لدى أي جهة كانت خلال فترة عمله لدى الطرف الأول سواءً بأجر أو بدون أجر بما في ذلك الإجازات والعطل وبعد الدوام.\n-3 أن يلتزم التزامًا تامًا بمواعيد العمل وفي حال الغياب المفاجئ بدون علم فإنه يحق لشركة فخر الجزيرة للحراسات الأمنية الخصم بما يعادل يومين من راتبي.\n-4 أن يلتزم التزامًا تامًا بلبس الزي الرسمي المحدد لي في العمل وأن يكون نظيفًا ومرتبًا وفي حال عدم الالتزام يحق لشركة فخر الجزيرة للحراسات الأمنية الخصم بما يعادل يوم من راتبي.\n-5 أن ألتزم التزامًا تامًا بعدم الانسحاب من الموقع وفي حال الانسحاب يخصم بما يعادل ثلاثة أيام من راتبي.\n-6 في حال عدم التزامي بأي من لوائح ونظم العمل يطبق علي فورًا الالئحة الحسومات المعتمدة لدى شركة فخر الجزيرة للحراسات الأمنية.\n-7 إذا لم أكمل مدة شهر بالشركة لا يحق لي المطالبة بأي راتب أو مستحقات وأقر بأنها فترة تدريبية حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (53).\n-8 إذا لم أكمل مدة {{PROBATION}} أشهر بالشركة لا يحق لي المطالبة بأي مستحقات وأقر بأنها فترة تجريبية حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (53).\n-9 في حالة رفضي من قبل العميل لأسباب منطقية يتم التعامل معي نظاميًا مثل الاستقالة الفورية ولا يحق لي بأي مستحقات.\n-10 عندما يرد على الشركة خطاب من أي مشروع بوجود مخالفة خلال فترة استلامي فإنه لا مانع لدي من خصم كامل مبلغ المخالفة من استحقاقي ومرتباتي وليس لي الحق في الاعتراض.\n-11 أن يلتزم بتنفيذ أية مهام أو أعمال يكلفه بها الطرف الأول في حالات الضرورة وفقًا لما تقتضيه مصلحة العمل.\n-12 أن يلتزم بالمحافظة على ما في عهدته وأن يستخدمها في الأغراض المعدة لها ولأداء عمله الذي تتطلبه وظيفته.\n-13 أن يبلغ فورًا الطرف الأول عن أي فعل أو تقصير ينتج عنه إلحاق ضرر أو خسارة مادية أو معنوية بالعمل.\n-14 أن يحافظ على الأسرار الخاصة بالعمل وعدم إفشائها.\n-15 أن يستخدم كل قدراته في تحسين وتطوير العمل.`,
+    art9:`المادة التاسعة : التزامات الطرف الثاني-:\n1- أن يباشر مهام وظيفته في المقر الذي يحدده الطرف الأول بما يعادل {{HOURS}} ساعات يوميًا وفي الأسبوع {{WEEK_HOURS}} ساعة وأن يتم منحه إجازة من كل أسبوع حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (98).\n2- أن يلتزم بعدم العمل لدى أي جهة كانت خلال فترة عمله لدى الطرف الأول سواءً بأجر أو بدون أجر بما في ذلك الإجازات والعطل وبعد الدوام.\n3- أن يلتزم التزامًا تامًا بمواعيد العمل وفي حال الغياب المفاجئ بدون علم فإنه يحق لشركة فخر الجزيرة للحراسات الأمنية الخصم بما يعادل يومين من راتبي.\n4- أن يلتزم التزامًا تامًا بلبس الزي الرسمي المحدد لي في العمل وأن يكون نظيفًا ومرتبًا وفي حال عدم الالتزام يحق لشركة فخر الجزيرة للحراسات الأمنية الخصم بما يعادل يوم من راتبي.\n5- أن ألتزم التزامًا تامًا بعدم الانسحاب من الموقع وفي حال الانسحاب يخصم بما يعادل ثلاثة أيام من راتبي.\n6- في حال عدم التزامي بأي من لوائح ونظم العمل يطبق علي فورًا الالئحة الحسومات المعتمدة لدى شركة فخر الجزيرة للحراسات الأمنية.\n7- إذا لم أكمل مدة شهر بالشركة لا يحق لي المطالبة بأي راتب أو مستحقات وأقر بأنها فترة تدريبية حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (53).\n8- إذا لم أكمل مدة {{PROBATION}} أشهر بالشركة لا يحق لي المطالبة بأي مستحقات وأقر بأنها فترة تجريبية حسب بند وزارة العمل والعمال بالمملكة العربية السعودية (53).\n9- في حالة رفضي من قبل العميل لأسباب منطقية يتم التعامل معي نظاميًا مثل الاستقالة الفورية ولا يحق لي بأي مستحقات.\n10- عندما يرد على الشركة خطاب من أي مشروع بوجود مخالفة خلال فترة استلامي فإنه لا مانع لدي من خصم كامل مبلغ المخالفة من استحقاقي ومرتباتي وليس لي الحق في الاعتراض.\n11- أن يلتزم بتنفيذ أية مهام أو أعمال يكلفه بها الطرف الأول في حالات الضرورة وفقًا لما تقتضيه مصلحة العمل.\n12- أن يلتزم بالمحافظة على ما في عهدته وأن يستخدمها في الأغراض المعدة لها ولأداء عمله الذي تتطلبه وظيفته.\n13- أن يبلغ فورًا الطرف الأول عن أي فعل أو تقصير ينتج عنه إلحاق ضرر أو خسارة مادية أو معنوية بالعمل.\n14- أن يحافظ على الأسرار الخاصة بالعمل وعدم إفشائها.\n15- أن يستخدم كل قدراته في تحسين وتطوير العمل.`,
     art10:`المادة العاشرة : أحكام عامة:-\n1- لا يترتب على هذا العقد أي التزامات على الطرف الأول في مواجهة من يعولهم الطرف الثاني.\n2- يعتبر عنوان الطرف الأول عنوانًا مشتركًا لكلا الطرفين ويحق للطرف الأول أن يسلم فيه جميع الإشعارات والإخطارات إلى الطرف الثاني يدًا أو وضعها على لوحة الإعلانات في مقر العمل.\n3- أي خلاف ينشأ بين طرفي العقد بسبب تنفيذه أو تفسيره يتم حله وديًا فإذا تعذر ذلك فيعرض النزاع على لجان العمل المختصة في مدينة مكة.\n4- تحتسب المدة في هذا العقد بالتقويم الميلادي.\n5- يقر الطرف الثاني بأنه لا توجد لديه أي أمراض مزمنة، وأن الوثائق المقدمة منه صحيحة ومكتملة، وفي حالة ظهور خلاف ذلك يحق للطرف الأول إنهاء هذا العقد.\n6- يلغي هذا العقد أي عقد أو اتفاق سابق بين الطرفين.\n7- كل ما لم يرد بشأنه نص في هذا العقد يطبق عليه نظام العمل والعمال المعمول به في المملكة العربية السعودية.\n8- الالتزام التام بأوقات الدوام الرسمي.\n9- يقر الطرف الثاني بأنه قد سبق له قبل التوقيع على هذا العقد الاطلاع على ما جاء في لائحة تنظيم العمل المعمول بها لدى الطرف الأول وأنه ملتزم بما جاء فيها.`,
     art11:`المادة الحادي عشر : نسخ العقد:\n1- تم تحرير العقد من نسختين.\nعلى ما ذكر تم تنظيم هذا العقد والله خير الشاهدين،،،`
   };
@@ -4332,17 +4332,29 @@
       '{{CONTRACTCODE}}':c.contractCode||''
     };
   }
-  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,'').replace(/(^|\n)(\d{1,2})-(?=\s)/g,'$1<span class="num-ltr" style="display:inline-block;direction:ltr;unicode-bidi:isolate">$2-</span>'); }
+  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,'').replace(/(^|\n)(?:-(\d{1,2})|(\d{1,2})-)(?=\s)/g,(m0,pre,a,b)=>`${pre}<span class="num-ltr" style="display:inline-block;direction:ltr;unicode-bidi:isolate">${a||b}-</span>`); }
   function editableBlock(title,key,text,e,c){ return `<section class="contract-edit-block" data-contract-key="${key}"><h3>${title}</h3><div class="contract-editable" contenteditable="true" spellcheck="false">${fillContractText(text,e,c).replace(/\n/g,'<br>')}</div></section>`; }
+  const ART9_SPLIT_AT=9; /* البنود 1-8 في الصفحة الثانية والباقي في الثالثة */
+  function splitArt9(){ const L=contractSource.art9.split('\n'); return [L.slice(0,ART9_SPLIT_AT).join('\n'),L.slice(ART9_SPLIT_AT).join('\n')]; }
+  /* يصغّر الخط تلقائيًا عند الحاجة حتى لا يُقص أي نص من الصفحة (3 صفحات A4) */
+  function fitContractPages(){
+    const sheet=document.getElementById('contractSheet'); if(!sheet) return;
+    sheet.querySelectorAll('.contract-page-content').forEach(el=>{
+      el.style.removeProperty('--cfs');
+      if(!el.clientHeight) return;
+      let fs=12.8;
+      while(el.scrollHeight>el.clientHeight+1 && fs>10){ fs=Math.round((fs-0.2)*10)/10; el.style.setProperty('--cfs',fs+'px'); }
+    });
+  }
   function buildContractHtml(e,c){
     const num=escapeHtml(c.contractCode||'');
     const block=(title,key,text,extraClass='')=>`<section class="contract-edit-block new-contract-block ${extraClass}" data-contract-key="${key}">${title?`<h3>${title}</h3>`:''}<div class="contract-editable" contenteditable="true" spellcheck="false">${fillContractText(text,e,c).replace(/\n/g,'<br>')}</div></section>`;
     const header=`<div class="new-contract-header"><div class="new-contract-number">رقم العقد: ${num}</div><div class="new-contract-title">عقد عمل</div></div>`;
-    const p1=`<div class="contract-page new-contract-page page-1"><div class="contract-page-content">${header}${block('البيانات التمهيدية','intro',contractSource.intro)}${block('المادة الأولى','art1',contractSource.art1)}${block('المادة الثانية','art2',contractSource.art2)}${block('المادة الثالثة','art3',contractSource.art3)}${block('المادة الرابعة','art4',contractSource.art4)}</div></div>`;
-    const p2=`<div class="contract-page new-contract-page page-2"><div class="contract-page-content">${block('المادة الخامسة','art5',contractSource.art5)}${block('المادة السادسة','art6',contractSource.art6)}${block('المادة السابعة','art7',contractSource.art7)}${block('المادة الثامنة','art8',contractSource.art8)}</div></div>`;
-    const p3=`<div class="contract-page new-contract-page page-3"><div class="contract-page-content">${block('المادة التاسعة','art9',contractSource.art9)}</div></div>`;
-    const p4=`<div class="contract-page new-contract-page page-4"><div class="contract-page-content">${block('المادة العاشرة','art10',contractSource.art10)}${block('المادة الحادية عشرة','art11',contractSource.art11)}<div class="contract-signatures new-contract-signatures"><div>الطرف الأول<br>شركة فخر الجزيرة للحراسات الأمنية<br>التوقيع: ____________________</div><div>الطرف الثاني<br>${escapeHtml(e.fullname||'')}<br>التوقيع: ____________________<br>البصمة: ____________________</div></div></div></div>`;
-    return p1+p2+p3+p4;
+    const p1=`<div class="contract-page new-contract-page page-1"><div class="contract-page-content">${header}${block('البيانات التمهيدية','intro',contractSource.intro)}${block('المادة الأولى','art1',contractSource.art1)}${block('المادة الثانية','art2',contractSource.art2)}${block('المادة الثالثة','art3',contractSource.art3)}${block('المادة الرابعة','art4',contractSource.art4)}${block('المادة الخامسة','art5',contractSource.art5)}${block('المادة السادسة','art6',contractSource.art6)}</div></div>`;
+    const [art9a,art9b]=splitArt9();
+    const p2=`<div class="contract-page new-contract-page page-2"><div class="contract-page-content">${block('المادة السابعة','art7',contractSource.art7)}${block('المادة الثامنة','art8',contractSource.art8)}${block('المادة التاسعة','art9',art9a)}</div></div>`;
+    const p3=`<div class="contract-page new-contract-page page-3"><div class="contract-page-content">${block('','art9b',art9b)}${block('المادة العاشرة','art10',contractSource.art10)}${block('المادة الحادية عشرة','art11',contractSource.art11)}<div class="contract-signatures new-contract-signatures"><div>الطرف الأول<br>شركة فخر الجزيرة للحراسات الأمنية<br>التوقيع: ____________________</div><div>الطرف الثاني<br>${escapeHtml(e.fullname||'')}<br>التوقيع: ____________________<br>البصمة: ____________________</div></div></div></div>`;
+    return p1+p2+p3;
   }
   function renderContracts(){
     refreshEmpSelect(document.getElementById('contract_emp'),'— اختر الموظف —');
@@ -4364,7 +4376,7 @@
     rebuildBlock('art2',contractSource.art2);
     rebuildBlock('art4',contractSource.art4);
     rebuildBlock('art6',contractSource.art6);
-    rebuildBlock('art9',contractSource.art9);
+    { const [a9,b9]=splitArt9(); rebuildBlock('art9',a9); rebuildBlock('art9b',b9); }
     return duration;
   }
   function loadContractEmployee(empId, contractId){
@@ -4386,6 +4398,7 @@
     document.getElementById('contract_resign_notice').value=c.resignNotice??15;
     document.getElementById('contract_notes').value=c.notes||'';
     document.getElementById('contractSheet').innerHTML=buildContractHtml(e,c);
+    fitContractPages();
   }
   function updateContractDurationNote(){
     const start=document.getElementById('contract_start')?.value||'', end=document.getElementById('contract_end')?.value||'';
@@ -4395,7 +4408,7 @@
     return text;
   }
   function currentContractForm(){ const start=document.getElementById('contract_start').value,end=document.getElementById('contract_end').value,durationText=contractDurationText(start,end); return {duration:contractDurationMonths(start,end)||document.getElementById('contract_duration').value,durationText,start,end,location:document.getElementById('contract_location').value,hours:document.getElementById('contract_hours').value,weekHours:document.getElementById('contract_week_hours').value,probation:document.getElementById('contract_probation').value,notice:document.getElementById('contract_notice').value,noticeComp:document.getElementById('contract_notice_comp').value,resignNotice:document.getElementById('contract_resign_notice').value,notes:document.getElementById('contract_notes').value}; }
-  function renderContractSheet(){ const id=document.getElementById('contract_emp').value,e=employees.find(x=>x.id===id); if(!e)return; const c={...contractDataFromEmployee(e),...currentContractForm()}; document.getElementById('contractSheet').innerHTML=buildContractHtml(e,c); }
+  function renderContractSheet(){ const id=document.getElementById('contract_emp').value,e=employees.find(x=>x.id===id); if(!e)return; const c={...contractDataFromEmployee(e),...currentContractForm()}; document.getElementById('contractSheet').innerHTML=buildContractHtml(e,c); fitContractPages(); }
   document.getElementById('newContractBtn')?.addEventListener('click',()=>{
     currentContractId=null;
     newContractMode=true;
@@ -4445,6 +4458,7 @@
     const pages=sheet?[...sheet.querySelectorAll('.new-contract-page')].slice(0,4):[];
     if(!pages.length){ showToast('اختر الموظف أولاً لعرض العقد'); return; }
     if(!window.html2canvas || !(window.jspdf&&window.jspdf.jsPDF)){ showToast('مكتبة PDF غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
+    fitContractPages();
     showToast('جاري تجهيز ملف PDF…');
     try{
       const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
@@ -4460,6 +4474,7 @@
     }catch(err){ console.error(err); showToast('تعذر إنشاء ملف PDF'); }
   }
   function printContractSheet(){
+    fitContractPages();
     const sheet=document.getElementById('contractSheet');
     if(!sheet || !sheet.querySelector('.new-contract-page')) return;
     const win=window.open('', '_blank', 'width=900,height=1200');
@@ -4474,14 +4489,14 @@
       .contract-sheet{display:block!important;width:210mm!important;margin:0!important;padding:0!important;}
       .new-contract-page{display:block!important;position:relative!important;width:210mm!important;height:296.6mm!important;min-height:296.6mm!important;max-height:296.6mm!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#fff url("${location.href.replace(/index\.html.*$/,'')}assets/contract-bg.jpg") center top / 100% 100% no-repeat!important;page-break-after:auto!important;break-after:auto!important;page-break-inside:avoid!important;break-inside:avoid!important;}
       .new-contract-page+.new-contract-page{page-break-before:always!important;break-before:page!important;}
-      .contract-page-content{position:relative!important;z-index:2!important;width:210mm!important;height:296.6mm!important;max-height:296.6mm!important;overflow:hidden!important;padding:40mm 17mm 20mm!important;font-size:13.2px!important;line-height:1.6!important;font-weight:600!important;}
+      .contract-page-content{position:relative!important;z-index:2!important;width:210mm!important;height:296.6mm!important;max-height:296.6mm!important;overflow:hidden!important;padding:38mm 17mm 16mm!important;font-size:var(--cfs,12.8px)!important;line-height:1.5!important;font-weight:600!important;}
       .new-contract-page .contract-edit-block{display:block!important;margin:0 0 5px!important;padding:0!important;border:0!important;background:transparent!important;}
-      .new-contract-page .contract-edit-block h3{margin:2px 0 1px!important;font-size:15px!important;line-height:1.2!important;font-weight:800!important;color:#111!important;}
-      .new-contract-page .contract-editable{display:block!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;min-height:0!important;font-size:13.2px!important;line-height:1.6!important;font-weight:600!important;white-space:normal!important;}
+      .new-contract-page .contract-edit-block h3{margin:2px 0 1px!important;font-size:14.5px!important;line-height:1.2!important;font-weight:800!important;color:#111!important;}
+      .new-contract-page .contract-editable{display:block!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;min-height:0!important;font-size:var(--cfs,12.8px)!important;line-height:1.5!important;font-weight:600!important;white-space:normal!important;}
       .new-contract-page .new-contract-header{display:block!important;position:relative!important;min-height:15mm!important;margin:0 0 2mm!important;}
       .new-contract-page .new-contract-title{font-size:24px!important;line-height:1.2!important;margin-top:1mm!important;text-align:center!important;}
       .new-contract-page .new-contract-number{font-size:13px!important;padding:1px 6px!important;}
-      .new-contract-signatures{display:grid!important;grid-template-columns:1fr 1fr!important;gap:15mm!important;margin-top:8mm!important;text-align:center!important;line-height:1.9!important;}
+      .new-contract-signatures{display:grid!important;grid-template-columns:1fr 1fr!important;gap:15mm!important;margin-top:6mm!important;text-align:center!important;line-height:1.7!important;}
       .new-contract-signatures>div{min-height:18mm!important;}
       @media print{html,body{width:210mm!important;margin:0!important;padding:0!important;overflow:visible!important}.new-contract-page{height:296.6mm!important;max-height:296.6mm!important}}
     </style></head><body><div class="contract-sheet">${pages}</div></body></html>`);

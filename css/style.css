@@ -2399,3 +2399,15 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
   .new-contract-page .contract-editable{font-size:13.2px !important;line-height:1.6 !important;}
   .new-contract-signatures{margin-top:8mm !important;}
 }
+
+
+/* ===== Contract v7: three A4 pages, content below letterhead, balanced fill ===== */
+.new-contract-page .contract-page-content{padding:38mm 17mm 16mm !important;font-size:var(--cfs,12.8px) !important;line-height:1.5 !important;}
+.new-contract-page .contract-editable{font-size:var(--cfs,12.8px) !important;line-height:1.5 !important;}
+.new-contract-page .contract-edit-block h3{font-size:14.5px !important;}
+.new-contract-signatures{margin-top:6mm !important;line-height:1.7 !important;}
+@media print{
+  .new-contract-page .contract-page-content{padding:38mm 17mm 16mm !important;font-size:var(--cfs,12.8px) !important;line-height:1.5 !important;}
+  .new-contract-page .contract-editable{font-size:var(--cfs,12.8px) !important;line-height:1.5 !important;}
+  .new-contract-signatures{margin-top:6mm !important;}
+}
