@@ -2413,3 +2413,30 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
   .new-contract-page .contract-editable{font-size:var(--cfs,12.8px) !important;line-height:1.5 !important;}
   .new-contract-signatures{margin-top:6mm !important;}
 }
+
+/* تثبيت ترتيب ترقيم البنود العربية: 1- ثم نص البند، وليس -1 */
+.new-contract-page .contract-numbered-line{
+  display:grid!important;
+  grid-template-columns:auto minmax(0,1fr)!important;
+  align-items:start!important;
+  column-gap:6px!important;
+  direction:rtl!important;
+  text-align:right!important;
+  width:100%!important;
+  unicode-bidi:isolate!important;
+}
+.new-contract-page .contract-line-number{
+  display:block!important;
+  direction:ltr!important;
+  unicode-bidi:isolate!important;
+  white-space:nowrap!important;
+  text-align:left!important;
+  min-width:2.1em!important;
+}
+.new-contract-page .contract-line-text{
+  display:block!important;
+  direction:rtl!important;
+  unicode-bidi:plaintext!important;
+  text-align:right!important;
+  min-width:0!important;
+}
