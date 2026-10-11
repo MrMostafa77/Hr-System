@@ -729,7 +729,6 @@
     window.print();
   }
   function exportCurrentWord(){
-    if(currentView==='contracts'){ downloadContractWord(); return; }
     const el=currentViewElement(); if(!el)return;
     const clone=el.cloneNode(true);
     clone.querySelectorAll('button,input,select,textarea,svg,.no-print,.export-toolbar').forEach(n=>n.remove());
@@ -4333,7 +4332,7 @@
       '{{CONTRACTCODE}}':c.contractCode||''
     };
   }
-  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,'').replace(/(^|\n)(?:-(\d{1,2})|(\d{1,2})-)(?=\s)/g,(m0,pre,a,b)=>`${pre}<span class="num-ltr" style="display:inline-block;direction:ltr;unicode-bidi:isolate">${a||b}-</span>`); }
+  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,'').replace(/(^|\n)(?:-(\d{1,2})|(\d{1,2})-)(?=\s)/g,(m0,pre,a,b)=>`${pre}<span class="num-ltr" dir="ltr" style="display:inline-block;direction:ltr;unicode-bidi:isolate;white-space:nowrap">${a||b}-\u200E</span>`); }
   function editableBlock(title,key,text,e,c){ return `<section class="contract-edit-block" data-contract-key="${key}"><h3>${title}</h3><div class="contract-editable" contenteditable="true" spellcheck="false">${fillContractText(text,e,c).replace(/\n/g,'<br>')}</div></section>`; }
   const ART9_SPLIT_AT=9; /* البنود 1-8 في الصفحة الثانية والباقي في الثالثة */
   function splitArt9(){ const L=contractSource.art9.split('\n'); return [L.slice(0,ART9_SPLIT_AT).join('\n'),L.slice(ART9_SPLIT_AT).join('\n')]; }
@@ -4473,99 +4472,6 @@
       pdf.save(`عقد-${safe}.pdf`);
       showToast('تم تنزيل العقد بصيغة PDF');
     }catch(err){ console.error(err); showToast('تعذر إنشاء ملف PDF'); }
-  }
-  /* ===== Word (.docx) export for the employee contract — same 3 pages / letterhead as the PDF ===== */
-  function contractModelFromSheet(){
-    const sheet=document.getElementById('contractSheet'); if(!sheet) return null;
-    const LRM='\u200E';
-    const linesOf=root=>{
-      const lines=['']; const cur=()=>lines.length-1;
-      const walk=n=>n.childNodes.forEach(ch=>{
-        if(ch.nodeType===3){ lines[cur()]+=ch.nodeValue; return; }
-        if(ch.nodeType!==1) return;
-        const tag=ch.nodeName;
-        if(tag==='BR'){ lines.push(''); return; }
-        if(ch.classList.contains('num-ltr') || tag==='BDI'){ lines[cur()]+=LRM+ch.textContent+LRM; return; }
-        if(tag==='DIV' || tag==='P'){ if(lines[cur()].trim()) lines.push(''); walk(ch); if(lines[cur()].trim()) lines.push(''); return; }
-        walk(ch);
-      });
-      walk(root);
-      const out=lines.map(x=>x.replace(/\u00a0/g,' ').replace(/\s+$/,''));
-      while(out.length && !out[out.length-1]) out.pop();
-      return out;
-    };
-    return [...sheet.querySelectorAll('.new-contract-page')].slice(0,4).map(page=>{
-      const items=[];
-      page.querySelector('.contract-page-content')?.childNodes.forEach(n=>{
-        if(n.nodeType!==1) return;
-        if(n.classList.contains('new-contract-header')){
-          items.push({t:'header',number:(n.querySelector('.new-contract-number')?.textContent||'').trim(),title:(n.querySelector('.new-contract-title')?.textContent||'').trim()});
-        }else if(n.classList.contains('contract-edit-block')){
-          const h=n.querySelector('h3')?.textContent.trim(); if(h) items.push({t:'h3',text:h});
-          const ed=n.querySelector('.contract-editable'); if(ed) items.push({t:'lines',lines:linesOf(ed)});
-        }else if(n.classList.contains('new-contract-signatures')){
-          items.push({t:'sig',cols:[...n.children].map(d=>linesOf(d))});
-        }
-      });
-      return items;
-    });
-  }
-  async function makeContractDocx(){
-    const pages=contractModelFromSheet();
-    if(!pages||!pages.length) return null;
-    const esc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    const FONT='Arial', SZ=19; /* 9.5pt */
-    const run=(text,o={})=>`<w:r><w:rPr><w:rFonts w:ascii="${FONT}" w:hAnsi="${FONT}" w:cs="${FONT}"/>${o.b?'<w:b/><w:bCs/>':''}${o.u?'<w:u w:val="single"/>':''}<w:sz w:val="${o.sz||SZ}"/><w:szCs w:val="${o.sz||SZ}"/></w:rPr><w:t xml:space="preserve">${esc(text)}</w:t></w:r>`;
-    const para=(text,o={})=>`<w:p><w:pPr>${o.pb?'<w:pageBreakBefore/>':''}${o.ltr?'':'<w:bidi/>'}<w:spacing w:before="${o.before||0}" w:after="${o.after||0}" w:line="${o.line||360}" w:lineRule="auto"/>${o.jc?`<w:jc w:val="${o.jc}"/>`:''}</w:pPr>${text===''?'':run(text,o)}</w:p>`;
-    let body='';
-    pages.forEach((items,pi)=>{
-      let first=true;
-      const pb=()=>{ const v=first&&pi>0; first=false; return v; };
-      items.forEach(it=>{
-        if(it.t==='header'){
-          if(it.number) body+=para(it.number,{pb:pb(),ltr:true,jc:'left',sz:20,b:true,line:276});
-          if(it.title) body+=para(it.title,{pb:pb(),jc:'center',sz:38,b:true,u:true,line:300,before:40,after:120});
-        }else if(it.t==='h3'){
-          body+=para(it.text,{pb:pb(),sz:22,b:true,before:80,after:20,line:300});
-        }else if(it.t==='lines'){
-          it.lines.forEach((ln,i)=>{ body+=para(ln,{pb:pb(),after:i===it.lines.length-1?100:0}); });
-        }else if(it.t==='sig'){
-          const colW=4989;
-          const cell=lines=>`<w:tc><w:tcPr><w:tcW w:w="${colW}" w:type="dxa"/></w:tcPr>${lines.map(l=>para(l,{jc:'center',b:true,line:400})).join('')||para('')}</w:tc>`;
-          body+=`<w:tbl><w:tblPr><w:bidiVisual/><w:tblW w:w="${colW*2}" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="${colW}"/><w:gridCol w:w="${colW}"/></w:tblGrid><w:tr>${it.cols.map(cell).join('')}</w:tr></w:tbl>`+para('',{line:240});
-          first=false;
-        }
-      });
-    });
-    const NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
-    let bg=null;
-    try{ const r=await fetch(new URL('assets/contract-bg.jpg',location.href).href); if(r.ok) bg=await r.arrayBuffer(); }catch(_){}
-    const sect=`<w:sectPr>${bg?'<w:headerReference w:type="default" r:id="rId2"/>':''}<w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="2155" w:right="964" w:bottom="907" w:left="964" w:header="0" w:footer="0" w:gutter="0"/><w:bidi/></w:sectPr>`;
-    const zip=new window.JSZip();
-    zip.file('[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>${bg?'<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>':''}</Types>`);
-    zip.file('_rels/.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`);
-    zip.file('word/document.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${body}${sect}</w:body></w:document>`);
-    zip.file('word/_rels/document.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${bg?'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>':''}</Relationships>`);
-    if(bg){
-      const W=7560000,H=10692000;
-      zip.file('word/header1.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ${NS}><w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV><wp:extent cx="${W}" cy="${H}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:wrapNone/><wp:docPr id="1" name="Letterhead"/><wp:cNvGraphicFramePr/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="0" name="contract-bg.jpg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${W}" cy="${H}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p></w:hdr>`);
-      zip.file('word/_rels/header1.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/contract-bg.jpg"/></Relationships>`);
-      zip.file('word/media/contract-bg.jpg',bg);
-    }
-    return zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
-  }
-  async function downloadContractWord(){
-    const sheet=document.getElementById('contractSheet');
-    if(!sheet || !sheet.querySelector('.new-contract-page')){ showToast('اختر الموظف أولاً لعرض العقد'); return; }
-    if(!window.JSZip){ showToast('مكتبة Word غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
-    fitContractPages();
-    try{
-      const blob=await makeContractDocx(); if(!blob) return;
-      const emp=employees.find(x=>x.id===document.getElementById('contract_emp')?.value);
-      const safe=String(emp?.fullname||'موظف').replace(/[\\/:*?"<>|]+/g,' ').trim();
-      const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=`عقد-${safe}.docx`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),1500);
-      showToast('تم تنزيل العقد بصيغة Word');
-    }catch(err){ console.error(err); showToast('تعذر إنشاء ملف Word'); }
   }
   function printContractSheet(){
     fitContractPages();
