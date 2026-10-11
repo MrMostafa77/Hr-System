@@ -4332,7 +4332,7 @@
       '{{CONTRACTCODE}}':c.contractCode||''
     };
   }
-  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,'').replace(/(^|\n)(\d{1,2})-(?=\s)/g,'$1<bdi dir="ltr">$2-</bdi>'); }
+  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,'').replace(/(^|\n)(\d{1,2})-(?=\s)/g,'$1<span class="num-ltr" style="display:inline-block;direction:ltr;unicode-bidi:isolate">$2-</span>'); }
   function editableBlock(title,key,text,e,c){ return `<section class="contract-edit-block" data-contract-key="${key}"><h3>${title}</h3><div class="contract-editable" contenteditable="true" spellcheck="false">${fillContractText(text,e,c).replace(/\n/g,'<br>')}</div></section>`; }
   function buildContractHtml(e,c){
     const num=escapeHtml(c.contractCode||'');
