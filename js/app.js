@@ -4332,7 +4332,7 @@
       '{{CONTRACTCODE}}':c.contractCode||''
     };
   }
-  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,'').replace(/(^|\n)(?:-(\d{1,2})|(\d{1,2})-)(?=\s)/g,(m0,pre,a,b)=>`${pre}<span class="num-ltr" style="display:inline-block;direction:ltr;unicode-bidi:isolate">${a||b}-</span>`); }
+  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,'').replace(/(^|\n)(?:-(\d{1,2})|(\d{1,2})-)(?=\s)/g,(m0,pre,a,b)=>`${pre}<span class="num-ltr" dir="ltr" style="display:inline-block;direction:ltr;unicode-bidi:isolate;white-space:nowrap">${a||b}-\u200E</span>`); }
   function editableBlock(title,key,text,e,c){ return `<section class="contract-edit-block" data-contract-key="${key}"><h3>${title}</h3><div class="contract-editable" contenteditable="true" spellcheck="false">${fillContractText(text,e,c).replace(/\n/g,'<br>')}</div></section>`; }
   const ART9_SPLIT_AT=9; /* البنود 1-8 في الصفحة الثانية والباقي في الثالثة */
   function splitArt9(){ const L=contractSource.art9.split('\n'); return [L.slice(0,ART9_SPLIT_AT).join('\n'),L.slice(ART9_SPLIT_AT).join('\n')]; }
