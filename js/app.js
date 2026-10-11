@@ -718,7 +718,7 @@
     const url=URL.createObjectURL(blob),a=document.createElement('a'); a.href=url; a.download=exportFileBase()+'.xls'; document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url); showToast('تم تصدير التبويب بصيغة Excel');
   }
   function printCurrentForExport(){
-    if(currentView==='contracts' && document.querySelector('#contractSheet .new-contract-page')){ printContractSheet(); return; }
+    if(currentView==='contracts'){ downloadContractPdf(); return; }
     const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(currentView);
     const id='exportPrintStyle'; document.getElementById(id)?.remove();
     const st=document.createElement('style'); st.id=id;
@@ -4332,14 +4332,14 @@
       '{{CONTRACTCODE}}':c.contractCode||''
     };
   }
-  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,''); }
+  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,'').replace(/(^|\n)(\d{1,2})-(?=\s)/g,'$1<bdi dir="ltr">$2-</bdi>'); }
   function editableBlock(title,key,text,e,c){ return `<section class="contract-edit-block" data-contract-key="${key}"><h3>${title}</h3><div class="contract-editable" contenteditable="true" spellcheck="false">${fillContractText(text,e,c).replace(/\n/g,'<br>')}</div></section>`; }
   function buildContractHtml(e,c){
     const num=escapeHtml(c.contractCode||'');
     const block=(title,key,text,extraClass='')=>`<section class="contract-edit-block new-contract-block ${extraClass}" data-contract-key="${key}">${title?`<h3>${title}</h3>`:''}<div class="contract-editable" contenteditable="true" spellcheck="false">${fillContractText(text,e,c).replace(/\n/g,'<br>')}</div></section>`;
     const header=`<div class="new-contract-header"><div class="new-contract-number">رقم العقد: ${num}</div><div class="new-contract-title">عقد عمل</div></div>`;
-    const p1=`<div class="contract-page new-contract-page page-1"><div class="contract-page-content">${header}${block('البيانات التمهيدية','intro',contractSource.intro)}${block('المادة الأولى','art1',contractSource.art1)}${block('المادة الثانية','art2',contractSource.art2)}${block('المادة الثالثة','art3',contractSource.art3)}${block('المادة الرابعة','art4',contractSource.art4)}${block('المادة الخامسة','art5',contractSource.art5)}${block('المادة السادسة','art6',contractSource.art6)}</div></div>`;
-    const p2=`<div class="contract-page new-contract-page page-2"><div class="contract-page-content">${block('المادة السابعة','art7',contractSource.art7)}${block('المادة الثامنة','art8',contractSource.art8)}</div></div>`;
+    const p1=`<div class="contract-page new-contract-page page-1"><div class="contract-page-content">${header}${block('البيانات التمهيدية','intro',contractSource.intro)}${block('المادة الأولى','art1',contractSource.art1)}${block('المادة الثانية','art2',contractSource.art2)}${block('المادة الثالثة','art3',contractSource.art3)}${block('المادة الرابعة','art4',contractSource.art4)}</div></div>`;
+    const p2=`<div class="contract-page new-contract-page page-2"><div class="contract-page-content">${block('المادة الخامسة','art5',contractSource.art5)}${block('المادة السادسة','art6',contractSource.art6)}${block('المادة السابعة','art7',contractSource.art7)}${block('المادة الثامنة','art8',contractSource.art8)}</div></div>`;
     const p3=`<div class="contract-page new-contract-page page-3"><div class="contract-page-content">${block('المادة التاسعة','art9',contractSource.art9)}</div></div>`;
     const p4=`<div class="contract-page new-contract-page page-4"><div class="contract-page-content">${block('المادة العاشرة','art10',contractSource.art10)}${block('المادة الحادية عشرة','art11',contractSource.art11)}<div class="contract-signatures new-contract-signatures"><div>الطرف الأول<br>شركة فخر الجزيرة للحراسات الأمنية<br>التوقيع: ____________________</div><div>الطرف الثاني<br>${escapeHtml(e.fullname||'')}<br>التوقيع: ____________________<br>البصمة: ____________________</div></div></div></div>`;
     return p1+p2+p3+p4;
@@ -4440,6 +4440,25 @@
     document.getElementById('contractSavedNote').textContent='تم حفظ بيانات العقد وتعديلاته بنجاح.';
     showToast('تم حفظ العقد وتعديلاته بنجاح');
   });
+  async function downloadContractPdf(){
+    const sheet=document.getElementById('contractSheet');
+    const pages=sheet?[...sheet.querySelectorAll('.new-contract-page')].slice(0,4):[];
+    if(!pages.length){ showToast('اختر الموظف أولاً لعرض العقد'); return; }
+    if(!window.html2canvas || !(window.jspdf&&window.jspdf.jsPDF)){ showToast('مكتبة PDF غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
+    showToast('جاري تجهيز ملف PDF…');
+    try{
+      const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+      for(let i=0;i<pages.length;i++){
+        const canvas=await window.html2canvas(pages[i],{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false,scrollX:0,scrollY:-window.scrollY});
+        if(i) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/jpeg',0.95),'JPEG',0,0,210,297);
+      }
+      const emp=employees.find(x=>x.id===document.getElementById('contract_emp')?.value);
+      const safe=String(emp?.fullname||'موظف').replace(/[\\/:*?"<>|]+/g,' ').trim();
+      pdf.save(`عقد-${safe}.pdf`);
+      showToast('تم تنزيل العقد بصيغة PDF');
+    }catch(err){ console.error(err); showToast('تعذر إنشاء ملف PDF'); }
+  }
   function printContractSheet(){
     const sheet=document.getElementById('contractSheet');
     if(!sheet || !sheet.querySelector('.new-contract-page')) return;
@@ -4455,14 +4474,14 @@
       .contract-sheet{display:block!important;width:210mm!important;margin:0!important;padding:0!important;}
       .new-contract-page{display:block!important;position:relative!important;width:210mm!important;height:296.6mm!important;min-height:296.6mm!important;max-height:296.6mm!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#fff url("${location.href.replace(/index\.html.*$/,'')}assets/contract-bg.jpg") center top / 100% 100% no-repeat!important;page-break-after:auto!important;break-after:auto!important;page-break-inside:avoid!important;break-inside:avoid!important;}
       .new-contract-page+.new-contract-page{page-break-before:always!important;break-before:page!important;}
-      .contract-page-content{position:relative!important;z-index:2!important;width:210mm!important;height:296.6mm!important;max-height:296.6mm!important;overflow:hidden!important;padding:28mm 17mm 17mm!important;font-size:13.2px!important;line-height:1.35!important;font-weight:600!important;}
-      .new-contract-page .contract-edit-block{display:block!important;margin:0 0 4px!important;padding:0!important;border:0!important;background:transparent!important;}
+      .contract-page-content{position:relative!important;z-index:2!important;width:210mm!important;height:296.6mm!important;max-height:296.6mm!important;overflow:hidden!important;padding:40mm 17mm 20mm!important;font-size:13.2px!important;line-height:1.6!important;font-weight:600!important;}
+      .new-contract-page .contract-edit-block{display:block!important;margin:0 0 5px!important;padding:0!important;border:0!important;background:transparent!important;}
       .new-contract-page .contract-edit-block h3{margin:2px 0 1px!important;font-size:15px!important;line-height:1.2!important;font-weight:800!important;color:#111!important;}
-      .new-contract-page .contract-editable{display:block!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;min-height:0!important;font-size:13.2px!important;line-height:1.35!important;font-weight:600!important;white-space:normal!important;}
+      .new-contract-page .contract-editable{display:block!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;min-height:0!important;font-size:13.2px!important;line-height:1.6!important;font-weight:600!important;white-space:normal!important;}
       .new-contract-page .new-contract-header{display:block!important;position:relative!important;min-height:15mm!important;margin:0 0 2mm!important;}
       .new-contract-page .new-contract-title{font-size:24px!important;line-height:1.2!important;margin-top:1mm!important;text-align:center!important;}
       .new-contract-page .new-contract-number{font-size:13px!important;padding:1px 6px!important;}
-      .new-contract-signatures{margin-top:7mm!important;line-height:1.6!important;gap:20mm!important;}
+      .new-contract-signatures{display:grid!important;grid-template-columns:1fr 1fr!important;gap:15mm!important;margin-top:8mm!important;text-align:center!important;line-height:1.9!important;}
       .new-contract-signatures>div{min-height:18mm!important;}
       @media print{html,body{width:210mm!important;margin:0!important;padding:0!important;overflow:visible!important}.new-contract-page{height:296.6mm!important;max-height:296.6mm!important}}
     </style></head><body><div class="contract-sheet">${pages}</div></body></html>`);

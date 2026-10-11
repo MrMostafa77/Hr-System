@@ -2383,3 +2383,19 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 .employee-payroll-note{margin-top:10px;padding:8px 10px;border-top:1px dashed var(--border);font-weight:700;color:var(--ink-soft)}
 @media(max-width:900px){.employee-payroll-detail-grid{grid-template-columns:repeat(2,minmax(130px,1fr));}}
 @media(max-width:560px){.employee-payroll-detail-grid{grid-template-columns:1fr;}}
+
+
+/* ===== Contract final layout (screen = print = PDF) =====
+   Content starts below the letterhead logo, wider line spacing, signatures side by side. */
+.new-contract-page .contract-page-content{padding:40mm 17mm 20mm !important;font-size:13.2px !important;line-height:1.6 !important;}
+.new-contract-page .contract-editable{font-size:13.2px !important;line-height:1.6 !important;}
+.new-contract-page .contract-edit-block{margin:0 0 5px !important;}
+.new-contract-page .contract-edit-block h3{font-size:15px !important;}
+.new-contract-signatures{display:grid !important;grid-template-columns:1fr 1fr !important;gap:15mm !important;margin-top:8mm !important;text-align:center !important;line-height:1.9 !important;}
+@media print{
+  .new-contract-page{height:296.6mm !important;min-height:296.6mm !important;max-height:296.6mm !important;page-break-after:auto !important;break-after:auto !important;}
+  .new-contract-page+.new-contract-page{page-break-before:always !important;break-before:page !important;}
+  .new-contract-page .contract-page-content{height:296.6mm !important;padding:40mm 17mm 20mm !important;font-size:13.2px !important;line-height:1.6 !important;}
+  .new-contract-page .contract-editable{font-size:13.2px !important;line-height:1.6 !important;}
+  .new-contract-signatures{margin-top:8mm !important;}
+}
