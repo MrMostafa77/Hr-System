@@ -2510,22 +2510,35 @@
     if(!start || start.slice(0,7)!==ym)return 0;
     return Math.max(0,Math.min(30,Number(start.slice(8,10))-1));
   }
+  // أيام الفترة الواقعة قبل المباشرة (تُحسب من أيام الفترة نفسها، فتصح مع الشهر الكامل ومع الفترات المخصصة)
+  function nonAttendanceDaysForCols(e,cols){
+    const start=attStartDateFor(e.id); if(!start) return 0;
+    let n=0; cols.forEach(c=>{ if(c.iso<start) n++; });
+    return Math.min(PAY_MONTH_DAYS,n);
+  }
+  // لم يباشر خلال كامل الفترة: تاريخ المباشرة بعد آخر يوم فيها، أو لا يوجد تاريخ مباشرة ولا أي حضور مسجل
+  function employeeNotStartedFor(e,cols){
+    if(!cols.length) return false;
+    const start=attStartDateFor(e.id);
+    if(start) return cols[cols.length-1].iso<start;
+    return !cols.some(c=>attCodeAt(c.ym,e.id,c.d));
+  }
   function payrollStatementForCols(e,cols,sumIn){
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
     const basic=Number(e.basicsalary)||0,housing=Number(e.housing)||0,transport=Number(e.transport)||0,otherAllow=Number(e.otherallow)||0;
     const monthlyGross=basic+housing+transport+otherAllow, day=empDayRate(e);
-    const overtime=r2((sum['ض']||0)*day*OVERTIME_FACTOR), bonus=Number(a.bonus)||0, totalEarned=monthlyGross+overtime+bonus;
-    const nonWorkDays=nonAttendanceDaysFor(e,ym), nonWorkDed=r2(nonWorkDays*day);
+    const overtime=r2((sum['ض']||0)*day*OVERTIME_FACTOR), bonus=Number(a.bonus)||0, totalEarned=r2(monthlyGross+overtime+bonus);
+    const notStarted=employeeNotStartedFor(e,cols), nonWorkDays=notStarted?PAY_MONTH_DAYS:nonAttendanceDaysForCols(e,cols), nonWorkDed=notStarted?r2(monthlyGross):r2(nonWorkDays*day);
     const ded=attDeductionsFor(e,cols,day), penalty=ded.penalty, withdrawal=ded.withdrawal;
     // الغياب (غ) حسب لائحة المشروع، والانكشاف (ش) يوم بأجر اليوم الإجمالي
     const absenceDays=ded.absenceCount+(sum['ش']||0), absence=r2(ded.absence+(sum['ش']||0)*day);
     const project=projects.find(p=>String(p.name||'')===String(e.project||''));
     const insuranceBase=basic+housing;
     // التأمينات الاجتماعية: حصة الموظف فقط من (الأساسي + السكن)، وتُخصم إذا كانت مفعّلة في المشروع
-    const gosi=project?.siEnabled ? r2(insuranceBase*(Number(project.siGuardRate)||SI_GUARD_RATE)/100) : 0;
+    const gosi=(project?.siEnabled && !notStarted) ? r2(insuranceBase*(Number(project.siGuardRate)||SI_GUARD_RATE)/100) : 0;
     const uniform=Number(a.uniform)||0,newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0,other=Number(a.other)||0;
-    const deduction=nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance+other;
-    return {ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,other,deduction,net:totalEarned-deduction,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
+    const deduction=r2(nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance+other);
+    return {ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
   }
   function payrollStatementFor(e){
     const ym=document.getElementById('payrollMonth')?.value||payrollAvailableMonths()[0]||currentMonthStr();
@@ -2804,14 +2817,6 @@
   }
   const ATT_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
   const ATT_CODE_LABELS = {'':'—','ح':'حضور','غ':'غياب','ش':'انكشاف','ج':'جزاء','راحة':'راحة','ط':'تغطية','ض':'إضافي','س':'انسحاب','جمع':'جمع','عيد':'عيد','ق':'تطبيق'};
-  function daysInMonth(ym){
-    const [y,m] = ym.split('-').map(Number);
-    return new Date(y, m, 0).getDate();
-  }
-  function currentMonthStr(){
-    const d = new Date();
-    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
-  }
   function monthLabel(ym){
     if(!ym) return '';
     const [y,m] = ym.split('-').map(Number);
@@ -3213,7 +3218,7 @@
     const first=cols[0],last=cols[cols.length-1],isMonth=first.d===1&&first.ym===last.ym&&cols.length===daysInMonth(first.ym),periodLabel=isMonth?`شهر ${monthLabel(first.ym)}`:`الفترة من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)}`;
     const projs=[...new Set(list.map(e=>e.project).filter(Boolean))],scope=single?`الموظف: ${list[0].fullname||''}`:(projs.length===1?`المشروع: ${projs[0]}`:'كل المشاريع');
     const rows=list.map((e,i)=>({i:i+1,name:e.fullname||'',location:e.region||e.project||'',job:e.jobtitle||'',p:payrollStatementForCols(e,cols)}));
-    const totals=PP_COLS.map(c=>c.sum?rows.reduce((a,r)=>a+(Number(c.k(r))||0),0):null);
+    const totals=PP_COLS.map(c=>c.sum?r2(rows.reduce((a,r)=>a+(Number(c.k(r))||0),0)):null);
     const title=`${single?'مسير راتب':'مسير رواتب'} ${periodLabel}`,sub=`${scope} — من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)} — أساس الحساب 30 يوم${single?'':` — عدد الموظفين: ${rows.length}`} — تاريخ الإعداد: ${fmtDMY(todayISO())}`;
     const fileBase=`مسير_${single?(list[0].fullname||'موظف'):(projs.length===1?projs[0]:'كل_المشاريع')}_${isMonth?monthLabel(first.ym):fmtDMY(first.iso)+'_'+fmtDMY(last.iso)}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
     return {title,sub,rows,totals,single,fileBase,cls:'pay-paper'};
