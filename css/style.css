@@ -930,9 +930,9 @@
 @media print{
   .contract-preview{padding:0!important;background:#fff!important;overflow:visible!important;}
   .contract-sheet{width:210mm!important;margin:0!important;font-size:15px!important;line-height:1.45!important;}
-  .new-contract-page{width:210mm!important;height:297mm!important;min-height:297mm!important;max-height:297mm!important;margin:0!important;padding:0!important;overflow:hidden!important;page-break-after:always!important;break-after:page!important;page-break-inside:avoid!important;break-inside:avoid!important;}
-  .new-contract-page:last-child{page-break-after:auto!important;break-after:auto!important;}
-    .contract-page-content{height:297mm!important;overflow:hidden!important;}
+  .new-contract-page{width:210mm!important;height:296.6mm!important;min-height:296.6mm!important;max-height:296.6mm!important;margin:0!important;padding:0!important;overflow:hidden!important;page-break-after:auto!important;break-after:auto!important;page-break-inside:avoid!important;break-inside:avoid!important;}
+  .new-contract-page+.new-contract-page{page-break-before:always!important;break-before:page!important;}
+    .contract-page-content{height:296.6mm!important;overflow:hidden!important;}
   .new-contract-page .contract-editable{border:0!important;background:transparent!important;}
 }
 

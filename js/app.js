@@ -718,6 +718,7 @@
     const url=URL.createObjectURL(blob),a=document.createElement('a'); a.href=url; a.download=exportFileBase()+'.xls'; document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url); showToast('تم تصدير التبويب بصيغة Excel');
   }
   function printCurrentForExport(){
+    if(currentView==='contracts' && document.querySelector('#contractSheet .new-contract-page')){ printContractSheet(); return; }
     const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(currentView);
     const id='exportPrintStyle'; document.getElementById(id)?.remove();
     const st=document.createElement('style'); st.id=id;
@@ -4252,7 +4253,7 @@
     return {empId:e.id,contractCode,duration:c.duration??e.contractduration??12,durationText:autoDuration||c.durationText||'',start,end,location:c.location??e.project??e.region??'',hours:c.hours??8,weekHours:c.weekHours??48,probation:c.probation??6,notice:c.notice??30,noticeComp:c.noticeComp??300,resignNotice:c.resignNotice??15,notes:c.notes??'',overtime:c.overtime??'يتم الاتفاق على قيمة العمل الإضافي كتابياً',salary:c.salary??(Number(e.basicsalary)||0),housing:c.housing??(Number(e.housing)||0),transport:c.transport??(Number(e.transport)||0),other:c.other??(Number(e.otherallow)||0),customHtml:c.customHtml||''};
   }
   const contractSource = {
-    intro:`انه في يوم {{DAY_NAME}} بتاريخ {{START_HIJRI}} هـ الموافق: {{START_M}} م قد تم الاتفاق بين كل من :\nأ- شركة فخر الجزيرة للحراسات الأمنية سجل تجاري رقم (4031263286)، مكة، المملكة العربية السعودية ويمثلها في هذا العقد زهير سفر القثامي بصفته المدير العام جوال رقم (0537030099) والمشار اليها في هذا العقد الطرف الأول.\n\nب- السيد / {{FULLNAME}} رقم الهوية {{IDNUM}} / - عنوانه / {{ADDRESS}}\nرقم الجوال / {{PHONE}} والمشار اليه في الطرف الثاني.`,
+    intro:`انه في يوم {{DAY_NAME}} بتاريخ {{START_HIJRI}} هـ الموافق: {{START_M}} م قد تم الاتفاق بين كل من :\nأ- شركة فخر الجزيرة للحراسات الأمنية سجل تجاري رقم (4031263286)، مكة، المملكة العربية السعودية ويمثلها في هذا العقد زهير سفر القثامي بصفته المدير العام جوال رقم (0537030099) والمشار اليها في هذا العقد الطرف الأول.\n\nب- السيد / {{FULLNAME}} رقم الهوية / {{IDNUM}} - عنوانه / {{ADDRESS}}\nرقم الجوال / {{PHONE}} والمشار اليه في الطرف الثاني.`,
     art1:`المادة الأولى : موضوع العقد:-\nيوافق الطرف الثاني على العمل لدى الطرف الأول وتحت إدارته وأشرافه أو إدارة من ينوب عنه في وفق شروط هذا العقد في وظيفة ( {{JOB}} ) أو أي وظيفة أخرى يتم تكليفه بها، ما لم تختلف اختلافًا جوهريًا عن مهامه الأصلية حسب حاجة العمل إذا رأى الطرف الأول تكليفه بأدائها ووافق الطرف الثاني على ذلك.`,
     art2:`المادة الثانية : مدة العقد -:\nمدة هذا العقد ( {{DURATION}} ) تبدأ اعتبارًا من تاريخ مباشرة العمل الموافق {{START_M}} م، وتنتهي بتاريخ {{END_DATE}} م، أو وفق ما يتفق عليه الطرفان، وتحتسب مدة العقد بالتقويم الميلادي.`,
     art3:`المادة الثالثة : مكان العمل:-\nاتفق الطرفان على حق الطرف الأول في تكليف الطرف الثاني بالعمل في المكان الذي يراه الطرف الأول مناسبًا ضمن حدود مقر أداء الطرف الأول لأعماله وللطرف الأول الحق بنقل الطرف الثاني من مقر عمل لآخر وفقًا لما تقتضيه مصلحة العمل طالما أن هذا النقل لا يترتب ضررًا جسيمًا على الطرف الثاني.`,
@@ -4265,12 +4266,34 @@
     art10:`المادة العاشرة : أحكام عامة:-\n1- لا يترتب على هذا العقد أي التزامات على الطرف الأول في مواجهة من يعولهم الطرف الثاني.\n2- يعتبر عنوان الطرف الأول عنوانًا مشتركًا لكلا الطرفين ويحق للطرف الأول أن يسلم فيه جميع الإشعارات والإخطارات إلى الطرف الثاني يدًا أو وضعها على لوحة الإعلانات في مقر العمل.\n3- أي خلاف ينشأ بين طرفي العقد بسبب تنفيذه أو تفسيره يتم حله وديًا فإذا تعذر ذلك فيعرض النزاع على لجان العمل المختصة في مدينة مكة.\n4- تحتسب المدة في هذا العقد بالتقويم الميلادي.\n5- يقر الطرف الثاني بأنه لا توجد لديه أي أمراض مزمنة، وأن الوثائق المقدمة منه صحيحة ومكتملة، وفي حالة ظهور خلاف ذلك يحق للطرف الأول إنهاء هذا العقد.\n6- يلغي هذا العقد أي عقد أو اتفاق سابق بين الطرفين.\n7- كل ما لم يرد بشأنه نص في هذا العقد يطبق عليه نظام العمل والعمال المعمول به في المملكة العربية السعودية.\n8- الالتزام التام بأوقات الدوام الرسمي.\n9- يقر الطرف الثاني بأنه قد سبق له قبل التوقيع على هذا العقد الاطلاع على ما جاء في لائحة تنظيم العمل المعمول بها لدى الطرف الأول وأنه ملتزم بما جاء فيها.`,
     art11:`المادة الحادي عشر : نسخ العقد:\n1- تم تحرير العقد من نسختين.\nعلى ما ذكر تم تنظيم هذا العقد والله خير الشاهدين،،،`
   };
+  /* تفقيط المبلغ بالحروف العربية (ريال / هللة). المبلغ صفر أو فارغ => نص فارغ */
+  function arabicAmountWords(n){
+    const num=Math.round((Number(n)||0)*100)/100;
+    if(!(num>0) || num>=1e9) return num>=1e9?`${fmt(num)} ريال`:'';
+    const ONES=['','واحد','اثنان','ثلاثة','أربعة','خمسة','ستة','سبعة','ثمانية','تسعة','عشرة','أحد عشر','اثنا عشر','ثلاثة عشر','أربعة عشر','خمسة عشر','ستة عشر','سبعة عشر','ثمانية عشر','تسعة عشر'];
+    const TENS=['','','عشرون','ثلاثون','أربعون','خمسون','ستون','سبعون','ثمانون','تسعون'];
+    const HUND=['','مائة','مائتان','ثلاثمائة','أربعمائة','خمسمائة','ستمائة','سبعمائة','ثمانمائة','تسعمائة'];
+    const below=x=>{ const h=Math.floor(x/100), r=x%100, parts=[]; if(h) parts.push(HUND[h]); if(r){ if(r<20) parts.push(ONES[r]); else { const o=r%10,t=Math.floor(r/10); parts.push(o?`${ONES[o]} و${TENS[t]}`:TENS[t]); } } return parts.join(' و'); };
+    const scaled=(g,one,two,few,many)=>{ if(g===1) return one; if(g===2) return two; const r=g%100; return `${below(g)} ${(r>=3&&r<=10)?few:many}`; };
+    const intWords=x=>{
+      const m=Math.floor(x/1e6), t=Math.floor((x%1e6)/1000), r=x%1000, parts=[];
+      if(m) parts.push(scaled(m,'مليون','مليونان','ملايين','مليون'));
+      if(t) parts.push(scaled(t,'ألف','ألفان','آلاف','ألف'));
+      if(r) parts.push(below(r));
+      return parts.join(' و');
+    };
+    const riyals=Math.floor(num), halalas=Math.round((num-riyals)*100);
+    const out=[];
+    if(riyals) out.push(riyals===1?'ريال واحد':riyals===2?'ريالان':`${intWords(riyals)} ريال`);
+    if(halalas) out.push(halalas===1?'هللة واحدة':halalas===2?'هللتان':`${intWords(halalas)} هللة`);
+    return out.join(' و');
+  }
   function contractReplacements(e,c){
     const total=(Number(c.salary)||0)+(Number(c.housing)||0)+(Number(c.transport)||0)+(Number(c.other)||0);
-    const words=n=>{ const v=Number(n)||0; return v===1500?'ألف وخمسمائة ريال':v===500?'خمسمائة ريال':v===1000?'ألف ريال':v===3000?'ثلاثة آلاف ريال فقط':`${fmt(v)} ريال`; };
+    const words=arabicAmountWords;
     const dateVal=c.start||new Date().toISOString().slice(0,10);
     const d=new Date(dateVal+'T00:00:00');
-    const arDate=isNaN(d)?dateVal:d.toLocaleDateString('ar-SA-u-ca-islamic',{day:'2-digit',month:'2-digit',year:'numeric'});
+    const arDate=isNaN(d)?dateVal:d.toLocaleDateString('ar-SA-u-ca-islamic',{day:'2-digit',month:'2-digit',year:'numeric'}).replace(/[\u200e\u200f\u061c]/g,'').replace(/\s*ه[ـ]?\s*$/,'').trim();
     const grDate=isNaN(d)?dateVal:d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
     const dayName=isNaN(d)?'':d.toLocaleDateString('ar-SA',{weekday:'long'});
     return {
@@ -4309,7 +4332,7 @@
       '{{CONTRACTCODE}}':c.contractCode||''
     };
   }
-  function fillContractText(text,e,c){ const r=contractReplacements(e,c); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>escapeHtml(r[m]??m)); }
+  function fillContractText(text,e,c){ const r=contractReplacements(e,c); const ltr=new Set(['{{IDNUM}}','{{PHONE}}']); return String(text||'').replace(/\{\{[A-Z_]+\}\}/g,m=>{ const v=escapeHtml(r[m]??m); return (ltr.has(m)&&r[m])?`<bdi dir="ltr">${v}</bdi>`:v; }).replace(/\s*المبلغ كتابة \(\s*\)/g,''); }
   function editableBlock(title,key,text,e,c){ return `<section class="contract-edit-block" data-contract-key="${key}"><h3>${title}</h3><div class="contract-editable" contenteditable="true" spellcheck="false">${fillContractText(text,e,c).replace(/\n/g,'<br>')}</div></section>`; }
   function buildContractHtml(e,c){
     const num=escapeHtml(c.contractCode||'');
@@ -4417,7 +4440,7 @@
     document.getElementById('contractSavedNote').textContent='تم حفظ بيانات العقد وتعديلاته بنجاح.';
     showToast('تم حفظ العقد وتعديلاته بنجاح');
   });
-  document.getElementById('printContractBtn')?.addEventListener('click',()=>{
+  function printContractSheet(){
     const sheet=document.getElementById('contractSheet');
     if(!sheet || !sheet.querySelector('.new-contract-page')) return;
     const win=window.open('', '_blank', 'width=900,height=1200');
@@ -4430,9 +4453,9 @@
       html,body{margin:0!important;padding:0!important;width:210mm!important;background:#fff!important;}
       body{direction:rtl;font-family:"JF Flat Regular","JF Flat","Segoe UI",Tahoma,sans-serif;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
       .contract-sheet{display:block!important;width:210mm!important;margin:0!important;padding:0!important;}
-      .new-contract-page{display:block!important;position:relative!important;width:210mm!important;height:297mm!important;min-height:297mm!important;max-height:297mm!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#fff url("${location.href.replace(/index\.html.*$/,'')}assets/contract-bg.jpg") center top / 100% 100% no-repeat!important;page-break-after:always!important;break-after:page!important;page-break-inside:avoid!important;break-inside:avoid!important;}
-      .new-contract-page:last-of-type{page-break-after:auto!important;break-after:auto!important;}
-      .contract-page-content{position:relative!important;z-index:2!important;width:210mm!important;height:297mm!important;max-height:297mm!important;overflow:hidden!important;padding:28mm 17mm 17mm!important;font-size:13.2px!important;line-height:1.35!important;font-weight:600!important;}
+      .new-contract-page{display:block!important;position:relative!important;width:210mm!important;height:296.6mm!important;min-height:296.6mm!important;max-height:296.6mm!important;margin:0!important;padding:0!important;overflow:hidden!important;background:#fff url("${location.href.replace(/index\.html.*$/,'')}assets/contract-bg.jpg") center top / 100% 100% no-repeat!important;page-break-after:auto!important;break-after:auto!important;page-break-inside:avoid!important;break-inside:avoid!important;}
+      .new-contract-page+.new-contract-page{page-break-before:always!important;break-before:page!important;}
+      .contract-page-content{position:relative!important;z-index:2!important;width:210mm!important;height:296.6mm!important;max-height:296.6mm!important;overflow:hidden!important;padding:28mm 17mm 17mm!important;font-size:13.2px!important;line-height:1.35!important;font-weight:600!important;}
       .new-contract-page .contract-edit-block{display:block!important;margin:0 0 4px!important;padding:0!important;border:0!important;background:transparent!important;}
       .new-contract-page .contract-edit-block h3{margin:2px 0 1px!important;font-size:15px!important;line-height:1.2!important;font-weight:800!important;color:#111!important;}
       .new-contract-page .contract-editable{display:block!important;padding:0!important;margin:0!important;border:0!important;background:transparent!important;min-height:0!important;font-size:13.2px!important;line-height:1.35!important;font-weight:600!important;white-space:normal!important;}
@@ -4441,13 +4464,14 @@
       .new-contract-page .new-contract-number{font-size:13px!important;padding:1px 6px!important;}
       .new-contract-signatures{margin-top:7mm!important;line-height:1.6!important;gap:20mm!important;}
       .new-contract-signatures>div{min-height:18mm!important;}
-      @media print{html,body{width:210mm!important;margin:0!important;padding:0!important;overflow:visible!important}.new-contract-page{height:297mm!important;max-height:297mm!important;page-break-after:always!important;break-after:page!important}.new-contract-page:last-of-type{page-break-after:auto!important;break-after:auto!important;}}
+      @media print{html,body{width:210mm!important;margin:0!important;padding:0!important;overflow:visible!important}.new-contract-page{height:296.6mm!important;max-height:296.6mm!important}}
     </style></head><body><div class="contract-sheet">${pages}</div></body></html>`);
     win.document.close();
     const printNow=()=>{setTimeout(()=>{win.focus();win.print();},250);};
     const imgs=[...win.document.images];
     if(imgs.length){let left=imgs.length; const done=()=>{if(--left<=0)printNow();}; imgs.forEach(img=>{if(img.complete)done();else{img.onload=done;img.onerror=done;}}); setTimeout(printNow,1500);}else printNow();
-  });
+  }
+  document.getElementById('printContractBtn')?.addEventListener('click',printContractSheet);
 
   /* ===== all saved employee contracts ===== */
   function uniqueSorted(values){
