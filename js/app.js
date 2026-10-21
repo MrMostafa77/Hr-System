@@ -91,7 +91,7 @@
     regions = Array.isArray(state?.regions) ? state.regions : [];
     projects = Array.isArray(state?.projects) ? state.projects : [];
     departments = Array.isArray(state?.departments) ? state.departments : [];
-    contracts = Array.isArray(state?.contracts) ? state.contracts : [];
+    contracts = Array.isArray(state?.contracts) ? state.contracts.filter((c,i,a)=>c && (c.id==null || a.findIndex(x=>x && x.id===c.id)===i)) : [];
     commencements = Array.isArray(state?.commencements) ? state.commencements : [];
     projectAccounts = Array.isArray(state?.projectAccounts) ? state.projectAccounts : [];
     payrollRecords = state?.payrollRecords && typeof state.payrollRecords==='object' ? state.payrollRecords : {};
@@ -104,6 +104,9 @@
   }
   let cloudSaveTimer = null;
   let cloudApplying = false;
+  // تتبّع حالة الحفظ السحابي: حتى لا يكتب snapshot قديم فوق تغييراتنا المحلية (سبب اختفاء العقد بعد حفظه).
+  let cloudDirty = false, cloudSaving = 0, cloudSeq = 0, cloudLastSaveAt = 0;
+  function localWritesPending(){ return cloudDirty || cloudSaving>0 || (Date.now()-cloudLastSaveAt)<2500; }
   let forceOperationalReset = false;
   function persistLocal(){
     writeLocal(STORAGE_KEY,employees); writeLocal(ATT_KEY,attendance);
@@ -115,10 +118,23 @@
     if(message) showToast(message);
     if(!window.FB?.saveState || cloudApplying) return;
     clearTimeout(cloudSaveTimer);
-    cloudSaveTimer=setTimeout(()=>window.FB.saveState(currentState()).catch(err=>{
-      console.error('Firestore save failed:',err);
-      showToast('تم الحفظ محليًا، وتعذر مزامنة التغييرات مع قاعدة البيانات');
-    }),120);
+    const seq=++cloudSeq; cloudDirty=true;
+    cloudSaveTimer=setTimeout(()=>{
+      cloudSaving++;
+      window.FB.saveState(currentState()).catch(err=>{
+        console.error('Firestore save failed:',err);
+        showToast('تم الحفظ محليًا، وتعذر مزامنة التغييرات مع قاعدة البيانات');
+      }).finally(()=>{ cloudSaving--; if(seq===cloudSeq) cloudDirty=false; cloudLastSaveAt=Date.now(); });
+    },120);
+  }
+  // حفظ سحابي فوري يُنتظر نجاحه فعلاً (يُستخدم عند حفظ العقد) بدل إظهار «تم الحفظ» قبل انتهاء الكتابة.
+  async function saveCloudNow(){
+    persistLocal();
+    if(!window.FB?.saveState) return;
+    clearTimeout(cloudSaveTimer);
+    const seq=++cloudSeq; cloudDirty=true; cloudSaving++;
+    try{ await withTimeout(window.FB.saveState(currentState()),20000,'saveState'); }
+    finally{ cloudSaving--; if(seq===cloudSeq) cloudDirty=false; cloudLastSaveAt=Date.now(); }
   }
   function loadEmployees(){
     const state=localState();
@@ -4448,22 +4464,38 @@
   });
   ['contract_start','contract_end','contract_location','contract_hours','contract_week_hours','contract_probation','contract_notice','contract_notice_comp','contract_resign_notice','contract_notes'].forEach(id=>document.getElementById(id)?.addEventListener('input',()=>{ if(id==='contract_start'||id==='contract_end') updateContractDurationNote(); renderContractSheet(); }));
   document.getElementById('rebuildContractBtn')?.addEventListener('click',renderContractSheet);
-  document.getElementById('saveContractBtn')?.addEventListener('click',()=>{
+  document.getElementById('saveContractBtn')?.addEventListener('click',async()=>{
+    const btn=document.getElementById('saveContractBtn'); if(btn?.disabled) return;
     const empId=document.getElementById('contract_emp').value,e=employees.find(x=>x.id===empId); if(!e){showToast('اختر الموظف أولاً');return;}
     const existing=currentContractId ? contracts.find(c=>c.id===currentContractId) : null;
-    const contractCode=existing?.contractCode || nextContractCode(e.region||'');
-    const data={id:currentContractId||('ct'+Date.now()+Math.random().toString(36).slice(2,7)),empId,contractCode,...currentContractForm(),customHtml:document.getElementById('contractSheet').innerHTML,templateVersion:6,updatedAt:new Date().toISOString()};
-    if(currentContractId){
-      const i=contracts.findIndex(c=>c.id===currentContractId);
-      if(i>=0) contracts[i]=data; else contracts.push(data);
-    }else{
-      contracts.push(data);
-      currentContractId=data.id;
-      newContractMode=false;
-    }
-    e.contractduration=data.duration;e.startdate=data.start;e.contractend=data.end;e.project=data.location;saveContracts();saveEmployees();
-    document.getElementById('contractSavedNote').textContent='تم حفظ بيانات العقد وتعديلاته بنجاح.';
-    showToast('تم حفظ العقد وتعديلاته بنجاح');
+    const formCode=String(document.getElementById('contract_code')?.value||'').trim();
+    const codeTaken=code=>contracts.some(c=>c.contractCode===code && c.id!==currentContractId);
+    // رقم العقد: العقد المحفوظ يحتفظ برقمه، والجديد يأخذ التالي في التسلسل.
+    // وإن اختفى عقد محفوظ من القائمة بسبب مزامنة قديمة نعيد استخدام رقمه الظاهر بدل حرق رقم جديد.
+    let contractCode;
+    if(existing) contractCode=existing.contractCode||nextContractCode(e.region||'');
+    else if(currentContractId && formCode && !codeTaken(formCode)) contractCode=formCode;
+    else contractCode=nextContractCode(e.region||'');
+    // المعرّف يُثبَّت قبل أي انتظار: إعادة الضغط/إعادة المحاولة تحدّث نفس العقد ولا تُنشئ عقداً مكرراً.
+    const id=currentContractId||('ct'+Date.now()+Math.random().toString(36).slice(2,7));
+    const data={id,empId,contractCode,...currentContractForm(),customHtml:document.getElementById('contractSheet').innerHTML,templateVersion:6,updatedAt:new Date().toISOString()};
+    const i=contracts.findIndex(c=>c.id===id);
+    if(i>=0) contracts[i]=data; else contracts.push(data);
+    currentContractId=id; newContractMode=false;
+    const codeEl=document.getElementById('contract_code'); if(codeEl) codeEl.value=contractCode;
+    e.contractduration=data.duration;e.startdate=data.start;e.contractend=data.end;e.project=data.location;
+    const noteEl=document.getElementById('contractSavedNote');
+    if(btn) btn.disabled=true;
+    try{
+      await saveCloudNow();
+      try{renderProjectCapacity(); renderProjects();}catch(_){}
+      if(noteEl) noteEl.textContent='تم حفظ بيانات العقد وتعديلاته بنجاح.';
+      showToast('تم حفظ العقد وتعديلاته بنجاح');
+    }catch(err){
+      console.error('Contract save failed:',err);
+      if(noteEl) noteEl.textContent='لم يُحفظ العقد في قاعدة البيانات. تحقق من الاتصال ثم اضغط «حفظ» مرة أخرى (لن يتكرر العقد).';
+      showToast('تعذر حفظ العقد في قاعدة البيانات — اضغط حفظ مرة أخرى');
+    }finally{ if(btn) btn.disabled=false; }
   });
   async function downloadContractPdf(){
     const sheet=document.getElementById('contractSheet');
@@ -4947,6 +4979,8 @@
       }
       window.FB.startRealtimeSync((state)=>{
         if(!state) return;
+        // تجاهل أي snapshot يصل أثناء/بعد حفظ محلي مباشرة: قد يكون قديماً فيمسح العقد الذي حفظناه للتو.
+        if(!forceOperationalReset && localWritesPending()) return;
         cloudApplying=true;
         try{
           // أثناء تنفيذ "بدء دورة بيانات جديدة" يجب قبول الحالة الفارغة
@@ -4963,7 +4997,8 @@
             persistLocal();
             refreshEmployeeDependencies();
           }
-          switchView(currentView);
+          // لا نعيد بناء شاشة العقود أثناء التحرير حتى لا يُمسح النموذج المفتوح.
+          if(currentView!=='contracts') switchView(currentView);
           if(currentView==='employees') renderEmployeeTable();
           renderAttendanceAndPenalties?.();
         } finally { cloudApplying=false; }
