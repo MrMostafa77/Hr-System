@@ -106,6 +106,15 @@
     return [...list].sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')) || String(b.startDate||'').localeCompare(String(a.startDate||'')))[0]||null;
   }
   // رقم العقد المحفوظ (contractCode) هو المرجع الوحيد: نصحّح الرقم الظاهر في نص العقد المحفوظ ليطابقه دائماً.
+  // نص العقد المحفوظ يجب أن يخص نفس الموظف: نتحقق من رقم هويته (أو اسمه) داخل النص.
+  function contractHtmlMatchesEmployee(html, e){
+    if(!html || !e) return true;
+    const txt=String(html).replace(/<[^>]*>/g,' ');
+    const id=String(e.idnum||'').trim();
+    if(id) return txt.includes(id);
+    const nm=String(e.fullname||'').trim();
+    return nm ? txt.includes(nm) : true;
+  }
   function fixContractHtmlNumber(html, code){
     if(!html || !code) return html;
     try{
@@ -4515,6 +4524,12 @@
     document.getElementById('contract_notes').value=c.notes||'';
     // العقد المحفوظ يُعرض بنصه المحفوظ كما هو (بما فيه أي تعديل نصي)، والجديد من النموذج.
     const savedC=currentContractId?contracts.find(x=>x.id===currentContractId):null;
+    if(savedC && savedC.customHtml && !contractHtmlMatchesEmployee(savedC.customHtml,e)){
+      // النص المحفوظ يخص موظفاً آخر: نعيد بناء العقد من بيانات هذا الموظف ونثبّته.
+      savedC.customHtml=buildContractHtml(e,c);
+      try{ saveContracts(); }catch(_){}
+      showToast('تم تصحيح نص العقد ليطابق بيانات الموظف — راجع التواريخ والموقع ثم احفظ');
+    }
     document.getElementById('contractSheet').innerHTML=(savedC&&savedC.customHtml)?fixContractHtmlNumber(savedC.customHtml,savedC.contractCode):buildContractHtml(e,c);
     fitContractPages();
     applyContractReadOnly(!!currentContractId && !editMode);
@@ -4576,6 +4591,7 @@
       const id=currentContractId||('ct'+Date.now()+Math.random().toString(36).slice(2,7));
       const codeEl=document.getElementById('contract_code');
       if(codeEl && codeEl.value!==contractCode){ codeEl.value=contractCode; currentContractId=id; renderContractSheet(); }
+      if(!contractHtmlMatchesEmployee(document.getElementById('contractSheet').innerHTML,e)) renderContractSheet();
       const data={id,empId,contractCode,...currentContractForm(),customHtml:fixContractHtmlNumber(document.getElementById('contractSheet').innerHTML,contractCode),templateVersion:6,updatedAt:new Date().toISOString()};
       const i=contracts.findIndex(c=>c.id===id);
       if(i>=0) contracts[i]=data; else contracts.push(data);
