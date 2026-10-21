@@ -96,6 +96,7 @@
     projectAccounts = Array.isArray(state?.projectAccounts) ? state.projectAccounts : [];
     payrollRecords = state?.payrollRecords && typeof state.payrollRecords==='object' ? state.payrollRecords : {};
     syncEmployeeStartDates();
+    normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
     if(!departments.length && employees.length){
       const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map);
@@ -122,6 +123,19 @@
       t.content.querySelectorAll('.new-contract-number').forEach(n=>{ n.textContent='رقم العقد: '+code; });
       return t.innerHTML;
     }catch(_){ return html; }
+  }
+  // رقم الحساب داخل الآيبان السعودي مُبطَّن بأصفار من اليسار حتى 18 خانة؛ رقم الحساب الفعلي هو الباقي بعد حذف هذه الأصفار.
+  function stripAcctZeros(a){ const t=String(a==null?'':a).trim(); return /^\d+$/.test(t) ? (t.replace(/^0+/,'')||'0') : t; }
+  function normalizeEmployeeAccounts(){
+    try{
+      (employees||[]).forEach(e=>{
+        if(!e) return;
+        const fx=a=>(typeof a==='string'&&/^0\d+$/.test(a))?stripAcctZeros(a):a;
+        e.accountno=fx(e.accountno);
+        if(Array.isArray(e.ibans)) e.ibans.forEach(x=>{ if(x) x.accountno=fx(x.accountno); });
+        if(Array.isArray(e.ibanHistory)) e.ibanHistory.forEach(x=>{ if(x) x.accountno=fx(x.accountno); });
+      });
+    }catch(_){}
   }
   function syncEmployeeStartDates(){
     try{
@@ -179,6 +193,7 @@
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
     settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{};
     syncEmployeeStartDates();
+    normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
     if(!departments.length && employees.length){ const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map); }
     persistLocal();
@@ -1780,14 +1795,14 @@
     const numeric=rearranged.replace(/[A-Z]/g,ch=>String(ch.charCodeAt(0)-55));
     let rem=0; for(const ch of numeric) rem=(rem*10+Number(ch))%97;
     if(rem!==1) return {ok:false,message:'رقم الايبان غير صحيح أو لا يجتاز التحقق.'};
-    const bankCode=iban.slice(4,6), account=iban.slice(6);
+    const bankCode=iban.slice(4,6), account=stripAcctZeros(iban.slice(6));
     return {ok:true,bankCode,bank:SAUDI_BANKS[bankCode]||'بنك مرخص داخل المملكة — الرمز '+bankCode,account};
   }
   function updateBankFromIBAN(){
     const iban=document.getElementById('f_iban')?.value||'', bank=document.getElementById('f_bankname'), account=document.getElementById('f_accountno'), code=document.getElementById('f_bankcode');
     const clean=iban.replace(/\s+/g,'').toUpperCase();
     if(clean.length>=6){ const bankCode=clean.slice(4,6); const bankInfo=SAUDI_BANKS[bankCode]; if(bank) bank.value=bankInfo?.name||''; if(code) code.value=bankInfo?.code||''; } else { if(bank) bank.value=''; if(code) code.value=''; }
-    if(account) account.value=/^SA[0-9]{6,}$/.test(clean) ? clean.slice(6,24) : '';
+    if(account) account.value=/^SA[0-9]{6,}$/.test(clean) ? stripAcctZeros(clean.slice(6,24)) : '';
   }
 
   /* ===== الآيبانات المتعددة للموظف ===== */
@@ -1796,7 +1811,7 @@
   // employee.iban/bankname/accountno/bankcode : الآيبان المفعّل حالياً (الافتراضي)
   function ibanBankInfo(clean){
     const c=String(clean||'').slice(4,6), info=SAUDI_BANKS[c];
-    return {bankname:info?.name||'', bankcode:info?.code||'', accountno:/^SA[0-9]{6,}$/.test(clean)?clean.slice(6,24):''};
+    return {bankname:info?.name||'', bankcode:info?.code||'', accountno:/^SA[0-9]{6,}$/.test(clean)?stripAcctZeros(clean.slice(6,24)):''};
   }
   function employeeIbanList(e){
     if(!e) return [];
