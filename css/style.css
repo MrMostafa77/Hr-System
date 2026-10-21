@@ -2442,3 +2442,13 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
   .fj-doc-page:last-child{page-break-after:auto;break-after:auto}
   @page{size:A4 portrait;margin:0}
 }
+
+/* ===== تقرير المشاريع التفصيلي ===== */
+.pdr-toolbar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
+.pdr-project{border:1px solid var(--line,#e3e7ee);border-radius:12px;padding:14px;margin-bottom:18px}
+.pdr-project-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.pdr-project-head h3{margin:0}
+.pdr-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:8px 0 12px}
+.pdr-card{background:var(--gold-soft,#fff8e6);border-radius:10px;padding:10px 12px}.pdr-card span{display:block;font-size:12px;opacity:.75;margin-bottom:4px}.pdr-card b{font-size:15px}
+.pdr-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
+.pdr-ok{background:#e6f6ec;color:#146c2e}.pdr-up{background:#fff1d6;color:#9a5b00}.pdr-down{background:#fde7e7;color:#b42318}
+.pdr-table small.pay-code{display:block;opacity:.65}

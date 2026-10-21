@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://db.onlinewebfonts.com">
 <link href="https://db.onlinewebfonts.com/c/7d411bb0357d6fd29347455b7d207995?family=JF+Flat+Regular" rel="stylesheet">
 <script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('hr_theme_v1')==='light'?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}</script>
-<link rel="stylesheet" href="css/style.css?v=20261011f">
+<link rel="stylesheet" href="css/style.css?v=20261021a">
 </head>
 <body>
 
@@ -1009,6 +1009,14 @@
 
       <div id="projectReportsPanel" class="project-reports-panel" style="display:none">
         <div class="topbar"><div class="pagetitle"><h2>تقارير المشاريع</h2><p>ملخص المشاريع وقائمة المشاريع</p></div></div>
+        <div class="card section-card pdr-card-wrap">
+          <div class="pdr-toolbar">
+            <div class="payroll-filter-group"><label>المشروع</label><select id="pdrProject"><option value="">كل المشاريع</option></select></div>
+            <div class="payroll-filter-group"><label>الشهر</label><select id="pdrMonth"></select></div>
+            <button type="button" class="btn" id="pdrPrintBtn">طباعة التقرير</button>
+          </div>
+          <div id="pdrOutput"></div>
+        </div>
         <div class="card section-card project-summary-card">
         <div class="project-summary-title">ملخص المشروع الشهري</div>
         <div class="project-summary-grid">
@@ -1081,7 +1089,7 @@
 <script src="js/firebase-init.js?v=20261011f" type="module"></script>
 <script src="js/access.js?v=20261011f" type="module"></script>
 <script src="js/data.js?v=20261011f" defer></script>
-<script src="js/app.js?v=20261011f" defer></script>
+<script src="js/app.js?v=20261021a" defer></script>
 <script>
 (function(){
   function fallbackEmployeeCancel(e){

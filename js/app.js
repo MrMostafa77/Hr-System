@@ -2817,12 +2817,137 @@
   }
   document.getElementById('employeeReportSearch')?.addEventListener('input',renderEmployeeReports);
 
+  /* ===== تقرير المشاريع التفصيلي: الإيرادات + الرواتب + الدوام (مع اختيار المشروع والشهر) ===== */
+  const pdrState={project:'',month:''};
+  const PDR_ROLES=['guards','guardsFemale','supervisors','managers','patrols'];
+  function pdrCanFinance(){ return !(window.HRAuth&&typeof window.HRAuth.canFinance==='function')||!!window.HRAuth.canFinance(); }
+  function pdrRefreshControls(){
+    const ps=document.getElementById('pdrProject'), ms=document.getElementById('pdrMonth'); if(!ps||!ms)return;
+    ps.innerHTML='<option value="">كل المشاريع</option>'+projects.map(p=>`<option value="${escapeAttr(p.id)}">${escapeHtml(p.name||'—')}</option>`).join('');
+    ps.value=projects.some(p=>p.id===pdrState.project)?pdrState.project:'';
+    const months=payrollAvailableMonths(), cur=currentMonthStr();
+    ms.innerHTML=months.length?months.map(m=>`<option value="${escapeAttr(m)}">${escapeHtml(monthLabel(m))}</option>`).join(''):'<option value="">لا توجد أشهر متاحة</option>';
+    ms.value=months.includes(pdrState.month)?pdrState.month:(months.includes(cur)?cur:(months[0]||''));
+    pdrState.project=ps.value; pdrState.month=ms.value;
+  }
+  function pdrDiffPill(diff,unit){
+    const d=Math.round((Number(diff)||0)*100)/100;
+    if(d===0) return '<span class="pdr-pill pdr-ok">مطابق</span>';
+    return d>0?`<span class="pdr-pill pdr-up">زيادة ${fmt(Math.abs(d))}${unit?' '+unit:''}</span>`:`<span class="pdr-pill pdr-down">نقص ${fmt(Math.abs(d))}${unit?' '+unit:''}</span>`;
+  }
+  function pdrCompute(p,ym){
+    const cols=monthCols(ym), today=todayISO();
+    const periodOpen=cols.length>0 && cols[cols.length-1].iso>today;
+    const periodDays=periodOpen?Math.min(PAY_MONTH_DAYS,cols.filter(c=>c.iso<=today).length):PAY_MONTH_DAYS;
+    const vat=(p.vatRate===undefined||p.vatRate===null||p.vatRate==='')?15:(Number(p.vatRate)||0);
+    // الإيرادات
+    const revRows=[]; const rv=p.revenueItems||{};
+    Object.keys(projectKinds).forEach(k=>{
+      if(!Array.isArray(rv[k])) return;
+      rv[k].forEach(r=>{
+        const qty=Number(r.quantity)||0, unit=Number(r.unit)||0, ex=qty*unit, v=ex*vat/100;
+        if(!qty&&!unit) return;
+        revRows.push({name:projectKinds[k]+(r.type?` — ${r.type}`:''),qty,unit,ex,vat:v,inc:ex+v});
+      });
+    });
+    // الفئات البشرية
+    const roles={}; PDR_ROLES.forEach(k=>{
+      const cv=(p.costItems&&Array.isArray(p.costItems[k]))?p.costItems[k]:[];
+      roles[k]={k,label:roleCapacityLabels[k],cap:projectRoleCapacity(p,k),budget:cv.reduce((a,r)=>a+(Number(r.quantity)||0)*(Number(r.unit)||0),0),hasCost:cv.length>0,emps:[]};
+    });
+    roles.other={k:'other',label:'وظائف أخرى / غير محددة',cap:0,budget:0,hasCost:false,emps:[]};
+    employees.filter(e=>sameProjectName(e.project,p.name)).forEach(e=>{
+      const k=roleCapacityKey(e.jobtitle), bucket=(k&&roles[k])?roles[k]:roles.other;
+      const eligible=employeeEligibleForHR(e);
+      const row={e,eligible,st:null,worked:0,absent:0,real:0,sum:{}};
+      if(eligible){
+        const st=payrollStatementForCols(e,cols);
+        row.st=st; row.sum=st.sum||{}; row.worked=st.workDays||0;
+        row.absent=(row.sum['غ']||0)+(row.sum['ش']||0);
+        row.real=Math.max(0,row.worked-row.absent);
+      }
+      bucket.emps.push(row);
+    });
+    return {p,ym,cols,periodOpen,periodDays,vat,revRows,roles};
+  }
+  function pdrTotals(d,fin){
+    const t={revEx:0,revVat:0,revInc:0,earned:0,net:0,deduction:0,budget:0,expectedDays:0,workedDays:0,absentDays:0,realDays:0,headcount:0,cap:0};
+    d.revRows.forEach(r=>{t.revEx+=r.ex;t.revVat+=r.vat;t.revInc+=r.inc;});
+    Object.values(d.roles).forEach(r=>{
+      t.budget+=r.budget; t.cap+=r.cap; t.headcount+=r.emps.length; t.expectedDays+=r.cap*d.periodDays;
+      r.emps.forEach(x=>{ t.workedDays+=x.worked; t.absentDays+=x.absent; t.realDays+=x.real; if(x.st){t.earned+=x.st.totalEarned;t.net+=x.st.net;t.deduction+=x.st.deduction;} });
+    });
+    return t;
+  }
+  function pdrProjectHtml(d,fin){
+    const t=pdrTotals(d,fin), p=d.p, roleKeys=[...PDR_ROLES,'other'].filter(k=>d.roles[k].cap>0||d.roles[k].emps.length||d.roles[k].budget>0);
+    const th=(...a)=>'<tr>'+a.map(x=>`<th>${x}</th>`).join('')+'</tr>';
+    let h=`<div class="pdr-project"><div class="pdr-project-head"><h3>${escapeHtml(p.name||'—')}</h3><span class="pill pill-gray">${escapeHtml(p.region||'')}</span><span class="pill pill-gray">${escapeHtml(monthLabel(d.ym))}</span></div>`;
+    // بطاقات الملخص
+    const dayDiff=t.realDays-t.expectedDays;
+    h+=`<div class="pdr-cards">`;
+    if(fin) h+=`<div class="pdr-card"><span>الإيرادات المستحقة (بالضريبة)</span><b>${money(t.revInc)}</b></div><div class="pdr-card"><span>الرواتب المستحقة (إجمالي)</span><b>${money(t.earned)}</b></div><div class="pdr-card"><span>صافي الرواتب بعد الخصم</span><b>${money(t.net)}</b></div>`;
+    h+=`<div class="pdr-card"><span>أيام الدوام المطلوبة</span><b>${fmt(t.expectedDays)} يوم</b></div><div class="pdr-card"><span>أيام الدوام الفعلية</span><b>${fmt(t.realDays)} يوم</b></div><div class="pdr-card"><span>الفرق في الدوام</span><b>${pdrDiffPill(dayDiff,'يوم')}</b></div></div>`;
+    // 1) الإيرادات
+    h+=`<div class="pj-bd-title">١) الإيرادات المستحقة للمشروع (شهريًا)</div>`;
+    if(!fin) h+=`<div class="empty-note">ليست لديك صلاحية عرض البيانات المالية.</div>`;
+    else h+=`<div class="table-wrap"><table class="payroll-table pj-bd pdr-table"><thead>${th('البند','العدد','سعر الوحدة','الإجمالي قبل الضريبة',`الضريبة (${fmt(d.vat)}%)`,'الإجمالي بالضريبة')}</thead><tbody>${
+      d.revRows.map(r=>`<tr><td>${escapeHtml(r.name)}</td><td class="mono">${fmt(r.qty)}</td><td class="mono">${money(r.unit)}</td><td class="mono">${money(r.ex)}</td><td class="mono">${money(r.vat)}</td><td class="mono">${money(r.inc)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty-note">لا توجد بنود إيرادات مسجلة لهذا المشروع.</td></tr>'
+    }<tr class="pj-bd-total"><td>الإجمالي</td><td></td><td></td><td class="mono">${money(t.revEx)}</td><td class="mono">${money(t.revVat)}</td><td class="mono">${money(t.revInc)}</td></tr></tbody></table></div>`;
+    // 2) الرواتب
+    h+=`<div class="pj-bd-title">٢) الرواتب المستحقة (من تبويب الرواتب) ومقارنتها بالمخطط</div>`;
+    if(!fin) h+=`<div class="empty-note">ليست لديك صلاحية عرض البيانات المالية.</div>`;
+    else{
+      h+=`<div class="table-wrap"><table class="payroll-table pj-bd pdr-table"><thead>${th('الفئة','العدد المطلوب','العدد الفعلي','المخطط شهريًا (حسب التكاليف)','المستحق فعليًا (إجمالي)','الفرق','صافي بعد الخصومات')}</thead><tbody>${
+        roleKeys.map(k=>{const r=d.roles[k], earned=r.emps.reduce((a,x)=>a+(x.st?x.st.totalEarned:0),0), net=r.emps.reduce((a,x)=>a+(x.st?x.st.net:0),0);
+          return `<tr><td>${escapeHtml(r.label)}</td><td class="mono">${fmt(r.cap)}</td><td class="mono">${fmt(r.emps.length)}${r.emps.length>r.cap&&r.k!=='other'?' <span class="pdr-pill pdr-up">زيادة</span>':(r.emps.length<r.cap?' <span class="pdr-pill pdr-down">نقص</span>':'')}</td><td class="mono">${r.hasCost?money(r.budget):'—'}</td><td class="mono">${money(earned)}</td><td>${r.hasCost?pdrDiffPill(earned-r.budget,'ريال'):'—'}</td><td class="mono">${money(net)}</td></tr>`;}).join('')||'<tr><td colspan="7" class="empty-note">لا توجد بيانات.</td></tr>'
+      }<tr class="pj-bd-total"><td>الإجمالي</td><td class="mono">${fmt(t.cap)}</td><td class="mono">${fmt(t.headcount)}</td><td class="mono">${money(t.budget)}</td><td class="mono">${money(t.earned)}</td><td>${pdrDiffPill(t.earned-t.budget,'ريال')}</td><td class="mono">${money(t.net)}</td></tr></tbody></table></div>`;
+      const rows=[]; roleKeys.forEach(k=>d.roles[k].emps.forEach(x=>rows.push({role:d.roles[k].label,...x})));
+      h+=`<div class="pj-bd-title" style="font-size:13px">تفصيل رواتب الأفراد</div><div class="table-wrap"><table class="payroll-table pj-bd pdr-table"><thead>${th('م','الاسم','الوظيفة','الراتب الشهري','أيام العمل','إضافي + مكافأة','إجمالي المستحق','الخصومات','الصافي')}</thead><tbody>${
+        rows.map((x,i)=>{const st=x.st; return st
+          ?`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td class="mono">${money(st.monthlyGross)}</td><td class="mono">${fmt(x.worked)}</td><td class="mono">${money(st.overtime+st.bonus)}</td><td class="mono">${money(st.totalEarned)}</td><td class="mono">${money(st.deduction)}</td><td class="mono"><b>${money(st.net)}</b></td></tr>`
+          :`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td colspan="6" class="empty-note">لا يدخل في الرواتب (لا يوجد عقد أو مباشرة)</td></tr>`;}).join('')||'<tr><td colspan="9" class="empty-note">لا يوجد موظفون على هذا المشروع.</td></tr>'
+      }</tbody></table></div>`;
+    }
+    // 3) الدوام
+    h+=`<div class="pj-bd-title">٣) الدوام: المطلوب مقابل الفعلي (${fmt(d.periodDays)} يوم للفرد${d.periodOpen?' — الشهر لم ينتهِ بعد':''})</div>`;
+    h+=`<div class="table-wrap"><table class="payroll-table pj-bd pdr-table"><thead>${th('الفئة','العدد المطلوب','الأيام المطلوبة','أيام الدوام المسجلة','أيام الغياب','الدوام الفعلي','الفرق','الحالة')}</thead><tbody>${
+      roleKeys.map(k=>{const r=d.roles[k], exp=r.cap*d.periodDays, w=r.emps.reduce((a,x)=>a+x.worked,0), ab=r.emps.reduce((a,x)=>a+x.absent,0), re=r.emps.reduce((a,x)=>a+x.real,0);
+        return `<tr><td>${escapeHtml(r.label)}</td><td class="mono">${fmt(r.cap)}</td><td class="mono">${fmt(exp)}</td><td class="mono">${fmt(w)}</td><td class="mono" ${ab?'style="color:#b42318;font-weight:700"':''}>${fmt(ab)}</td><td class="mono"><b>${fmt(re)}</b></td><td class="mono">${fmt(re-exp)}</td><td>${r.k==='other'?'—':pdrDiffPill(re-exp,'يوم')}</td></tr>`;}).join('')||'<tr><td colspan="8" class="empty-note">لا توجد بيانات.</td></tr>'
+    }<tr class="pj-bd-total"><td>الإجمالي</td><td class="mono">${fmt(t.cap)}</td><td class="mono">${fmt(t.expectedDays)}</td><td class="mono">${fmt(t.workedDays)}</td><td class="mono">${fmt(t.absentDays)}</td><td class="mono">${fmt(t.realDays)}</td><td class="mono">${fmt(dayDiff)}</td><td>${pdrDiffPill(dayDiff,'يوم')}</td></tr></tbody></table></div>`;
+    const arows=[]; roleKeys.forEach(k=>d.roles[k].emps.forEach(x=>arows.push({role:d.roles[k].label,...x})));
+    h+=`<div class="pj-bd-title" style="font-size:13px">تفصيل دوام الأفراد</div><div class="table-wrap"><table class="payroll-table pj-bd pdr-table"><thead>${th('م','الاسم','الوظيفة','حضور (ح)','غياب (غ/ش)','راحة','تغطية (ط)','دوام مسجل','الدوام الفعلي',`الفرق عن ${fmt(d.periodDays)}`)}</thead><tbody>${
+      arows.map((x,i)=>x.eligible
+        ?`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td class="mono">${fmt(x.sum['ح']||0)}</td><td class="mono" ${x.absent?'style="color:#b42318;font-weight:700"':''}>${fmt(x.absent)}</td><td class="mono">${fmt(x.sum['راحة']||0)}</td><td class="mono">${fmt(x.sum['ط']||0)}</td><td class="mono">${fmt(x.worked)}</td><td class="mono"><b>${fmt(x.real)}</b></td><td>${pdrDiffPill(x.real-d.periodDays,'يوم')}</td></tr>`
+        :`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td colspan="7" class="empty-note">لا يوجد عقد أو مباشرة — لا يُحتسب له دوام</td></tr>`).join('')||'<tr><td colspan="10" class="empty-note">لا يوجد موظفون على هذا المشروع.</td></tr>'
+    }</tbody></table></div>`;
+    h+=`<div class="project-summary-note">الدوام الفعلي = أيام الدوام المسجلة في كشف الحضور − أيام الغياب (غ/ش). الأيام المطلوبة = عدد الأفراد المطلوب في المشروع × ${fmt(d.periodDays)} يوم. الرواتب مأخوذة من نفس حساب تبويب الرواتب للشهر المختار.</div></div>`;
+    return h;
+  }
+  function renderProjectDetailReport(){
+    const out=document.getElementById('pdrOutput'); if(!out)return;
+    pdrRefreshControls();
+    const ym=pdrState.month;
+    if(!ym){out.innerHTML='<div class="empty-note">لا يوجد شهر حضور متاح لإعداد التقرير.</div>';return;}
+    const fin=pdrCanFinance();
+    const list=pdrState.project?projects.filter(p=>p.id===pdrState.project):projects;
+    out.innerHTML=list.map(p=>pdrProjectHtml(pdrCompute(p,ym),fin)).join('')||'<div class="empty-note">لا توجد مشاريع.</div>';
+  }
+  document.getElementById('pdrProject')?.addEventListener('change',e=>{pdrState.project=e.target.value;renderProjectDetailReport();});
+  document.getElementById('pdrMonth')?.addEventListener('change',e=>{pdrState.month=e.target.value;renderProjectDetailReport();});
+  document.getElementById('pdrPrintBtn')?.addEventListener('click',()=>{
+    const out=document.getElementById('pdrOutput'); if(!out||!out.innerHTML.trim())return;
+    const w=window.open('','_blank'); if(!w){showToast('اسمح بفتح النوافذ المنبثقة للطباعة');return;}
+    w.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>تقرير المشاريع</title><style>body{font-family:Tahoma,Arial,sans-serif;padding:16px;color:#111}h3{margin:18px 0 8px}table{width:100%;border-collapse:collapse;margin:6px 0 14px;font-size:12px}th,td{border:1px solid #bbb;padding:5px 7px;text-align:center}th{background:#eee}td:first-child,th:first-child{text-align:right}.pj-bd-title{font-weight:800;margin:14px 0 6px}.pdr-cards{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.pdr-card{border:1px solid #bbb;padding:6px 10px;border-radius:6px}.pdr-card span{display:block;font-size:11px;color:#555}.pdr-pill{padding:1px 7px;border-radius:10px;border:1px solid #999;font-size:11px}.pdr-project{page-break-after:always}.pill{display:none}.project-summary-note{font-size:11px;color:#555}</style></head><body><h2>تقرير المشاريع — ${escapeHtml(monthLabel(pdrState.month))}</h2>${out.innerHTML}</body></html>`);
+    w.document.close(); setTimeout(()=>w.print(),400);
+  });
+
   function renderReports(){
     const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel');
     if(card)card.style.display=(projectMode||employeeMode)?'none':'';
     if(panel)panel.style.display=projectMode?'':'none';
     if(employeePanel)employeePanel.style.display=employeeMode?'':'none';
-    if(projectMode){renderProjects();renderProjectCapacity();return;}
+    if(projectMode){renderProjects();renderProjectCapacity();try{renderProjectDetailReport();}catch(err){console.error(err);}return;}
     if(employeeMode){renderEmployeeReports();return;}
     refreshPayrollMonthOptions();refreshPayrollFilters();
     try{
