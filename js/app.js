@@ -1728,10 +1728,23 @@
     return prefix+String(max+1).padStart(4,'0');
   }
   // Contract numbers are independent from employee numbers, while following the same region/year/month/sequence format.
+  // أول رقم ناقص في تسلسل العقود لنفس البادئة (مثال: 1..7 ثم 9..14 => 8). يرجع 0 إن لم يوجد ناقص.
+  function firstMissingContractSeq(prefix, excludeId=''){
+    const re=new RegExp('^'+prefix.replace(/[-]/g,'\\-')+'(\\d{4})$');
+    const used=new Set(); let max=0;
+    contracts.forEach(c=>{
+      if(!c || (excludeId && c.id===excludeId)) return;
+      const m=String(c.contractCode||'').match(re);
+      if(m){ const n=Number(m[1]); used.add(n); if(n>max) max=n; }
+    });
+    for(let n=1;n<max;n++){ if(!used.has(n)) return n; }
+    return 0;
+  }
   function nextContractCode(region, excludeId=''){
     const code=regionCode(region), now=new Date(), yy=String(now.getFullYear()).slice(-2), mm=String(now.getMonth()+1).padStart(2,'0');
     const prefix=`${code}-${yy}-${mm}-`;
-    // العدّاد الدائم: رقم صدر مرة لا يُعاد إصداره أبداً حتى لو حُذف العقد صاحبه.
+    { const gap=firstMissingContractSeq(prefix,excludeId); if(gap) return prefix+String(gap).padStart(4,'0'); } // الرقم الناقص أولاً
+    // العدّاد الدائم للأرقام الجديدة بعد آخر رقم.
     let max=Number(settings?.contractSeq?.[prefix])||0;
     contracts.forEach(c=>{
       if(excludeId && c.id===excludeId) return;
@@ -1747,6 +1760,7 @@
     const prefix=`${code}-${yy}-${mm}-`;
     if(!settings || typeof settings!=='object') settings={};
     if(!settings.contractSeq || typeof settings.contractSeq!=='object') settings.contractSeq={};
+    { const gap=firstMissingContractSeq(prefix,''); if(gap) return prefix+String(gap).padStart(4,'0'); } // املأ الرقم الناقص قبل فتح رقم جديد
     let floor=Number(settings.contractSeq[prefix])||0;
     const re=new RegExp('^'+prefix.replace(/[-]/g,'\\-')+'(\\d{4})$');
     contracts.forEach(c=>{ const m=String(c.contractCode||'').match(re); if(m) floor=Math.max(floor,Number(m[1])); });
