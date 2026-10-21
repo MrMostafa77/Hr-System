@@ -29,7 +29,7 @@
   let currentView = 'dashboard';
   let currentProfileId = null;
   let pendingDeleteId = null;
-  let currentDocType = 'contract';
+  let currentDocType = 'iban';
   let currentContractId = null;
   let newContractMode = false;
   let pendingEmployeeFiles = {};
@@ -4982,39 +4982,50 @@
     loadSettingsIntoForm();
     renderDocSheet();
   }
+  /* ===== المستندات: ورق الشركة الرسمي (اللوجو + العلامة المائية) ===== */
+  function docCompany(){ return settings.company || 'شركة فخر الجزيرة للحراسات الأمنية'; }
+  function docManager(){ return settings.manager || 'زهير سفر القثامي'; }
+  function docDateLine(){ const t=todayISO(); return `التاريخ: ${formatHijri(t)} هـ الموافق: ${formatGregorianArabic(t)} م`; }
+  function docPage(title, body, opts={}){
+    return `<div class="fj-doc-page"><div class="fj-doc-content"><h2 class="fj-doc-title">${title}</h2>${opts.noDate?'':`<div class="fj-doc-date">${docDateLine()}</div>`}${body}</div></div>`;
+  }
+  function docEmpTable(e, extra=[]){
+    const rows=[['اسم الموظف',e.fullname],['رقم الهوية / الإقامة',e.idnum],['الرقم الوظيفي',e.empcode],['المسمى الوظيفي',e.jobtitle],['الموقع / المشروع',e.project||e.region],...extra];
+    const cells=rows.map(r=>`<th>${r[0]}</th><td>${blank(r[1])}</td>`);
+    let out=''; for(let i=0;i<cells.length;i+=2) out+=`<tr>${cells[i]}${cells[i+1]||'<th></th><td></td>'}</tr>`;
+    return `<table class="doc-mini-table"><tbody>${out}</tbody></table>`;
+  }
+  function docSign(labels){ return `<div class="sign-row">${labels.map(l=>`<div>${l}<br>...........................</div>`).join('')}</div>`; }
+  function docEmptyRows(n,cols,pre=[]){
+    let h=''; for(let i=0;i<n;i++){ const r=pre[i]||[]; h+=`<tr><td>${i+1}</td>${Array.from({length:cols-1},(_,k)=>`<td>${r[k]!=null?escapeHtml(r[k]):'&nbsp;'}</td>`).join('')}</tr>`; }
+    return h;
+  }
+  function docNum(n){ return (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function renderDocSheet(){
     const empId = document.getElementById('doc_emp').value;
     const e = employees.find(x=>x.id===empId) || {};
-    const co = settings.company || 'اسم الشركة';
-    const today = new Date().toLocaleDateString('ar-SA-u-ca-gregory');
+    const co = docCompany();
     const sheet = document.getElementById('docSheet');
-    let html = '';
-    if(currentDocType==='contract'){
-      const c=contractDataFromEmployee(e);
-      html = buildContractHtml(e,c);
-    }else if(currentDocType==='penalties'){
-      html=`<h2>لائحة الجزاءات والخصومات</h2><div class="doc-date">${today}</div>
-      <p><b>ملاحظة:</b> هذه اللائحة مستقلة عن عقد العمل ويُرجع إليها عند تطبيق الجزاءات وفق الإجراءات المعتمدة.</p>
-      <p>نحرص على التحفيز وليس العقاب، ويسبق الخصم إنذار شفهي ثم إنذار خطي أول وثانٍ، ثم الخصم عند استمرار المخالفة وبعد التحقيق.</p>
-      <table class="doc-mini-table"><thead><tr><th>م</th><th>المخالفة أثناء العمل</th><th>الخصم / الإجراء</th></tr></thead><tbody>
-      <tr><td>1</td><td>التأخير، عدم الالتزام بالزي، عدم حمل البطاقة أو أدوات العمل، التدخين أو المزاح أثناء العمل، عدم اتباع التعليمات</td><td>حسم نصف يوم، وعند التكرار حسم يوم</td></tr>
-      <tr><td>2</td><td>الغياب، التجمعات في المواقع، عدم متابعة دخول أو خروج المواد</td><td>حسم يومين</td></tr>
-      <tr><td>3</td><td>الغياب أيام العيد أو الانسحاب من العمل دون إذن مسبق</td><td>حسم أربعة أيام</td></tr>
-      <tr><td>4</td><td>الغياب خمسة أيام أو أكثر متتالية خلال الشهر أو عشرين يوماً في السنة</td><td>فصل بدون مستحقات</td></tr>
-      <tr><td>5</td><td>النوم أثناء العمل أو عدم التقيد بالتعليمات أو الانشغال بالجوال والأجهزة الذكية</td><td>حسم ثلاثة أيام</td></tr>
-      <tr><td>6</td><td>مخالفات أخرى لم تذكر أعلاه</td><td>وفق الحالة واللائحة المعتمدة</td></tr></tbody></table>`;
-    }else if(currentDocType==='directwork'){
-      html=`<h2>مباشرة عمل</h2><div class="doc-date">التاريخ: ${today}</div>
-      <table class="doc-mini-table"><tbody><tr><th>اسم الموظف</th><td>${blank(e.fullname)}</td></tr><tr><th>المسمى الوظيفي</th><td>${blank(e.jobtitle)}</td></tr><tr><th>القسم</th><td>${blank(e.dept)}</td></tr><tr><th>الموقع</th><td>${blank(e.project||e.region)}</td></tr></tbody></table>
-      <p>نفيدكم بأن الموظف المذكور أعلاه باشر العمل لدينا اعتباراً من:</p><p>التاريخ: <span class="blank">/ / 144هـ</span> الموافق: <span class="blank">/ / 202م</span></p>
-      <p>نوع المباشرة: ☐ تعيين جديد &nbsp;&nbsp; ☐ إعادة تعيين &nbsp;&nbsp; ☐ عودة من الإجازة &nbsp;&nbsp; ☐ أخرى</p>
-      <p>أقر أنا الموظف بأنني باشرت العمل لدى ${blank(co)} وألتزم بأنظمة الشركة وتعليماتها وفترة التجربة المحددة في عقد العمل.</p>
-      <div class="sign-row"><div>اسم الموظف<br>${blank(e.fullname)}<br>التوقيع: ....................</div><div>الموارد البشرية<br>...........................</div><div>رئيس العمليات<br>...........................</div></div>`;
-    }else if(currentDocType==='fileundertaking'){
-      html = `
-        <h2>إقرار وتعهد بإكمال ملف التوظيف</h2>
-        <div class="doc-date">التاريخ: ${today}</div>
-        <p>أقر وأتعهد أنا الموظف: ${blank(e.fullname)}، هوية رقم: ${blank(e.idnum)}، موقعي: ${blank(e.dept)}،</p>
+    const offerBox=document.getElementById('docOfferFields'); if(offerBox) offerBox.style.display=currentDocType==='offers'?'':'none';
+    const T=currentDocType;
+    let html='';
+    if(T==='iban'){
+      html=docPage('مذكرة تفويض آيبان بنكي',`
+        <p>السادة / ${blank(co)} المحترمين</p>
+        <p>السلام عليكم ورحمة الله وبركاته،</p>
+        <p>أفوّضكم أنا الموظف الموضحة بياناتي أدناه بإيداع جميع مستحقاتي المالية (الرواتب والبدلات والمستحقات الأخرى) في الحساب البنكي المبيّن في هذه المذكرة، وأقر بأن بيانات الحساب صحيحة ومسؤوليتها عليّ، وأن الشركة غير مسؤولة عن أي تأخير أو خطأ ناتج عن عدم صحة بيانات الآيبان.</p>
+        ${docEmpTable(e)}
+        <table class="doc-mini-table"><tbody>
+          <tr><th>اسم البنك</th><td>${blank(e.bankname)}</td><th>رقم الحساب</th><td>${blank(e.accountno)}</td></tr>
+          <tr><th>رقم الآيبان (IBAN)</th><td colspan="3" dir="ltr" style="text-align:center;font-weight:700;letter-spacing:1px">${e.iban?escapeHtml(e.iban):'<span class="blank">SA..............................</span>'}</td></tr>
+        </tbody></table>
+        <p><b>المرفقات:</b> صورة شهادة الآيبان من البنك — صورة الهوية الوطنية / الإقامة.</p>
+        <p>وهذا إقرار مني بذلك،،،</p>
+        ${docSign(['اسم الموظف: '+escapeHtml(e.fullname||'.................'),'التوقيع','البصمة'])}
+        ${docSign(['الموارد البشرية','الحسابات'])}`);
+    }else if(T==='fileundertaking'){
+      html=docPage('إقرار وتعهد بإكمال ملف التوظيف',`
+        <p>أقر وأتعهد أنا الموظف: ${blank(e.fullname)}، هوية رقم: ${blank(e.idnum)}، المسمى الوظيفي: ${blank(e.jobtitle)}، الموقع: ${blank(e.project||e.dept)}،</p>
         <p>بإكمال متطلبات ملف التوظيف الخاص بي خلال أسبوع من تاريخ توقيعي على هذا الإقرار، وفي حال عدم تجاوبي يحق للشركة إيقافي عن العمل وإنهاء خدماتي.</p>
         <p><b>المستندات المطلوبة:</b></p>
         <ol>
@@ -5025,41 +5036,112 @@
           <li>شهادة الآيبان البنكي.</li>
           <li>تعبئة الكفالة الحضورية من الكفيل مع صورة من هوية الكفيل.</li>
         </ol>
-        <div class="sign-row"><div>اسم الموظف: ${blank(e.fullname)}</div><div>التوقيع<br>...........................</div><div>البصمة<br>...........................</div></div>`;
-    }else if(currentDocType==='guarantee'){
-      html = `
-        <h2>كفالة حضورية وغرم</h2>
-        <div class="doc-date">التاريخ: ${today}</div>
-        <p>أتعهد أنا: <span class="blank">.......................</span> (اسم الكفيل)، بصفتي كفيلاً للموظف / ${blank(e.fullname)} الراغب في العمل لدى ${blank(co)}،</p>
-        <p>بأنه في حال تركه للعمل دون تسليم العُهد المسلّمة له أو تصفية الحقوق أو تسببه في أي التزامات أو إتلاف ممتلكات خاصة بالشركة أو بعملائها، فسوف أُحضره فوراً خلال مدة أقصاها أسبوعان من تاريخ إبلاغي بذلك، وفي حال عدم تمكني من إحضاره أقر بموافقتي على تحمل جميع المبالغ المترتبة عليه وكذلك العُهد، وألتزم بتحمل أي إجراء قانوني يصدر بحقه من الجهات الرسمية.</p>
-        <p style="font-size:12px; color:var(--ink-soft);">ملاحظة: يجب إرفاق صورة من بطاقة أحوال الكفيل.</p>
-        <div class="sign-row"><div>اسم الكفيل<br>...........................</div><div>التوقيع والبصمة<br>...........................</div><div>التاريخ<br>...........................</div></div>`;
-    }else if(currentDocType==='medical'){
-      html = `
-        <h2>استمارة كشف طبي</h2>
-        <div class="doc-date">التاريخ: ${today}</div>
-        <p>الاسم: ${blank(e.fullname)} &nbsp;&nbsp; المسمى الوظيفي: ${blank(e.jobtitle)}</p>
-        <hr>
+        ${docSign(['اسم الموظف: '+escapeHtml(e.fullname||'.................'),'التوقيع','البصمة'])}`);
+    }else if(T==='salarytransfer'){
+      html=docPage('إقرار تحويل راتب',`
+        <p>السادة: ${blank(co)} المحترمين</p>
+        <p>السلام عليكم ورحمة الله وبركاته،</p>
+        <p>أنا الموظف: ${blank(e.fullname)}، رقم الهوية: ${blank(e.idnum)}، الرقم الوظيفي: ${blank(e.empcode)}.</p>
+        <p>نظراً لعدم إمكانية تحويل راتبي الشهري إلى حسابي الخاص، أرجو منكم إيداع راتبي في حساب السيد:</p>
+        <table class="doc-mini-table"><tbody>
+          <tr><th>الاسم</th><td>${blank(e.holder_name)}</td><th>رقم الهوية الوطنية</th><td>${blank('')}</td></tr>
+          <tr><th>صلة القرابة</th><td>${blank('')}</td><th>اسم البنك</th><td>${blank('')}</td></tr>
+          <tr><th>رقم الآيبان</th><td colspan="3" dir="ltr">${blank('')}</td></tr>
+        </tbody></table>
+        <p>مع تأكيدي بموافقة صاحب الحساب وعدم ممانعته على إيداع راتبي في حسابه، وأتحمّل كافة التبعات القانونية بالكامل في حال عدم صحة ذلك، وبهذا أُخلي مسؤولية ${blank(co)} من أي مساءلة بهذا الخصوص.</p>
+        <p><b>المرفقات:</b> صورة من الحساب البنكي المراد التحويل إليه — صورة من هوية صاحب الحساب.</p>
+        ${docSign(['اسم الموظف: '+escapeHtml(e.fullname||'.................'),'التوقيع','البصمة'])}
+        ${docSign(['اعتماد مشرف الموقع','مدير العمليات'])}`);
+    }else if(T==='offers'){
+      const g=id=>document.getElementById(id)?.value||'';
+      const client=g('offer_client'), proj=g('offer_project');
+      const guards=Number(g('offer_guards'))||0, gp=Number(g('offer_guard_price'))||0, sups=Number(g('offer_sups'))||0, sp=Number(g('offer_sup_price'))||0, months=Number(g('offer_months'))||1;
+      const gTot=guards*gp*months, sTot=sups*sp*months, sub=gTot+sTot, vat=Math.round(sub*0.15*100)/100, total=sub+vat;
+      html=docPage('عرض فني',`
+        <p>السادة / ${blank(client)} المحترمين</p>
+        <p><b>الموضوع:</b> عرض فني لتقديم خدمات الحراسات الأمنية${proj?' — '+escapeHtml(proj):''}</p>
+        <p>السلام عليكم ورحمة الله وبركاته،</p>
+        <p>يسر ${blank(co)} أن تتقدم إليكم بعرضها الفني لتقديم خدمات الحراسات الأمنية وفق ما يلي:</p>
+        <ol>
+          <li>عدد الحراس: ${guards||'.....'} حارس${sups?`، وعدد المشرفين: ${sups}`:''}.</li>
+          <li>مدة التعاقد: ${months} شهراً من تاريخ المباشرة.</li>
+          <li>توفير حراس مؤهلين ومرخصين نظاماً، يرتدون الزي الرسمي ويحملون بطاقات التعريف.</li>
+          <li>الإشراف الميداني الدوري على الموقع ورفع تقارير دورية للجهة.</li>
+          <li>توفير بديل فوري عند غياب أي حارس أو انتهاء خدماته.</li>
+          <li>التزام الحراس بتعليمات الجهة وأنظمة الموقع وسجلات الدخول والخروج.</li>
+          <li>تحمل الشركة كامل التزامات العاملين من أجور وتأمينات اجتماعية وتأمين طبي.</li>
+        </ol>
+        <p>ونحن على أتم الاستعداد لتزويدكم بأي تفاصيل إضافية.</p>
+        ${docSign(['المدير العام<br>'+escapeHtml(docManager()),'الختم'])}`)
+      +docPage('عرض مالي',`
+        <p>السادة / ${blank(client)} المحترمين</p>
+        <p><b>الموضوع:</b> عرض مالي لخدمات الحراسات الأمنية${proj?' — '+escapeHtml(proj):''}</p>
+        <table class="doc-mini-table doc-offer-table"><thead><tr><th>البند</th><th>العدد</th><th>السعر الشهري للفرد</th><th>المدة (أشهر)</th><th>الإجمالي</th></tr></thead><tbody>
+          <tr><td>حارس أمن</td><td>${guards}</td><td>${docNum(gp)}</td><td>${months}</td><td>${docNum(gTot)}</td></tr>
+          ${sups?`<tr><td>مشرف</td><td>${sups}</td><td>${docNum(sp)}</td><td>${months}</td><td>${docNum(sTot)}</td></tr>`:''}
+          <tr><th colspan="4">الإجمالي قبل الضريبة</th><td>${docNum(sub)}</td></tr>
+          <tr><th colspan="4">ضريبة القيمة المضافة (15%)</th><td>${docNum(vat)}</td></tr>
+          <tr><th colspan="4">الإجمالي شامل الضريبة</th><td><b>${docNum(total)}</b></td></tr>
+        </tbody></table>
+        <p><b>ملاحظات:</b></p>
+        <ol>
+          <li>الأسعار بالريال السعودي.</li>
+          <li>مدة صلاحية العرض ثلاثون يوماً من تاريخه.</li>
+          <li>يتم السداد شهرياً وفق الفاتورة المعتمدة.</li>
+        </ol>
+        ${docSign(['المدير العام<br>'+escapeHtml(docManager()),'الختم'])}`,{noDate:true});
+    }else if(T==='medical'){
+      html=docPage('استمارة كشف طبي',`
+        ${docEmpTable(e)}
+        <table class="doc-mini-table"><tbody>
+          <tr><th>ضغط الدم</th><td>&nbsp;</td><th>السكر</th><td>&nbsp;</td></tr>
+          <tr><th>النظر</th><td>&nbsp;</td><th>السمع</th><td>&nbsp;</td></tr>
+          <tr><th>الطول / الوزن</th><td>&nbsp;</td><th>أمراض مزمنة</th><td>&nbsp;</td></tr>
+          <tr><th>ملاحظات الطبيب</th><td colspan="3">&nbsp;<br>&nbsp;</td></tr>
+        </tbody></table>
         <p><b>نتيجة الكشف الطبي:</b></p>
         <p>وبناءً على نتائج الكشف والفحوصات الطبية الموضحة أعلاه، فقد تبيّن أن المذكور:</p>
         <p>☐ لائق طبياً للعمل &nbsp;&nbsp;&nbsp; ☐ لائق طبياً للعمل مع ملاحظات &nbsp;&nbsp;&nbsp; ☐ غير لائق طبياً للعمل</p>
         <p>هذا للاطلاع والإحاطة.. وتقبلوا خالص التحية وفائق التقدير.</p>
-        <div class="sign-row"><div>اسم الدكتور<br>...........................</div><div>التوقيع<br>...........................</div><div>الختم<br>...........................</div></div>`;
-    }else if(currentDocType==='salarytransfer'){
-      html = `
-        <h2>إقرار تحويل راتب</h2>
-        <div class="doc-date">التاريخ: ${today}</div>
-        <p>السادة: ${blank(co)} المحترمين</p>
+        ${docSign(['اسم الدكتور','التوقيع','الختم'])}`);
+    }else if(T==='absences'){
+      const acts=(penalties||[]).filter(x=>String(x.empId||'')===String(e.id)).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,6);
+      const pre=acts.map(x=>[x.date?fmtDMY(String(x.date).slice(0,10)):'',x.type||'',x.days!=null?String(x.days):'',x.amount!=null&&x.amount!==''?String(x.amount):'',x.notes||'']);
+      html=docPage('محضر غياب وخصم',`
+        ${docEmpTable(e)}
+        <table class="doc-mini-table doc-grid-table"><thead><tr><th style="width:7%">م</th><th>التاريخ</th><th>نوع المخالفة</th><th>الأيام</th><th>مبلغ الخصم</th><th>ملاحظات</th></tr></thead><tbody>${docEmptyRows(6,6,pre)}
+        <tr><th colspan="3">الإجمالي</th><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></tbody></table>
+        <p>تقرر الخصم من مستحقات الموظف المذكور وفق لائحة الجزاءات والخصومات المعتمدة، وذلك بعد ثبوت المخالفة الموضحة أعلاه.</p>
+        <p>إقرار الموظف: اطلعت على المحضر أعلاه وأقر بصحة ما ورد فيه ☐ &nbsp; أعترض على ما ورد فيه ☐ &nbsp; السبب: ..............................................</p>
+        ${docSign(['الموظف','المشرف المباشر','الموارد البشرية','المدير العام'])}`);
+    }else if(T==='coverage'){
+      const cov=(coverage||[]).filter(x=>e.id && (String(x.guardId||'')===String(e.id)||String(x.absentId||'')===String(e.id))).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).slice(0,6);
+      const pre=cov.map(x=>[x.date?fmtDMY(String(x.date).slice(0,10)):'',x.absentName||x.absent||'',x.guardName||'',x.location||x.project||'',x.notes||'']);
+      html=docPage('محضر تغطية',`
+        <p>الموقع / المشروع: ${blank(e.project||e.region)}</p>
+        <p>تمت التغطيات الموضحة أدناه لسد غياب الحراس في الموقع المذكور وفق التفاصيل التالية:</p>
+        <table class="doc-mini-table doc-grid-table"><thead><tr><th style="width:7%">م</th><th>التاريخ</th><th>اسم الغائب</th><th>اسم المغطّي</th><th>الموقع</th><th>ملاحظات</th></tr></thead><tbody>${docEmptyRows(8,6,pre)}</tbody></table>
+        <p>أقر أنا الموقع أدناه بصحة التغطيات المذكورة أعلاه.</p>
+        ${docSign(['المغطّي','مشرف الموقع','الموارد البشرية','المدير العام'])}`);
+    }else if(T==='gosi'){
+      html=docPage('إقرار التأمينات الاجتماعية',`
+        <p>السادة / ${blank(co)} المحترمين</p>
         <p>السلام عليكم ورحمة الله وبركاته،</p>
-        <p>نظراً لعدم إمكانية تحويل راتبي الشهري إلى حسابي الخاص، أرجو منكم إيداع راتبي في حساب السيد:</p>
-        <p>الاسم: ${e.holder_name ? blank(e.holder_name) : '<span class="blank">.......................</span>'} &nbsp; رقم الهوية الوطنية: <span class="blank">.......................</span> &nbsp; صلة القرابة: <span class="blank">.......................</span></p>
-        <p>مع تأكيدي بموافقة صاحب الحساب وعدم ممانعته على إيداع راتبي في حسابه، وأتحمّل كافة التبعات القانونية بالكامل في حال عدم صحة ذلك، وبهذا أُخلي مسؤولية ${blank(co)} من أي مساءلة بهذا الخصوص.</p>
-        <p><b>المرفقات:</b> صورة من الحساب البنكي المراد التحويل إليه — صورة من هوية صاحب الحساب.</p>
-        <div class="sign-row"><div>اسم الموظف<br>${blank(e.fullname)}</div><div>رقم الهوية<br>${blank(e.idnum)}</div><div>البصمة<br>...........................</div></div>
-        <div class="sign-row"><div>اعتماد مشرف الموقع<br>...........................</div><div>مدير العمليات<br>...........................</div></div>`;
+        ${docEmpTable(e,[['الجنسية',e.nationality],['تاريخ الميلاد',e.dob]])}
+        <p>أقر أنا الموظف الموضحة بياناتي أعلاه بما يلي:</p>
+        <ol>
+          <li>أن البيانات الشخصية والوظيفية المذكورة صحيحة، وأتحمل مسؤولية أي خطأ فيها.</li>
+          <li>موافقتي على تسجيلي في المؤسسة العامة للتأمينات الاجتماعية، وخصم حصتي النظامية من أجري الشهري.</li>
+          <li>أنني لست مشتركاً في التأمينات الاجتماعية لدى جهة أخرى في الوقت الحالي ☐ &nbsp; أنا مشترك لدى جهة أخرى ☐ (اسم الجهة: ....................)</li>
+          <li>التزامي بإبلاغ الشركة فوراً عند أي تغيير في بياناتي أو وضعي التأميني.</li>
+        </ol>
+        <p>وهذا إقرار مني بذلك،،،</p>
+        ${docSign(['اسم الموظف: '+escapeHtml(e.fullname||'.................'),'التوقيع','البصمة'])}
+        ${docSign(['الموارد البشرية','المدير العام'])}`);
     }
     sheet.innerHTML = html;
   }
+  ['offer_client','offer_project','offer_guards','offer_guard_price','offer_sups','offer_sup_price','offer_months'].forEach(id=>document.getElementById(id)?.addEventListener('input',renderDocSheet));
 
   function refreshEmployeeDependencies(){
     try{

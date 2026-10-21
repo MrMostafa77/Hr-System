@@ -774,13 +774,23 @@
       <div class="doc-layout">
         <div class="card doc-picker no-print">
           <div class="field"><label>الموظف</label><select id="doc_emp"></select></div>
-          <div class="doc-type-btn active" data-doc="contract">عقد عمل</div>
-          <div class="doc-type-btn" data-doc="penalties">لائحة الجزاءات والخصومات</div>
-          <div class="doc-type-btn" data-doc="directwork">مباشرة عمل</div>
-          <div class="doc-type-btn" data-doc="fileundertaking">تعهد بإكمال ملف التوظيف</div>
-          <div class="doc-type-btn" data-doc="guarantee">كفالة حضورية وغرم</div>
-          <div class="doc-type-btn" data-doc="medical">استمارة كشف طبي</div>
+          <div class="doc-type-btn active" data-doc="iban">مذكرة تفويض آيبان بنكي</div>
+          <div class="doc-type-btn" data-doc="fileundertaking">تعهد بإكمال ملف موظف</div>
           <div class="doc-type-btn" data-doc="salarytransfer">إقرار تحويل راتب</div>
+          <div class="doc-type-btn" data-doc="offers">عروض فنية ومالية</div>
+          <div class="doc-type-btn" data-doc="medical">كشف طبي</div>
+          <div class="doc-type-btn" data-doc="absences">محاضر غيابات وخصومات</div>
+          <div class="doc-type-btn" data-doc="coverage">محضر تغطيات</div>
+          <div class="doc-type-btn" data-doc="gosi">إقرار التأمينات</div>
+          <div class="doc-offer-fields no-print" id="docOfferFields" style="display:none">
+            <div class="field"><label>الجهة (السادة)</label><input type="text" id="offer_client"></div>
+            <div class="field"><label>اسم المشروع / الموقع</label><input type="text" id="offer_project"></div>
+            <div class="field"><label>عدد الحراس</label><input type="number" id="offer_guards" min="0" value="1"></div>
+            <div class="field"><label>سعر الحارس شهرياً (قبل الضريبة)</label><input type="number" id="offer_guard_price" min="0" step="0.01" value="0"></div>
+            <div class="field"><label>عدد المشرفين</label><input type="number" id="offer_sups" min="0" value="0"></div>
+            <div class="field"><label>سعر المشرف شهرياً (قبل الضريبة)</label><input type="number" id="offer_sup_price" min="0" step="0.01" value="0"></div>
+            <div class="field"><label>مدة العقد (أشهر)</label><input type="number" id="offer_months" min="1" value="12"></div>
+          </div>
         </div>
         <div class="doc-sheet-wrap">
           <div class="doc-sheet" id="docSheet"></div>
