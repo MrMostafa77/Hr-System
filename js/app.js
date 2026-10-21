@@ -95,9 +95,23 @@
     commencements = Array.isArray(state?.commencements) ? state.commencements : [];
     projectAccounts = Array.isArray(state?.projectAccounts) ? state.projectAccounts : [];
     payrollRecords = state?.payrollRecords && typeof state.payrollRecords==='object' ? state.payrollRecords : {};
+    syncEmployeeStartDates();
     if(!departments.length && employees.length){
       const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map);
     }
+  }
+  // ===== تاريخ المباشرة: المصدر الوحيد هو سجل المباشرة، ويُنسخ تلقائياً لبيانات الموظف =====
+  function pickLatestCommencement(list){
+    return [...list].sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')) || String(b.startDate||'').localeCompare(String(a.startDate||'')))[0]||null;
+  }
+  function syncEmployeeStartDates(){
+    try{
+      (employees||[]).forEach(e=>{
+        const c=commencementForEmployee(e.id);
+        const d=String(c?.startDate||'').slice(0,10);
+        if(d && e.startdate!==d) e.startdate=d;
+      });
+    }catch(_){}
   }
   function currentState(){
     return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords};
@@ -145,6 +159,7 @@
     const state=localState();
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
     settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{};
+    syncEmployeeStartDates();
     if(!departments.length && employees.length){ const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map); }
     persistLocal();
   }
@@ -1352,7 +1367,7 @@
   }
   function employeeCommencementInfo(e){
     const list=commencements.filter(c=>c && c.empId===e.id && String(c.project||'').trim()===String(e.project||'').trim());
-    return list.sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''))[0]||null;
+    return pickLatestCommencement(list);
   }
   function employeeCommencementStatus(e){ return employeeCommencementInfo(e) ? 'مباشر' : 'غير مباشر'; }
   function employeeAlertList(e){
@@ -1549,7 +1564,7 @@
         <h4>البيانات الوظيفية</h4>
         <div class="info-grid">
           ${infoItem('الرقم الوظيفي', e.empcode, true)}
-          ${infoItem('تاريخ المباشرة', e.startdate)}
+          ${infoItem('تاريخ المباشرة', commencementForEmployee(e.id)?.startDate||e.startdate)}
           ${infoItem('حالة العقد', employeeContractStatus(e))}
           ${infoItem('نوع العقد', employeeContractInfo(e.id).contract?.type || '')}
           ${infoItem('مدة العقد', employeeContractInfo(e.id).contract?.duration ? employeeContractInfo(e.id).contract.duration+' شهر' : '')}
@@ -1735,8 +1750,8 @@
   }
   // تاريخ المباشرة الفعلي للموظف من سجل المباشرات (أحدث تاريخ)
   function commencementDateForEmployee(id){
-    const list=(commencements||[]).filter(x=>String(x.empId)===String(id)&&x.startDate).sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate)));
-    return list[0]?.startDate||'';
+    const list=(commencements||[]).filter(x=>String(x.empId)===String(id)&&x.startDate);
+    return pickLatestCommencement(list)?.startDate||'';
   }
   function validateSaudiIBAN(value){
     const iban=String(value||'').replace(/\s+/g,'').toUpperCase();
@@ -2157,7 +2172,7 @@
     syncAllowancePercentagesFromData();
     document.getElementById('formTitle').textContent = 'تعديل بيانات: ' + (e.fullname||'');
     refreshDepartmentJobSelects(e.dept||'', e.jobtitle||''); fillNationalityAndIssueRegion(); refreshEmployeeProjectSelect(e.region||''); const projectEl=document.getElementById('f_project'); if(projectEl) projectEl.value=e.project||''; composeFullName(); updateBankFromIBAN();
-    { const sd=document.getElementById('f_startdate'); if(sd && !sd.value) sd.value=commencementDateForEmployee(e.id); }
+    { const sd=document.getElementById('f_startdate'); const cd=String(commencementForEmployee(e.id)?.startDate||'').slice(0,10); if(sd && cd) sd.value=cd; else if(sd && !sd.value) sd.value=commencementDateForEmployee(e.id); }
     syncStartDateAction();
     pendingEmployeeFiles={};
     loadIbansIntoForm(e);
@@ -2340,6 +2355,7 @@
     const id = document.getElementById('f_id').value || ('e'+Date.now());
     const data = {id};
     formFields.forEach(f=>{ const el = document.getElementById('f_'+f); data[f] = el ? el.value : ''; });
+    { const cd=String(commencementForEmployee(id)?.startDate||'').slice(0,10); if(cd) data.startdate=cd; } // تاريخ المباشرة من شاشة المباشرة فقط
     const phone9=normalizeDigits(document.getElementById('f_phone9')?.value||'');
     data.phone='+966'+phone9;
     data.fullname=['firstname','fathername','grandname','familyname'].map(k=>data[k]).filter(Boolean).join(' ');
@@ -2872,7 +2888,7 @@
     const project = String(e?.project||'').trim();
     const matches = commencements.filter(c=>String(c.empId||'')===String(empId) && (!project || !String(c.project||'').trim() || String(c.project||'').trim()===project) && c.startDate);
     if(!matches.length) return null;
-    return matches.sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate)))[0];
+    return pickLatestCommencement(matches);
   }
   // قاعدة النظام: بداية الحضور والرواتب = تاريخ المباشرة فقط، ويشترط وجود عقد ومباشرة.
   // لا يُستخدم تاريخ بداية العقد ولا تاريخ بدء العمل المكتوب في بيانات الموظف.
@@ -4850,7 +4866,7 @@
       applyCommReadOnly(true);
     },50);
   }
-  document.getElementById('comm_project')?.addEventListener('change',()=>{document.getElementById('comm_startdate').value=new Date().toISOString().slice(0,10);renderCommencementEmployees();renderCommencementEmployee();});
+  document.getElementById('comm_project')?.addEventListener('change',()=>{document.getElementById('comm_startdate').value='';renderCommencementEmployees();renderCommencementEmployee();});
   document.getElementById('comm_employee')?.addEventListener('change',()=>{document.getElementById('comm_startdate').value='';renderCommencementEmployee();});
   document.getElementById('comm_startdate')?.addEventListener('change',renderCommencementPaper);
   document.querySelectorAll('.comm-type-check').forEach(ch=>ch.addEventListener('change',()=>{
@@ -4870,6 +4886,7 @@
     const existingIndex=commencements.findIndex(x=>x.empId===e.id && String(x.project||'').trim()===String(project).trim());
     const rec={id:existingIndex>=0?commencements[existingIndex].id:'cm'+Date.now()+Math.random().toString(36).slice(2,7),empId:e.id,employeeName:e.fullname||'',empcode:e.empcode||'',project,region:e.region||'',dept:e.dept||'',jobtitle:e.jobtitle||'',contractId:contract.id||'',contractCode:contract.contractCode||'',startDate,types,otherType:document.getElementById('comm_other_type')?.value||'',updatedAt:new Date().toISOString()};
     if(existingIndex>=0)commencements[existingIndex]=rec;else commencements.push(rec);
+    { const pn=String(project).trim(); commencements=commencements.filter(x=>!(x && String(x.empId)===String(e.id) && String(x.project||'').trim()===pn && x.id!==rec.id)); } // منع تكرار مباشرة نفس الموظف/الموقع
     // تاريخ المباشرة هو بداية الحضور والرواتب: نحدّثه في ملف الموظف أيضاً
     e.startdate=startDate;
     saveCommencements();
