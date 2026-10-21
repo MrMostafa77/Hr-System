@@ -96,6 +96,7 @@
     projectAccounts = Array.isArray(state?.projectAccounts) ? state.projectAccounts : [];
     payrollRecords = state?.payrollRecords && typeof state.payrollRecords==='object' ? state.payrollRecords : {};
     syncEmployeeStartDates();
+    contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
     if(!departments.length && employees.length){
       const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map);
     }
@@ -103,6 +104,15 @@
   // ===== تاريخ المباشرة: المصدر الوحيد هو سجل المباشرة، ويُنسخ تلقائياً لبيانات الموظف =====
   function pickLatestCommencement(list){
     return [...list].sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')) || String(b.startDate||'').localeCompare(String(a.startDate||'')))[0]||null;
+  }
+  // رقم العقد المحفوظ (contractCode) هو المرجع الوحيد: نصحّح الرقم الظاهر في نص العقد المحفوظ ليطابقه دائماً.
+  function fixContractHtmlNumber(html, code){
+    if(!html || !code) return html;
+    try{
+      const t=document.createElement('template'); t.innerHTML=html;
+      t.content.querySelectorAll('.new-contract-number').forEach(n=>{ n.textContent='رقم العقد: '+code; });
+      return t.innerHTML;
+    }catch(_){ return html; }
   }
   function syncEmployeeStartDates(){
     try{
@@ -160,6 +170,7 @@
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
     settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{};
     syncEmployeeStartDates();
+    contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
     if(!departments.length && employees.length){ const map={}; employees.forEach(e=>{const d=String(e.dept||'').trim(); if(!d)return; if(!map[d])map[d]={id:'d'+Math.random().toString(36).slice(2,9),name:d,jobs:[]}; const j=String(e.jobtitle||'').trim(); if(j&&!map[d].jobs.includes(j))map[d].jobs.push(j);}); departments=Object.values(map); }
     persistLocal();
   }
@@ -4504,7 +4515,7 @@
     document.getElementById('contract_notes').value=c.notes||'';
     // العقد المحفوظ يُعرض بنصه المحفوظ كما هو (بما فيه أي تعديل نصي)، والجديد من النموذج.
     const savedC=currentContractId?contracts.find(x=>x.id===currentContractId):null;
-    document.getElementById('contractSheet').innerHTML=(savedC&&savedC.customHtml)?savedC.customHtml:buildContractHtml(e,c);
+    document.getElementById('contractSheet').innerHTML=(savedC&&savedC.customHtml)?fixContractHtmlNumber(savedC.customHtml,savedC.contractCode):buildContractHtml(e,c);
     fitContractPages();
     applyContractReadOnly(!!currentContractId && !editMode);
   }
@@ -4565,7 +4576,7 @@
       const id=currentContractId||('ct'+Date.now()+Math.random().toString(36).slice(2,7));
       const codeEl=document.getElementById('contract_code');
       if(codeEl && codeEl.value!==contractCode){ codeEl.value=contractCode; currentContractId=id; renderContractSheet(); }
-      const data={id,empId,contractCode,...currentContractForm(),customHtml:document.getElementById('contractSheet').innerHTML,templateVersion:6,updatedAt:new Date().toISOString()};
+      const data={id,empId,contractCode,...currentContractForm(),customHtml:fixContractHtmlNumber(document.getElementById('contractSheet').innerHTML,contractCode),templateVersion:6,updatedAt:new Date().toISOString()};
       const i=contracts.findIndex(c=>c.id===id);
       if(i>=0) contracts[i]=data; else contracts.push(data);
       currentContractId=id; newContractMode=false;
