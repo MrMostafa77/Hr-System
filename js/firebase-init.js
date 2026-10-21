@@ -2,7 +2,7 @@
 // No npm/build step is required; this project is static and GitHub/Firebase Hosting ready.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, writeBatch } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, writeBatch, runTransaction } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { firebaseConfig, APP_CHECK_SITE_KEY } from './firebase-config.js';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 
@@ -67,6 +67,19 @@ window.FB = {
   deleteEmployeeFile: async (path) => {
     if(!path) return;
     await deleteObject(ref(storage, path));
+  },
+  // عدّاد تسلسلي دائم لا ينقص أبداً (أرقام العقود): معاملة Firestore تمنع تكرار الرقم حتى مع أكثر من مستخدم.
+  // floor = أعلى رقم معروف محلياً، فيبدأ العدّاد منه إن كان أعلى من المخزّن.
+  reserveCounter: async (key, floor) => {
+    if(!auth.currentUser) throw new Error('AUTH_REQUIRED');
+    const cref = doc(firestore, 'hr_counters', String(key));
+    return runTransaction(firestore, async tx => {
+      const snap = await tx.get(cref);
+      const cur = snap.exists() ? (Number(snap.data().n) || 0) : 0;
+      const n = Math.max(cur, Number(floor) || 0) + 1;
+      tx.set(cref, { n, updatedAt: new Date().toISOString() });
+      return n;
+    });
   },
   hydrateState: async (fallbackState) => {
     const S = window.HRSplit;

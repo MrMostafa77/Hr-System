@@ -1681,13 +1681,32 @@
   function nextContractCode(region, excludeId=''){
     const code=regionCode(region), now=new Date(), yy=String(now.getFullYear()).slice(-2), mm=String(now.getMonth()+1).padStart(2,'0');
     const prefix=`${code}-${yy}-${mm}-`;
-    let max=0;
+    // العدّاد الدائم: رقم صدر مرة لا يُعاد إصداره أبداً حتى لو حُذف العقد صاحبه.
+    let max=Number(settings?.contractSeq?.[prefix])||0;
     contracts.forEach(c=>{
       if(excludeId && c.id===excludeId) return;
       const m=String(c.contractCode||'').match(new RegExp('^'+prefix.replace(/[-]/g,'\\-')+'(\\d{4})$'));
       if(m) max=Math.max(max,Number(m[1]));
     });
     return prefix+String(max+1).padStart(4,'0');
+  }
+  // حجز رقم العقد عند الحفظ فقط: معاملة (Transaction) على عدّاد في Firestore تمنع التكرار حتى مع أكثر من مستخدم،
+  // مع نسخة محلية دائمة في settings.contractSeq. العدّاد لا ينقص أبداً.
+  async function reserveContractCode(region){
+    const code=regionCode(region), now=new Date(), yy=String(now.getFullYear()).slice(-2), mm=String(now.getMonth()+1).padStart(2,'0');
+    const prefix=`${code}-${yy}-${mm}-`;
+    if(!settings || typeof settings!=='object') settings={};
+    if(!settings.contractSeq || typeof settings.contractSeq!=='object') settings.contractSeq={};
+    let floor=Number(settings.contractSeq[prefix])||0;
+    const re=new RegExp('^'+prefix.replace(/[-]/g,'\\-')+'(\\d{4})$');
+    contracts.forEach(c=>{ const m=String(c.contractCode||'').match(re); if(m) floor=Math.max(floor,Number(m[1])); });
+    let n=floor+1;
+    if(window.FB?.reserveCounter){
+      try{ n=await window.FB.reserveCounter('contract_'+prefix,floor); }
+      catch(err){ console.warn('Contract counter transaction failed, using local counter:',err); showToast('تعذر حجز رقم العقد من الخادم — استُخدم العدّاد المحلي'); n=floor+1; }
+    }
+    settings.contractSeq[prefix]=Math.max(Number(settings.contractSeq[prefix])||0,n);
+    return prefix+String(n).padStart(4,'0');
   }
   function updateEmployeeCode(force=false){
     const el=document.getElementById('f_empcode'), region=document.getElementById('f_region')?.value, id=document.getElementById('f_id')?.value;
@@ -2752,7 +2771,7 @@
     const ym=document.getElementById('payrollMonth')?.value,body=document.getElementById('reportTableBody'); if(!body)return;
     if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="25" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(), pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
-    const list=employees.filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    const list=payrollEmployees().filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
     document.getElementById('payrollCount').textContent=`${list.length} موظف`;
     body.innerHTML=list.map((e,i)=>{
       const p=payrollStatementForCols(e,monthCols(ym)),a=p.adjustment||{},action=a.internalAction||'';
@@ -2778,14 +2797,14 @@
   document.getElementById('payrollPreviewAllBtn')?.addEventListener('click',()=>{
     const ym=document.getElementById('payrollMonth')?.value;if(!ym){showToast('لا يوجد شهر حضور وانصراف متاح');return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(),pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
-    const list=employees.filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    const list=payrollEmployees().filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
     openPayrollPreview({list,cols:monthCols(ym),single:false});
   });
   document.getElementById('printReportBtn')?.addEventListener('click',()=>{
     const ym=document.getElementById('payrollMonth')?.value;
     if(!ym){showToast('لا يوجد شهر حضور وانصراف متاح');return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(),pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
-    const list=employees.filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    const list=payrollEmployees().filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
     if(!list.length){showToast('لا يوجد موظفون مطابقون للطباعة');return;}
     const model=buildPayrollModel(list,monthCols(ym),false);
     ppPrint(model);
@@ -2855,12 +2874,17 @@
     if(!matches.length) return null;
     return matches.sort((a,b)=>String(b.startDate).localeCompare(String(a.startDate)))[0];
   }
+  // قاعدة النظام: بداية الحضور والرواتب = تاريخ المباشرة فقط، ويشترط وجود عقد ومباشرة.
+  // لا يُستخدم تاريخ بداية العقد ولا تاريخ بدء العمل المكتوب في بيانات الموظف.
   function attStartDateFor(empId){
-    const c = commencementForEmployee(empId);
     const e = employees.find(x=>String(x.id)===String(empId));
-    const start = String(c?.startDate || e?.startdate || '').slice(0,10);
+    if(!e || !employeeContractInfo(e.id).contract) return '';
+    const c = commencementForEmployee(empId);
+    const start = String(c?.startDate || '').slice(0,10);
     return /^\d{4}-\d{2}-\d{2}$/.test(start) ? start : '';
   }
+  function employeeEligibleForHR(e){ return !!e && !!employeeContractInfo(e.id).contract && !!commencementForEmployee(e.id); }
+  function payrollEmployees(){ return employees.filter(employeeEligibleForHR); }
   // إجراء مسجل في تبويب إجراءات الموظفين لهذا اليوم؟ (انسحاب => س ، غيره => ج)
   function attActionCodeFor(empId, dateStr){
     const hit = (penalties||[]).filter(p=>String(p.empId)===String(empId) && String(p.date||'').slice(0,10)===dateStr);
@@ -2883,7 +2907,10 @@
     const raw = (attendance[ym] && attendance[ym][empId]) || {};
     const rec = {...raw};
     const nDays = daysInMonth(ym);
+    const startD = attStartDateFor(empId);
     for(let d=1; d<=nDays; d++){
+      // بلا عقد/مباشرة أو قبل تاريخ المباشرة: لا يُحتسب إلا يوم التغطية (ط)
+      if(rec[d] && rec[d]!=='ط' && (!startD || `${ym}-${String(d).padStart(2,'0')}`<startD)) delete rec[d];
       if(rec[d]==='ح' && attIsFutureDay(ym,d)) delete rec[d];
       if(!Object.prototype.hasOwnProperty.call(rec,d) || rec[d]==='') {
         const auto = autoAttendanceCode(ym,empId,d);
@@ -2927,6 +2954,7 @@
   function attCodeAt(ym, empId, day){
     let raw = (attendance[ym] && attendance[ym][empId]) ? attendance[ym][empId][day] : undefined;
     if(raw==='ح' && attIsFutureDay(ym,day)) raw = undefined;
+    if(raw!==undefined && raw!=='' && raw!=='ط'){ const st=attStartDateFor(empId); if(!st || `${ym}-${String(day).padStart(2,'0')}`<st) raw=undefined; }
     if(raw!==undefined && raw!=='') return raw;
     return autoAttendanceCode(ym, empId, day);
   }
@@ -2983,8 +3011,8 @@
     if(!region || !project) return;
     const rv=region.value, pv=project.value;
     const covG=covManualGuardEntries();
-    const regionsList=Array.from(new Set([...employees,...covG].map(e=>e.region).filter(Boolean))).sort();
-    const projectsList=Array.from(new Set([...employees,...covG].map(e=>e.project).filter(Boolean))).sort();
+    const regionsList=Array.from(new Set(attBaseList().map(e=>e.region).filter(Boolean))).sort();
+    const projectsList=Array.from(new Set(attBaseList().map(e=>e.project).filter(Boolean))).sort();
     region.innerHTML='<option value="">كل المناطق</option>'+regionsList.map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
     project.innerHTML='<option value="">كل المشاريع</option>'+projectsList.map(v=>`<option value="${escapeAttr(v)}">${escapeHtml(v)}</option>`).join('');
     region.value=rv; project.value=pv;
@@ -3007,7 +3035,7 @@
     const projectQ=document.getElementById('attProjectFilter')?.value||'';
     const statusQ=document.getElementById('attStatusFilter')?.value||'';
     const statusCols=statusQ?attColumns():null;
-    return [...employees, ...covManualGuardEntries()].filter(e=>{
+    return attBaseList().filter(e=>{
       const name=String(e.fullname||'').toLowerCase(), code=String(e.empcode||'').toLowerCase();
       if(!((!searchQ || name.includes(searchQ) || code.includes(searchQ)) &&
              (!regionQ || String(e.region||'')===regionQ) &&
@@ -3048,7 +3076,7 @@
     const anchorYm = cols.length ? cols[0].ym : currentMonthStr();
     body.innerHTML = list.map(e=>{
       const sum = attSummaryForCols(cols, e.id);
-      let cells = `<td class="name-col">${escapeHtml(e.fullname)}${e.isCov?'<span class="att-cov-badge">تغطيات — ليس موظفاً مضافاً</span>':''}</td>
+      let cells = `<td class="name-col">${escapeHtml(e.fullname)}${e.isCov?`<span class="att-cov-badge">${escapeHtml(e.covLabel||'تغطيات — ليس موظفاً مضافاً')}</span>`:''}</td>
         <td class="mono">${escapeHtml(e.empcode||'—')}</td>
         <td>${escapeHtml(e.region||'—')}</td>
         <td>${escapeHtml(e.project||'—')}</td>`;
@@ -3717,6 +3745,7 @@
       const r=employeeCommencementInfo(e);
       if(r){ openCommencementForRecord(r.id); return; }
       empCtxGo('commencements', ()=>{
+        applyCommReadOnly(false);
         const ps=document.getElementById('comm_project'), es=document.getElementById('comm_employee');
         if(ps){ ps.value=e.project||''; ps.dispatchEvent(new Event('change')); }
         setTimeout(()=>{ if(es){ es.value=e.id; es.dispatchEvent(new Event('change')); } },60);
@@ -3738,10 +3767,12 @@
       });
     },
     previewAtt(e){
+      if(!employeeEligibleForHR(e)){ empCtxAlert('لا يوجد حضور وانصراف لهذا الموظف: لا يوجد له عقد أو مباشرة (يظهر فقط ضمن التغطيات)'); return; }
       renderAttendance();
       openAttendanceSheet({list:[e], cols:attColumns(), single:true});
     },
     previewPayroll(e){
+      if(!employeeEligibleForHR(e)){ empCtxAlert('لا يوجد مسير رواتب لهذا الموظف: لا يوجد له عقد أو مباشرة'); return; }
       const months=payrollAvailableMonths(), sel=document.getElementById('payrollMonth')?.value;
       const ym=months.includes(sel)?sel:months[0];
       if(!ym){ empCtxAlert('لا يوجد شهر حضور وانصراف متاح لإعداد مسير الرواتب'); return; }
@@ -3908,6 +3939,19 @@
     });
     return [...map.values()];
   }
+  // موظف مضاف بلا عقد أو مباشرة: يظهر في الحضور فقط إن كانت له تغطيات، ويُعرض كـ «تغطيات» بلا حضور ولا راتب
+  function covEmployeeOnlyEntries(){
+    const seen=new Map();
+    (coverage||[]).forEach(c=>{
+      if(c.guardType==='manual'||!c.guardId) return;
+      const e=employees.find(x=>String(x.id)===String(c.guardId));
+      if(!e||employeeEligibleForHR(e)||seen.has(e.id)) return;
+      const loc=String(c.location||'').trim();
+      seen.set(e.id,{id:e.id,fullname:e.fullname,empcode:e.empcode,region:e.region||'',project:loc||e.project||'',jobtitle:e.jobtitle||'',isCov:true,covLabel:'تغطيات'});
+    });
+    return [...seen.values()];
+  }
+  function attBaseList(){ return [...payrollEmployees(), ...covEmployeeOnlyEntries(), ...covManualGuardEntries()]; }
   function covDayKey(rec){
     const d=String(rec?.date||'').slice(0,10);
     if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
@@ -4387,7 +4431,7 @@
   function renderContracts(){
     refreshEmpSelect(document.getElementById('contract_emp'),'— اختر الموظف —');
     const id=document.getElementById('contract_emp').value;
-    if(id) loadContractEmployee(id); else document.getElementById('contractSheet').innerHTML='<p class="empty-note">اختر موظفاً تمت إضافته إلى البرنامج لعرض عقده.</p>';
+    if(id){ if(currentContractId && contracts.some(c=>c.id===currentContractId && c.empId===id)) loadContractEmployee(id,currentContractId,!contractViewOnly); else if(newContractMode) loadContractEmployee(id,null); else openEmployeeContractDefault(id); } else document.getElementById('contractSheet').innerHTML='<p class="empty-note">اختر موظفاً تمت إضافته إلى البرنامج لعرض عقده.</p>';
   }
   function syncSavedContractDynamicFields(){
     const sheet=document.getElementById('contractSheet');
@@ -4407,7 +4451,24 @@
     { const [a9,b9]=splitArt9(); rebuildBlock('art9',a9); rebuildBlock('art9b',b9); }
     return duration;
   }
-  function loadContractEmployee(empId, contractId){
+  let contractViewOnly=false;
+  const CONTRACT_FORM_IDS=['contract_start','contract_end','contract_location','contract_hours','contract_week_hours','contract_probation','contract_notice','contract_notice_comp','contract_resign_notice','contract_notes'];
+  function applyContractReadOnly(ro,opts){
+    contractViewOnly=!!ro;
+    CONTRACT_FORM_IDS.forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=!!ro; });
+    document.querySelectorAll('#contractSheet [contenteditable]').forEach(el=>el.setAttribute('contenteditable',ro?'false':'true'));
+    const show=(id,on)=>{ const el=document.getElementById(id); if(el) el.style.display=on?'':'none'; };
+    show('saveContractBtn',!ro); show('rebuildContractBtn',!ro); show('editContractBtn',!!ro);
+    document.getElementById('contractSheet')?.classList.toggle('is-view-only',!!ro);
+    const note=document.getElementById('contractSavedNote');
+    if(note && !(opts&&opts.keepNote)) note.textContent= ro ? 'وضع المعاينة فقط — للتعديل اضغط «تعديل العقد».' : '';
+  }
+  // موظف له عقد محفوظ => معاينة آخر عقد له، وإلا عقد جديد
+  function openEmployeeContractDefault(empId){
+    const c=employeeContractInfo(empId).contract;
+    if(c) loadContractEmployee(empId,c.id); else loadContractEmployee(empId,null);
+  }
+  function loadContractEmployee(empId, contractId, editMode){
     const e=employees.find(x=>x.id===empId); if(!e)return;
     currentContractId=contractId||null;
     newContractMode=!currentContractId;
@@ -4425,8 +4486,11 @@
     document.getElementById('contract_notice_comp').value=c.noticeComp??300;
     document.getElementById('contract_resign_notice').value=c.resignNotice??15;
     document.getElementById('contract_notes').value=c.notes||'';
-    document.getElementById('contractSheet').innerHTML=buildContractHtml(e,c);
+    // العقد المحفوظ يُعرض بنصه المحفوظ كما هو (بما فيه أي تعديل نصي)، والجديد من النموذج.
+    const savedC=currentContractId?contracts.find(x=>x.id===currentContractId):null;
+    document.getElementById('contractSheet').innerHTML=(savedC&&savedC.customHtml)?savedC.customHtml:buildContractHtml(e,c);
     fitContractPages();
+    applyContractReadOnly(!!currentContractId && !editMode);
   }
   function updateContractDurationNote(){
     const start=document.getElementById('contract_start')?.value||'', end=document.getElementById('contract_end')?.value||'';
@@ -4436,10 +4500,11 @@
     return text;
   }
   function currentContractForm(){ const start=document.getElementById('contract_start').value,end=document.getElementById('contract_end').value,durationText=contractDurationText(start,end); return {duration:contractDurationMonths(start,end)||document.getElementById('contract_duration').value,durationText,start,end,location:document.getElementById('contract_location').value,hours:document.getElementById('contract_hours').value,weekHours:document.getElementById('contract_week_hours').value,probation:document.getElementById('contract_probation').value,notice:document.getElementById('contract_notice').value,noticeComp:document.getElementById('contract_notice_comp').value,resignNotice:document.getElementById('contract_resign_notice').value,notes:document.getElementById('contract_notes').value}; }
-  function renderContractSheet(){ const id=document.getElementById('contract_emp').value,e=employees.find(x=>x.id===id); if(!e)return; const c={...contractDataFromEmployee(e),...currentContractForm()}; document.getElementById('contractSheet').innerHTML=buildContractHtml(e,c); fitContractPages(); }
+  function renderContractSheet(){ const id=document.getElementById('contract_emp').value,e=employees.find(x=>x.id===id); if(!e)return; const c={...contractDataFromEmployee(e,currentContractId,!newContractMode),...currentContractForm()}; const codeVal=String(document.getElementById('contract_code')?.value||'').trim(); if(codeVal) c.contractCode=codeVal; document.getElementById('contractSheet').innerHTML=buildContractHtml(e,c); fitContractPages(); applyContractReadOnly(contractViewOnly,{keepNote:true}); }
   document.getElementById('newContractBtn')?.addEventListener('click',()=>{
     currentContractId=null;
     newContractMode=true;
+    applyContractReadOnly(false);
     const sel=document.getElementById('contract_emp');
     if(sel) sel.value='';
     ['contract_code','contract_duration','contract_start','contract_end','contract_location','contract_notes'].forEach(id=>{const el=document.getElementById(id); if(el) el.value='';});
@@ -4460,42 +4525,52 @@
       return;
     }
     if(newContractMode) loadContractEmployee(e.target.value,null);
-    else loadContractEmployee(e.target.value,currentContractId);
+    else openEmployeeContractDefault(e.target.value);
   });
   ['contract_start','contract_end','contract_location','contract_hours','contract_week_hours','contract_probation','contract_notice','contract_notice_comp','contract_resign_notice','contract_notes'].forEach(id=>document.getElementById(id)?.addEventListener('input',()=>{ if(id==='contract_start'||id==='contract_end') updateContractDurationNote(); renderContractSheet(); }));
   document.getElementById('rebuildContractBtn')?.addEventListener('click',renderContractSheet);
   document.getElementById('saveContractBtn')?.addEventListener('click',async()=>{
-    const btn=document.getElementById('saveContractBtn'); if(btn?.disabled) return;
+    const btn=document.getElementById('saveContractBtn'); if(btn?.disabled || contractViewOnly) return;
     const empId=document.getElementById('contract_emp').value,e=employees.find(x=>x.id===empId); if(!e){showToast('اختر الموظف أولاً');return;}
-    const existing=currentContractId ? contracts.find(c=>c.id===currentContractId) : null;
-    const formCode=String(document.getElementById('contract_code')?.value||'').trim();
-    const codeTaken=code=>contracts.some(c=>c.contractCode===code && c.id!==currentContractId);
-    // رقم العقد: العقد المحفوظ يحتفظ برقمه، والجديد يأخذ التالي في التسلسل.
-    // وإن اختفى عقد محفوظ من القائمة بسبب مزامنة قديمة نعيد استخدام رقمه الظاهر بدل حرق رقم جديد.
-    let contractCode;
-    if(existing) contractCode=existing.contractCode||nextContractCode(e.region||'');
-    else if(currentContractId && formCode && !codeTaken(formCode)) contractCode=formCode;
-    else contractCode=nextContractCode(e.region||'');
-    // المعرّف يُثبَّت قبل أي انتظار: إعادة الضغط/إعادة المحاولة تحدّث نفس العقد ولا تُنشئ عقداً مكرراً.
-    const id=currentContractId||('ct'+Date.now()+Math.random().toString(36).slice(2,7));
-    const data={id,empId,contractCode,...currentContractForm(),customHtml:document.getElementById('contractSheet').innerHTML,templateVersion:6,updatedAt:new Date().toISOString()};
-    const i=contracts.findIndex(c=>c.id===id);
-    if(i>=0) contracts[i]=data; else contracts.push(data);
-    currentContractId=id; newContractMode=false;
-    const codeEl=document.getElementById('contract_code'); if(codeEl) codeEl.value=contractCode;
-    e.contractduration=data.duration;e.startdate=data.start;e.contractend=data.end;e.project=data.location;
     const noteEl=document.getElementById('contractSavedNote');
     if(btn) btn.disabled=true;
     try{
+      const existing=currentContractId ? contracts.find(c=>c.id===currentContractId) : null;
+      const formCode=String(document.getElementById('contract_code')?.value||'').trim();
+      const codeTaken=code=>contracts.some(c=>c.contractCode===code && c.id!==currentContractId);
+      // رقم العقد: العقد المحفوظ يحتفظ برقمه دائماً. العقد الجديد يُحجز له رقم جديد من العدّاد الدائم (لا يتكرر أبداً).
+      // وإن اختفى عقد محفوظ من القائمة بسبب مزامنة قديمة نعيد استخدام رقمه الظاهر (صدر سابقاً) بدل حرق رقم جديد.
+      let contractCode;
+      if(existing) contractCode=existing.contractCode || await reserveContractCode(e.region||'');
+      else if(currentContractId && formCode && !codeTaken(formCode)) contractCode=formCode;
+      else contractCode=await reserveContractCode(e.region||'');
+      if(codeTaken(contractCode)) contractCode=await reserveContractCode(e.region||'');
+      // المعرّف يُثبَّت قبل الحفظ السحابي: إعادة الضغط/المحاولة تحدّث نفس العقد ولا تُنشئ عقداً مكرراً ولا تحرق رقماً.
+      const id=currentContractId||('ct'+Date.now()+Math.random().toString(36).slice(2,7));
+      const codeEl=document.getElementById('contract_code');
+      if(codeEl && codeEl.value!==contractCode){ codeEl.value=contractCode; currentContractId=id; renderContractSheet(); }
+      const data={id,empId,contractCode,...currentContractForm(),customHtml:document.getElementById('contractSheet').innerHTML,templateVersion:6,updatedAt:new Date().toISOString()};
+      const i=contracts.findIndex(c=>c.id===id);
+      if(i>=0) contracts[i]=data; else contracts.push(data);
+      currentContractId=id; newContractMode=false;
+      if(codeEl) codeEl.value=contractCode;
+      // تاريخ المباشرة (بداية الحضور والرواتب) يأتي من شاشة المباشرة فقط — لا نكتب تاريخ بداية العقد فوقه.
+      e.contractduration=data.duration;e.contractend=data.end; if(data.location) e.project=data.location;
       await saveCloudNow();
       try{renderProjectCapacity(); renderProjects();}catch(_){}
-      if(noteEl) noteEl.textContent='تم حفظ بيانات العقد وتعديلاته بنجاح.';
+      applyContractReadOnly(true,{keepNote:true});
+      if(noteEl) noteEl.textContent='تم حفظ العقد رقم '+contractCode+' بنجاح. وضع المعاينة فقط — للتعديل اضغط «تعديل العقد».';
       showToast('تم حفظ العقد وتعديلاته بنجاح');
     }catch(err){
       console.error('Contract save failed:',err);
-      if(noteEl) noteEl.textContent='لم يُحفظ العقد في قاعدة البيانات. تحقق من الاتصال ثم اضغط «حفظ» مرة أخرى (لن يتكرر العقد).';
+      if(noteEl) noteEl.textContent='لم يُحفظ العقد في قاعدة البيانات. تحقق من الاتصال ثم اضغط «حفظ العقد» مرة أخرى (لن يتكرر العقد ولن يضيع رقمه).';
       showToast('تعذر حفظ العقد في قاعدة البيانات — اضغط حفظ مرة أخرى');
     }finally{ if(btn) btn.disabled=false; }
+  });
+  // وضع المعاينة: عرض فقط. لا تعديل على العقد إلا بعد الضغط على زر «تعديل العقد».
+  document.getElementById('editContractBtn')?.addEventListener('click',()=>{
+    applyContractReadOnly(false);
+    const note=document.getElementById('contractSavedNote'); if(note) note.textContent='وضع التعديل — لا تنسَ الضغط على «حفظ العقد» بعد التعديل.';
   });
   async function downloadContractPdf(){
     const sheet=document.getElementById('contractSheet');
@@ -4603,13 +4678,15 @@
         <td class="mono">${escapeHtml(c.end||'—')}</td>
         <td>${escapeHtml(duration)}</td>
         <td class="all-contract-actions">
+          <button type="button" class="btn btn-sm all-contract-preview" data-emp-id="${escapeHtml(e.id)}" data-contract-id="${escapeHtml(c.id||'')}">معاينة</button>
           <button type="button" class="btn btn-primary btn-sm all-contract-edit" data-emp-id="${escapeHtml(e.id)}" data-contract-id="${escapeHtml(c.id||'')}">تعديل</button>
           <button type="button" class="btn btn-danger btn-sm all-contract-delete" data-contract-id="${escapeHtml(c.id||'')}" data-contract-code="${escapeHtml(c.contractCode||'')}">حذف</button>
         </td>
       </tr>`;
     }).join('');
     if(empty)empty.style.display=filtered.length?'none':'';
-    if(body)body.querySelectorAll('.all-contract-edit').forEach(btn=>btn.addEventListener('click',()=>openContractForEdit(btn.dataset.empId,btn.dataset.contractId)));
+    if(body)body.querySelectorAll('.all-contract-edit').forEach(btn=>btn.addEventListener('click',()=>openContractForEdit(btn.dataset.empId,btn.dataset.contractId,true)));
+    if(body)body.querySelectorAll('.all-contract-preview').forEach(btn=>btn.addEventListener('click',()=>openContractForEdit(btn.dataset.empId,btn.dataset.contractId,false)));
     if(body)body.querySelectorAll('.all-contract-delete').forEach(btn=>btn.addEventListener('click',()=>deleteSavedContract(btn.dataset.contractId,btn.dataset.contractCode)));
   }
   function deleteSavedContract(contractId,contractCode){
@@ -4629,12 +4706,13 @@
     renderAllContracts();
     showToast('تم حذف العقد بنجاح');
   }
-  function openContractForEdit(empId,contractId){
+  // افتراضياً معاينة (عرض فقط). edit=true يفتح العقد قابلاً للتعديل مباشرة (زر «تعديل»).
+  function openContractForEdit(empId,contractId,edit){
     switchView('contracts');
     const select=document.getElementById('contract_emp');
     if(select){
       select.value=empId;
-      loadContractEmployee(empId,contractId);
+      loadContractEmployee(empId,contractId,!!edit);
     }
     document.getElementById('contract_emp')?.scrollIntoView({behavior:'smooth',block:'start'});
   }
@@ -4674,6 +4752,17 @@
       return `${day} / ${month} / ${year}`;
     }catch(e){return ''; }
   }
+  let commViewOnly=false;
+  function applyCommReadOnly(ro,opts){
+    commViewOnly=!!ro;
+    ['comm_project','comm_startdate','comm_other_type'].forEach(id=>{ const el=document.getElementById(id); if(el) el.disabled=!!ro; });
+    const emp=document.getElementById('comm_employee'), pr=document.getElementById('comm_project'); if(emp) emp.disabled=!!ro || !(pr&&pr.value);
+    document.querySelectorAll('.comm-type-check').forEach(x=>x.disabled=!!ro);
+    const show=(id,on)=>{ const el=document.getElementById(id); if(el) el.style.display=on?'':'none'; };
+    show('saveCommencementBtn',!ro); show('editCommencementBtn',!!ro);
+    const note=document.getElementById('commSavedNote');
+    if(note && !(opts&&opts.keepNote)) note.textContent= ro ? 'وضع المعاينة فقط — للتعديل اضغط «تعديل المباشرة».' : '';
+  }
   function renderCommencementProjects(){
     const sel=document.getElementById('comm_project'); if(!sel)return;
     const cur=sel.value;
@@ -4683,7 +4772,7 @@
   function renderCommencementEmployees(){
     const p=document.getElementById('comm_project'), sel=document.getElementById('comm_employee'); if(!p||!sel)return;
     const cur=sel.value, list=guardsForProject(p.value);
-    sel.disabled=!p.value;
+    sel.disabled=!p.value||commViewOnly;
     sel.innerHTML='<option value="">'+(p.value?'اختر الحارس':'اختر الموقع أولاً')+'</option>'+list.map(e=>{
       const c=contractForEmployeeProject(e,p.value);
       return `<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'')} — ${escapeHtml(e.empcode||'')}${c?'':' — بدون عقد'}</option>`;
@@ -4750,6 +4839,7 @@
     renderCommencementProjects();
     renderCommencementEmployees();
     renderCommencementEmployee();
+    applyCommReadOnly(commViewOnly,{keepNote:true});
   }
   function openCommencementForRecord(id){
     const r=commencements.find(x=>x.id===id);if(!r)return;
@@ -4757,6 +4847,7 @@
     setTimeout(()=>{
       const p=document.getElementById('comm_project'),e=document.getElementById('comm_employee');
       p.value=r.project;renderCommencementEmployees();e.value=r.empId;document.getElementById('comm_startdate').value=r.startDate||'';renderCommencementEmployee();
+      applyCommReadOnly(true);
     },50);
   }
   document.getElementById('comm_project')?.addEventListener('change',()=>{document.getElementById('comm_startdate').value=new Date().toISOString().slice(0,10);renderCommencementEmployees();renderCommencementEmployee();});
@@ -4767,8 +4858,10 @@
     document.getElementById('comm_other_type').style.display=document.querySelector('.comm-type-check[data-type="أخرى"]')?.checked?'block':'none';
     setPaperTypes(selectedCommTypes());
   }));
-  document.getElementById('resetCommencementBtn')?.addEventListener('click',()=>{document.getElementById('comm_project').value='';const e=document.getElementById('comm_employee');e.value='';e.disabled=true;e.innerHTML='<option value="">اختر الموقع أولاً</option>';document.getElementById('comm_startdate').value='';document.querySelectorAll('.comm-type-check').forEach(x=>x.checked=false);document.getElementById('comm_other_type').value='';document.getElementById('comm_other_type').style.display='none';renderCommencementEmployee();});
+  document.getElementById('resetCommencementBtn')?.addEventListener('click',()=>{document.getElementById('comm_project').value='';const e=document.getElementById('comm_employee');e.value='';e.disabled=true;e.innerHTML='<option value="">اختر الموقع أولاً</option>';document.getElementById('comm_startdate').value='';document.querySelectorAll('.comm-type-check').forEach(x=>x.checked=false);document.getElementById('comm_other_type').value='';document.getElementById('comm_other_type').style.display='none';applyCommReadOnly(false);renderCommencementEmployee();});
+  document.getElementById('editCommencementBtn')?.addEventListener('click',()=>{ applyCommReadOnly(false); const n=document.getElementById('commSavedNote'); if(n) n.textContent='وضع التعديل — لا تنسَ الضغط على «حفظ المباشرة» بعد التعديل.'; });
   document.getElementById('saveCommencementBtn')?.addEventListener('click',()=>{
+    if(commViewOnly) return;
     const empId=document.getElementById('comm_employee')?.value||'', project=document.getElementById('comm_project')?.value||'', startDate=document.getElementById('comm_startdate')?.value||'';
     const e=employees.find(x=>x.id===empId);if(!project||!e){showToast('اختر الموقع والحارس أولاً');return;}
     const contract=contractForEmployeeProject(e,project);if(!contract){showToast('لا يمكن حفظ المباشرة: الحارس بدون عقد على الموقع المختار');return;}
@@ -4777,12 +4870,16 @@
     const existingIndex=commencements.findIndex(x=>x.empId===e.id && String(x.project||'').trim()===String(project).trim());
     const rec={id:existingIndex>=0?commencements[existingIndex].id:'cm'+Date.now()+Math.random().toString(36).slice(2,7),empId:e.id,employeeName:e.fullname||'',empcode:e.empcode||'',project,region:e.region||'',dept:e.dept||'',jobtitle:e.jobtitle||'',contractId:contract.id||'',contractCode:contract.contractCode||'',startDate,types,otherType:document.getElementById('comm_other_type')?.value||'',updatedAt:new Date().toISOString()};
     if(existingIndex>=0)commencements[existingIndex]=rec;else commencements.push(rec);
+    // تاريخ المباشرة هو بداية الحضور والرواتب: نحدّثه في ملف الموظف أيضاً
+    e.startdate=startDate;
     saveCommencements();
     // الحضور «ح» يُحسب تلقائياً يومياً من تاريخ المباشرة حتى اليوم فقط (autoAttendanceCode)،
     // ولا تُكتب أيام مسبقة/مستقبلية داخل البيانات.
     saveAttendance();
     renderCommencementList();
     showToast(existingIndex>=0?'تم تحديث المباشرة والحضور التلقائي':'تم حفظ المباشرة والحضور التلقائي');
+    applyCommReadOnly(true,{keepNote:true});
+    { const n=document.getElementById('commSavedNote'); if(n) n.textContent='تم حفظ المباشرة. وضع المعاينة فقط — للتعديل اضغط «تعديل المباشرة».'; }
   });
   document.getElementById('openAllCommencementsBtn')?.addEventListener('click',()=>{expandParentGroup('commencements');switchView('commencement-list');});
   document.getElementById('backToCommencementBtn')?.addEventListener('click',()=>{expandParentGroup('commencements');switchView('commencements');});

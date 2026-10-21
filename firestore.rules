@@ -51,6 +51,18 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+    // عدّادات تسلسلية دائمة (أرقام العقود): الرقم يزيد فقط ولا ينقص ولا يُحذف العدّاد،
+    // فلا يتكرر رقم عقد صدر مرة. الكتابة لمن لديه تبويب العقود/الموظفين أو المدير.
+    function canIssueCodes() {
+      return isAdmin() || hasAnyView(['contracts', 'allcontracts', 'employees', 'add', 'all-employees', 'commencements']);
+    }
+    match /hr_counters/{docId} {
+      allow read: if isActive();
+      allow create: if canIssueCodes() && request.resource.data.n is int && request.resource.data.n >= 1;
+      allow update: if canIssueCodes() && request.resource.data.n is int && request.resource.data.n > resource.data.n;
+      allow delete: if false;
+    }
+
     // علامة أن أول مدير تم إنشاؤه (تُكتب مرة واحدة)
     match /hr_meta/{docId} {
       allow read: if signedIn();

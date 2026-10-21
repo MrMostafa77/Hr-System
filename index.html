@@ -643,7 +643,7 @@
           <div class="field"><label>مهلة إشعار الاستقالة (بالأيام)</label><input type="number" id="contract_resign_notice" min="0" step="1" value="15"></div>
           <div class="field full"><label>شروط أو ملاحظات إضافية للعقد</label><textarea id="contract_notes" rows="3"></textarea></div>
           <div class="field full"><label>تحرير نص العقد</label><div class="empty-note">يمكن تعديل أي بند أو نص مباشرة داخل ورقة العقد. استخدم «إعادة إنشاء النموذج» للعودة للنص الأصلي.</div></div>
-          <div class="action-row"><button class="btn btn-primary" id="saveContractBtn">حفظ العقد</button><button class="btn btn-secondary" id="rebuildContractBtn" type="button">إعادة إنشاء النموذج</button></div>
+          <div class="action-row"><button class="btn btn-primary" id="saveContractBtn">حفظ العقد</button><button class="btn btn-primary" id="editContractBtn" type="button" style="display:none">تعديل العقد</button><button class="btn btn-secondary" id="rebuildContractBtn" type="button">إعادة إنشاء النموذج</button></div>
           <div id="contractSavedNote" class="empty-note" style="margin-top:10px"></div>
         </div>
         <div class="contract-preview"><div class="contract-sheet" id="contractSheet"></div></div>
@@ -699,8 +699,10 @@
           <div class="comm-alert" id="comm_contract_alert" style="display:none"></div>
           <div class="action-row commencement-actions">
             <button type="button" class="btn btn-primary" id="saveCommencementBtn">حفظ المباشرة</button>
+            <button type="button" class="btn btn-primary" id="editCommencementBtn" style="display:none">تعديل المباشرة</button>
             <button type="button" class="btn" id="resetCommencementBtn">مباشرة جديدة</button>
           </div>
+          <div id="commSavedNote" class="empty-note" style="margin-top:10px"></div>
         </div>
 
         <div class="card commencement-paper-card">
