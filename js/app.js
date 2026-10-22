@@ -4403,7 +4403,7 @@
       <tr><th>رقم المحضر</th><td>${blank(covMinuteNo(c))}</td><th>تاريخ التغطية</th><td>${blank(dateTxt)}</td></tr>
       <tr><th>اسم المشروع / الموقع</th><td>${blank(proj)}</td><th>المنطقة</th><td>${blank(region)}</td></tr>
       <tr><th>الوردية</th><td>${blank(c.shift)}</td><th>حالة الغياب</th><td>${blank(covStatusName(c.status))}</td></tr></tbody></table>`;
-    const t2=`<table class="doc-mini-table cov-parties"><thead><tr><th style="width:22%"></th><th>الحارس المغطّي (القائم بالتغطية)</th><th>الحارس الغائب (الذي تمت تغطيته)</th></tr></thead><tbody>
+    const t2=`<table class="doc-mini-table cov-parties"><thead><tr><th style="width:22%"></th><th class="cov-dark">الحارس المغطّي (القائم بالتغطية)</th><th class="cov-dark">الحارس الغائب (الذي تمت تغطيته)</th></tr></thead><tbody>
       <tr><th>الاسم</th><td><b>${blank(g.name)}</b></td><td><b>${blank(a.name)}</b></td></tr>
       <tr><th>الرقم الوظيفي</th><td>${escapeHtml(g.code||COV_NO_CODE)}</td><td>${escapeHtml(a.code||COV_NO_CODE)}</td></tr>
       <tr><th>رقم الهوية / الإقامة</th><td>${blank(g.idnum)}</td><td>${blank(a.idnum)}</td></tr>
@@ -4497,6 +4497,7 @@
       table{border-collapse:collapse;width:100%;direction:rtl;margin:4pt 0 8pt}
       table.doc-mini-table th,table.doc-mini-table td{border:1px solid #333;padding:3pt 5pt;font-size:11pt;text-align:right}
       table.doc-mini-table th{background:#dde3ee}
+      table.doc-mini-table th.cov-dark{background:#000;color:#fff}
       table.doc-grid-table td,table.doc-grid-table th{text-align:center;font-size:10pt}
       table.sg{margin-top:14pt}table.sg td{border:1px solid #333;width:33%;padding:5pt 7pt;vertical-align:top;font-size:11pt}
       .blank{border-bottom:1px dotted #555}.cov-pageno{text-align:center;font-size:10pt;color:#444}`;
