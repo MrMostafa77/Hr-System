@@ -2623,7 +2623,62 @@
     if(start) return cols[cols.length-1].iso<start;
     return !cols.some(c=>attCodeAt(c.ym,e.id,c.d));
   }
+  /* ===== تثبيت مسير الشهر المنتهي =====
+     الشهر الجاري: يُحسب مباشرة من الحضور والرواتب الحالية.
+     الشهر المنتهي: تُحفظ نسخة منه (داخل payrollRecords[الشهر][الموظف].snap) ولا تتغير
+     حتى لو تغيّر راتب الموظف أو لائحة المشروع، إلا إذا تغيّر حضور الموظف في ذلك الشهر
+     أو إجراءاته أو تعديلات المسير (مكافأة/خصومات...) — وعندها يُعاد الحساب بنفس الراتب المثبّت. */
+  const PAY_SNAP_KEYS=['day','basic','housing','transport','otherAllow','monthlyGross','overtime','bonus','totalEarned','nonWorkDays','nonWorkDed','absenceDays','absence','penalty','withdrawal','gosi','uniform','newspaper','advance','other','deduction','net','insuranceBase','workDays'];
+  const PAY_SUM_ZERO={'ح':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
+  function payCanFreeze(){ return !(window.HRAuth&&typeof window.HRAuth.canFinance==='function') || !!window.HRAuth.canFinance(); }
+  // الموظف يدخل مسير الشهر فقط إذا باشر في هذا الشهر أو قبله (أول حضور له لا يقع بعد نهاية الشهر)
+  function employeeInPayrollMonth(e,ym){ return employeeEligibleForHR(e) && !employeeNotStartedFor(e,monthCols(ym)); }
+  function payFreezeApplies(ym,cols){
+    return !!ym && ym<currentMonthStr() && cols.length===daysInMonth(ym) && cols[0].d===1 && cols.every(c=>c.ym===ym);
+  }
+  function payInputsFingerprint(e,cols,a){
+    const ym=cols[0].ym; let s='';
+    cols.forEach(c=>{ s+=(attCodeAt(c.ym,e.id,c.d)||'-')+','; });
+    (penalties||[]).forEach(x=>{ if(String(x.empId)===String(e.id) && String(x.date||'').slice(0,7)===ym) s+='|'+JSON.stringify(x); });
+    s+='#'+['bonus','uniform','newspaper','advance','other'].map(k=>Number(a[k])||0).join(':');
+    let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0;
+    return (h>>>0).toString(36)+'.'+s.length.toString(36);
+  }
+  let paySnapTimer=null;
+  function payStoreSnap(ym,empId,st,fp){
+    if(!payCanFreeze() || st.notStarted || !(st.monthlyGross>0)) return;   // لا نثبّت راتب صفري (بيانات مالية لم تُحمَّل)
+    if(!payrollRecords[ym]) payrollRecords[ym]={};
+    const rec=payrollRecords[ym][empId]=payrollRecords[ym][empId]||{bonus:0,uniform:0,newspaper:0,advance:0,other:0,internalAction:'',note:''};
+    const p={}; PAY_SNAP_KEYS.forEach(k=>{ if(st[k]) p[k]=st[k]; });
+    const sum={}; Object.keys(st.sum||{}).forEach(k=>{ if(st.sum[k]) sum[k]=st.sum[k]; });
+    rec.snap={v:1,fp,p,sum,ded:st.dedItems||[],at:new Date().toISOString()};
+    clearTimeout(paySnapTimer); paySnapTimer=setTimeout(()=>persistCloud(null),700);
+  }
+  function payStatementFromSnap(snap,cols,a){
+    const st={ym:cols[0].ym,notStarted:false,frozen:true};
+    PAY_SNAP_KEYS.forEach(k=>{ st[k]=Number(snap.p&&snap.p[k])||0; });
+    st.sum=Object.assign({},PAY_SUM_ZERO,snap.sum||{});
+    st.dedItems=Array.isArray(snap.ded)?snap.ded:[]; st.adjustment=a;
+    return st;
+  }
   function payrollStatementForCols(e,cols,sumIn){
+    const ym=cols.length?cols[0].ym:currentMonthStr();
+    if(!payFreezeApplies(ym,cols) || employeeNotStartedFor(e,cols)) return payrollComputeStatement(e,cols,sumIn);
+    const a=payrollAdjustmentFor(ym,e.id), fp=payInputsFingerprint(e,cols,a), snap=a.snap;
+    if(snap && snap.fp===fp && snap.p) return payStatementFromSnap(snap,cols,a);          // نسخة مثبتة وسليمة
+    // لا توجد نسخة بعد، أو تغيّر الحضور/الإجراءات/التعديلات: نعيد الحساب بالراتب المثبّت (إن وُجد) ونحفظ النسخة
+    const base=(snap&&snap.p)?{...e,basicsalary:snap.p.basic||0,housing:snap.p.housing||0,transport:snap.p.transport||0,otherallow:snap.p.otherAllow||0}:e;
+    const st=payrollComputeStatement(base,cols,sumIn);
+    payStoreSnap(ym,e.id,st,fp);
+    return st;
+  }
+  // إعادة احتساب شهر منتهي بالرواتب الحالية (بحذف النسخ المثبتة ليعاد تثبيتها)
+  function payUnfreezeMonth(ym){
+    let n=0; const m=payrollRecords[ym]||{};
+    Object.keys(m).forEach(id=>{ if(m[id]&&m[id].snap){ delete m[id].snap; n++; } });
+    return n;
+  }
+  function payrollComputeStatement(e,cols,sumIn){
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
     const basic=Number(e.basicsalary)||0,housing=Number(e.housing)||0,transport=Number(e.transport)||0,otherAllow=Number(e.otherallow)||0;
     const monthlyGross=basic+housing+transport+otherAllow, day=empDayRate(e);
@@ -2858,7 +2913,7 @@
     roles.other={k:'other',label:'وظائف أخرى / غير محددة',cap:0,budget:0,hasCost:false,emps:[]};
     employees.filter(e=>sameProjectName(e.project,p.name)).forEach(e=>{
       const k=roleCapacityKey(e.jobtitle), bucket=(k&&roles[k])?roles[k]:roles.other;
-      const eligible=employeeEligibleForHR(e);
+      const eligible=employeeInPayrollMonth(e,ym);
       const row={e,eligible,st:null,worked:0,absent:0,real:0,sum:{}};
       if(eligible){
         const st=payrollStatementForCols(e,cols);
@@ -2906,7 +2961,7 @@
       h+=`<div class="pj-bd-title" style="font-size:13px">تفصيل رواتب الأفراد</div><div class="table-wrap"><table class="payroll-table pj-bd pdr-table"><thead>${th('م','الاسم','الوظيفة','الراتب الشهري','أيام العمل','إضافي + مكافأة','إجمالي المستحق','الخصومات','الصافي')}</thead><tbody>${
         rows.map((x,i)=>{const st=x.st; return st
           ?`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td class="mono">${money(st.monthlyGross)}</td><td class="mono">${fmt(x.worked)}</td><td class="mono">${money(st.overtime+st.bonus)}</td><td class="mono">${money(st.totalEarned)}</td><td class="mono">${money(st.deduction)}</td><td class="mono"><b>${money(st.net)}</b></td></tr>`
-          :`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td colspan="6" class="empty-note">لا يدخل في الرواتب (لا يوجد عقد أو مباشرة)</td></tr>`;}).join('')||'<tr><td colspan="9" class="empty-note">لا يوجد موظفون على هذا المشروع.</td></tr>'
+          :`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td colspan="6" class="empty-note">لا يدخل في رواتب هذا الشهر (لا يوجد عقد أو مباشرة، أو لم يباشر بعد)</td></tr>`;}).join('')||'<tr><td colspan="9" class="empty-note">لا يوجد موظفون على هذا المشروع.</td></tr>'
       }</tbody></table></div>`;
     }
     // 3) الدوام
@@ -2961,7 +3016,7 @@
     const ym=document.getElementById('payrollMonth')?.value,body=document.getElementById('reportTableBody'); if(!body)return;
     if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="25" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(), pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
-    const list=payrollEmployees().filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
     document.getElementById('payrollCount').textContent=`${list.length} موظف`;
     body.innerHTML=list.map((e,i)=>{
       const p=payrollStatementForCols(e,monthCols(ym)),a=p.adjustment||{},action=a.internalAction||'';
@@ -2987,14 +3042,20 @@
   document.getElementById('payrollPreviewAllBtn')?.addEventListener('click',()=>{
     const ym=document.getElementById('payrollMonth')?.value;if(!ym){showToast('لا يوجد شهر حضور وانصراف متاح');return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(),pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
-    const list=payrollEmployees().filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
     openPayrollPreview({list,cols:monthCols(ym),single:false});
+  });
+  document.getElementById('payrollRecalcBtn')?.addEventListener('click',()=>{
+    const ym=document.getElementById('payrollMonth')?.value; if(!ym){showToast('لا يوجد شهر محدد');return;}
+    if(ym>=currentMonthStr()){showToast('الشهر الجاري يُحسب تلقائيًا ولا يحتاج إعادة احتساب');return;}
+    if(!confirm('سيتم إعادة احتساب مسير '+monthLabel(ym)+' بالرواتب والبيانات الحالية لكل الموظفين، وتحل محل النسخة المثبتة. هل تريد المتابعة؟')) return;
+    const n=payUnfreezeMonth(ym); renderReports(); persistCloud(n?'تمت إعادة احتساب المسير وتثبيته من جديد':'لا توجد نسخة مثبتة لهذا الشهر');
   });
   document.getElementById('printReportBtn')?.addEventListener('click',()=>{
     const ym=document.getElementById('payrollMonth')?.value;
     if(!ym){showToast('لا يوجد شهر حضور وانصراف متاح');return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(),pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
-    const list=payrollEmployees().filter(e=>(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
     if(!list.length){showToast('لا يوجد موظفون مطابقون للطباعة');return;}
     const model=buildPayrollModel(list,monthCols(ym),false);
     ppPrint(model);
