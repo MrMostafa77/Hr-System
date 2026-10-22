@@ -3026,7 +3026,7 @@
       const p=payrollStatementForCols(e,monthCols(ym)),a=p.adjustment||{},action=a.internalAction||'';
       const red=v=>Number(v)>0?' style="color:#b42318;font-weight:700"':'';
       return `<tr data-pay-row="${escapeAttr(e.id)}">
-      <td class="mono g1 st1">${i+1}</td><td class="g1 st2"><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td class="g1">${escapeHtml(e.region||e.project||'—')}</td><td class="g1">${escapeHtml(e.jobtitle||'—')}</td>
+      <td class="mono g1 st1">${i+1}</td><td class="g1 st2"><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td class="g1">${escapeHtml(e.project||e.region||'—')}</td><td class="g1">${escapeHtml(e.jobtitle||'—')}</td>
       <td class="mono g2">${fmt(p.day)}</td><td class="mono g2">${fmt(p.basic)}</td><td class="mono g2">${fmt(p.housing)}</td><td class="mono g2">${fmt(p.transport)}</td><td class="mono g2">${fmt(p.otherAllow)}</td><td class="mono g2 tot">${fmt(p.monthlyGross)}</td>
       <td class="mono g2">${fmt(p.overtime)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
       <td class="mono g3" ${red(p.nonWorkDed)}>${fmt(p.nonWorkDed)}${p.nonWorkDays?`<small class="pay-red-note">${p.nonWorkDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.gosi)}</td>
@@ -3429,7 +3429,7 @@
   .pay-paper .pay-table thead tr.g th{background:#dfe9ed;color:#111;font-size:9px;font-weight:800;padding:5px 2px}
   .pay-paper .pay-table thead tr:not(.g) th{background:#dfe9ed;color:#111;font-size:8.5px;font-weight:800;line-height:1.25;padding:5px 2px}
   .pay-paper .pay-table tbody td{font-size:9px;height:24px}
-  .pay-paper .pay-table tbody td.s{text-align:right;padding:4px 5px;font-weight:700;font-size:10px}
+  .pay-paper .pay-table tbody td.s{text-align:right;padding:4px 5px;font-weight:700;font-size:9.5px;overflow-wrap:break-word;word-break:normal;line-height:1.35}
   .pay-paper .pay-table tbody td.ptot,.pay-paper .pay-table tfoot td{background:#f1f5f6;font-weight:800}
   .pay-paper .pay-table tbody td.net{font-weight:800}
   .pay-paper .pay-table tfoot td{font-size:9px;padding:5px 2px}
@@ -3511,7 +3511,7 @@
   const AS_SUMS=[['الدوام',null],['حضور','ح'],['غياب','غ'],['تغطية','ط'],['جزاء','ج'],['راحات','راحة'],['إضافي','ض'],['انسحاب','س'],['جمع','جمع']];
   const PP_GROUPS=[['بيانات الموظف',4],['المستحقات (ريال)',9],['الخصومات (ريال)',10],['الصافي',1],['الإجراء الداخلي',1]];
   const PP_COLS=[
-    {h:'م',k:r=>r.i,t:'i'},{h:'الاسم',k:r=>r.name,t:'s',w:25},{h:'الموقع',k:r=>r.location,t:'s',w:16},{h:'الوظيفة',k:r=>r.job,t:'s',w:16},
+    {h:'م',k:r=>r.i,t:'i'},{h:'الاسم',k:r=>r.name,t:'s',w:25},{h:'المشروع',k:r=>r.location,t:'s',w:24},{h:'الوظيفة',k:r=>r.job,t:'s',w:16},
     {h:'اليوم',k:r=>r.p.day,t:'n'},{h:'الأساسي',k:r=>r.p.basic,t:'n',sum:1},{h:'بدل السكن',k:r=>r.p.housing,t:'n',sum:1},{h:'بدل المواصلات',k:r=>r.p.transport,t:'n',sum:1},{h:'بدلات أخرى',k:r=>r.p.otherAllow,t:'n',sum:1},
     {h:'الأجر الأخير',k:r=>r.p.monthlyGross,t:'n',sum:1,b:1,tot:1},{h:'إضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'مكافآت',k:r=>r.p.bonus,t:'n',sum:1},{h:'إجمالي الراتب',k:r=>r.p.totalEarned,t:'n',sum:1,b:1,tot:1},
     {h:'خصم عدم دوام',k:r=>r.p.nonWorkDed,t:'n',sum:1},{h:'تأمينات اجتماعية',k:r=>r.p.gosi,t:'n',sum:1},{h:'غيابات',k:r=>r.p.absence,t:'n',sum:1},{h:'جزاءات',k:r=>r.p.penalty,t:'n',sum:1},{h:'انسحاب',k:r=>r.p.withdrawal,t:'n',sum:1},
@@ -3523,7 +3523,7 @@
   function buildPayrollModel(list,cols,single){
     const first=cols[0],last=cols[cols.length-1],isMonth=first.d===1&&first.ym===last.ym&&cols.length===daysInMonth(first.ym),periodLabel=isMonth?`شهر ${monthLabel(first.ym)}`:`الفترة من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)}`;
     const projs=[...new Set(list.map(e=>e.project).filter(Boolean))],scope=single?`الموظف: ${list[0].fullname||''}`:(projs.length===1?`المشروع: ${projs[0]}`:'كل المشاريع');
-    const rows=list.map((e,i)=>({i:i+1,name:e.fullname||'',location:e.region||e.project||'',job:e.jobtitle||'',p:payrollStatementForCols(e,cols)}));
+    const rows=list.map((e,i)=>({i:i+1,name:e.fullname||'',location:e.project||e.region||'',job:e.jobtitle||'',p:payrollStatementForCols(e,cols)}));
     const totals=PP_COLS.map(c=>c.sum?r2(rows.reduce((a,r)=>a+(Number(c.k(r))||0),0)):null);
     const title=`${single?'مسير راتب':'مسير رواتب'} ${periodLabel}`,sub=`${scope} — من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)} — أساس الحساب 30 يوم${single?'':` — عدد الموظفين: ${rows.length}`} — تاريخ الإعداد: ${fmtDMY(todayISO())}`;
     const fileBase=`مسير_${single?(list[0].fullname||'موظف'):(projs.length===1?projs[0]:'كل_المشاريع')}_${isMonth?monthLabel(first.ym):fmtDMY(first.iso)+'_'+fmtDMY(last.iso)}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
@@ -3532,7 +3532,7 @@
   // رقم مجموعة اللون لكل عمود (تدرج لوني حسب أقسام الجدول)
   function ppColGroups(){ const g=[]; PP_GROUPS.forEach(([t,n],gi)=>{ for(let k=0;k<n;k++) g.push(gi+1); }); return g; }
   function ppColgroup(){
-    const n=PP_COLS.length, w=PP_COLS.map((c,i)=>i===0?2:i===1?10:(i===2||i===3)?6:i===n-1?7:(c.tot?4:3.5)), s=w.reduce((a,b)=>a+b,0);
+    const n=PP_COLS.length, w=PP_COLS.map((c,i)=>i===0?1.8:i===1?14:i===2?13:i===3?7:i===n-1?7:(c.tot?3.6:3.0)), s=w.reduce((a,b)=>a+b,0);
     return '<colgroup>'+w.map(x=>`<col style="width:${(x/s*100).toFixed(3)}%">`).join('')+'</colgroup>';
   }
   function ppPaperHTML(m){
