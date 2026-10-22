@@ -3902,23 +3902,61 @@
     }catch(err){ console.error(err); showToast('تعذر إنشاء ملف PDF'); }
     finally{ host.remove(); }
   }
+  /* رقم محضر الإجراء: رمز المنطقة_السنة-الشهر_تسلسل (مثال MAK_2026-10_00001) — تسلسل مستقل لإجراءات الموظفين، ويُحفظ مع الإجراء */
+  function actMinuteNo(rec, emp, store){
+    if(rec.minuteNo) return rec.minuteNo;
+    const pr=projects.find(x=>String(x.name||'')===String(rec.project||emp?.project||''));
+    const region=(pr&&pr.region)||emp?.region||'';
+    const ym=(String(rec.date||'').slice(0,7)||todayISO().slice(0,7));
+    const prefix=regionCode(region)+'_'+ym+'_';
+    let max=0; (penalties||[]).forEach(x=>{ const t=String(x.minuteNo||''); if(t.startsWith(prefix)){ const m=t.slice(prefix.length).match(/^(\d{5})$/); if(m) max=Math.max(max,Number(m[1])); } });
+    const no=prefix+String(max+1).padStart(5,'0');
+    if(store) rec.minuteNo=no;
+    return no;
+  }
+  function actionSheetPage(emp, rec, no){
+    const calc=actionCalc(emp, rec);
+    const proj=rec.project||emp.project||'';
+    const pr=projects.find(x=>String(x.name||'')===String(proj));
+    const region=(pr&&pr.region)||emp.region||'';
+    const code=(rec.code&&ATT_CODES.includes(rec.code))?rec.code:(/انسحاب/.test(String(rec.type||''))?'س':'ج');
+    const typeName=ATT_CODE_LABELS[code]||code;
+    const daysTxt = calc.item && !rec.manualDays && !(rec.manualAmount!=null&&rec.manualAmount!=='') ? policyDaysText(calc.item) : (calc.days===''||calc.days==null ? '—' : String(calc.days)+' يوم');
+    const amtTxt = calc.isDed ? ppNf(calc.amount)+' ريال' : '—';
+    const d=String(rec.date||'').slice(0,10), dateTxt=d?`${covWeekday(d)} ${fmtDMY(d)}`:'';
+    const day=empDayRate(emp);
+    const t1=`<table class="doc-mini-table"><tbody>
+      <tr><th>رقم المحضر</th><td>${blank(no)}</td><th>تاريخ الإجراء</th><td>${blank(dateTxt)}</td></tr>
+      <tr><th>اسم المشروع / الموقع</th><td>${blank(proj)}</td><th>المنطقة</th><td>${blank(region)}</td></tr></tbody></table>`;
+    const t2=`<table class="doc-mini-table"><tbody>
+      <tr><th>اسم الحارس</th><td><b>${blank(emp.fullname)}</b></td><th>الرقم الوظيفي</th><td>${blank(emp.empcode)}</td></tr>
+      <tr><th>رقم الهوية / الإقامة</th><td>${blank(emp.idnum)}</td><th>الجنسية</th><td>${blank(emp.nationality)}</td></tr>
+      <tr><th>المسمى الوظيفي</th><td>${blank(emp.jobtitle)}</td><th>الأجر اليومي (ريال)</th><td>${day?escapeHtml(ppNf(day)):blank('')}</td></tr></tbody></table>`;
+    const t3=`<table class="doc-mini-table"><tbody>
+      <tr><th>نوع الإجراء</th><td>${blank(typeName)}</td><th>أيام الخصم</th><td>${blank(daysTxt==='—'?'':daysTxt)}</td></tr>
+      <tr><th>المخالفة / سبب الإجراء</th><td colspan="3">${blank(rec.type)}</td></tr>
+      <tr><th>أساس الحساب</th><td colspan="3">${escapeHtml(calc.isDed?calc.source:'إجراء لا يترتب عليه خصم')}</td></tr>
+      <tr><th>قيمة الخصم</th><td colspan="3"><b>${escapeHtml(amtTxt)}</b></td></tr></tbody></table>`;
+    const box=(title,name)=>`<div class="cov-sign"><b>${title}</b><span>الاسم: ${name?`<u>${escapeHtml(name)}</u>`:'..............................'}</span><span>التوقيع: ..............................</span><span>التاريخ: ..............................</span></div>`;
+    const sign=`<div class="cov-sign-row">${box('الحارس',emp.fullname)}${box('مدير المشروع','')}${box('الموارد البشرية','')}</div>`;
+    const body=`<p>تقرر اتخاذ الإجراء الموضحة بياناته أدناه بحق الحارس${emp.fullname?` <b>${escapeHtml(emp.fullname)}</b>`:''}${proj?` في مشروع / موقع <b>${escapeHtml(proj)}</b>`:''}${dateTxt?` بتاريخ <b>${escapeHtml(dateTxt)}</b>`:''}، وفق البيانات التالية:</p>
+      <h3 class="cov-h">بيانات الإجراء</h3>${t1}
+      <h3 class="cov-h">بيانات الحارس</h3>${t2}
+      <h3 class="cov-h">بيانات المخالفة والخصم</h3>${t3}
+      <p class="cov-notes"><b>ملاحظات:</b> ${blank(rec.notes)}</p>
+      <p>يقر الموقعون أدناه بصحة البيانات الواردة في هذا المحضر، وعليه جرى التوقيع.</p>
+      ${sign}`;
+    return covPageShell('محضر مخالفة / إجراء موظف',body);
+  }
   function openActionSheet(emp, rec){
-    ensurePpStyle(); closePayrollPreview();
-    const m=buildActionSheetModel(emp, rec);
-    const ov=document.createElement('div'); ov.className='pp-overlay'; ov.id='ppOverlay';
-    ov.innerHTML=`<div class="pp-bar"><span class="pp-name">${escapeHtml(m.title)} — ${escapeHtml(emp.fullname||'')}</span>
-      <button class="btn btn-sm btn-primary" data-pp="print">طباعة</button>
-      <button class="btn btn-sm" data-pp="pdf">تنزيل PDF</button>
-      <button class="btn btn-sm" data-pp="full">ملء الشاشة</button>
-      <button class="btn btn-sm" data-pp="close">إغلاق</button></div>
-      <div class="pp-body"><div class="pp-paper ac-paper" data-w="794" style="width:794px">${m.html()}</div></div>`;
-    document.body.appendChild(ov);
-    ov.querySelector('[data-pp="print"]').onclick=()=>ppPrint(m);
-    ov.querySelector('[data-pp="pdf"]').onclick=()=>m.pdf(m);
-    ov.querySelector('[data-pp="close"]').onclick=closePayrollPreview;
-    ov.querySelector('[data-pp="full"]').onclick=()=>{ try{ if(document.fullscreenElement) document.exitFullscreen(); else (ov.requestFullscreen||ov.webkitRequestFullscreen).call(ov); }catch(e){} };
-    window.__ppResize=()=>ppFit(ov); window.addEventListener('resize',window.__ppResize); document.addEventListener('fullscreenchange',window.__ppResize);
-    ppFit(ov); document.addEventListener('keydown',ppEsc);
+    closePayrollPreview();
+    // إجراء محفوظ: يُثبَّت رقمه ويُحفظ، وإجراء غير محفوظ (معاينة): يُعرض الرقم المتوقع دون حجزه
+    const orig=rec.id?penalties.find(x=>x.id===rec.id):null;
+    let no;
+    if(orig){ const had=!!orig.minuteNo; no=actMinuteNo(orig,emp,true); if(!had) savePenalties(); }
+    else no=actMinuteNo(rec,emp,false);
+    covMinFile=('محضر_اجراء_'+(emp.fullname||'حارس')+'_'+no).replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
+    covMinOpen(actionSheetPage(emp,rec,no),1,'محضر إجراء موظف — '+(emp.fullname||''));
   }
   $a('viewActionBtn')?.addEventListener('click', ()=>{
     const emp=actEmp();
@@ -4120,6 +4158,7 @@
     const out={id:'p'+Date.now(), empId:emp.id, project:rec.project, date:rec.date, code:rec.code, type:rec.type, days:rec.days, notes:rec.notes};
     if(rec.manualDays) out.manualDays=true;
     if(rec.manualAmount!=null) out.manualAmount=rec.manualAmount;
+    out.minuteNo=actMinuteNo(out,emp,true);   // رقم المحضر التسلسلي
     penalties.push(out);
     savePenalties();
     actResetForm();
@@ -4455,10 +4494,10 @@
     document.removeEventListener('keydown',covMinKey);
   }
   function covMinKey(ev){ if(ev.key==='Escape') covMinClose(); }
-  function covMinOpen(pagesHtml,count){
+  function covMinOpen(pagesHtml,count,barTitle){
     covMinClose();
     const m=document.createElement('div'); m.id='covMinutesModal';
-    m.innerHTML=`<div class="cov-min-bar no-print"><b>محضر التغطيات</b><span class="pill pill-gray">${count} صفحة</span><div class="cov-min-actions"><button type="button" class="btn btn-primary" id="covMinPrint">طباعة</button><button type="button" class="btn" id="covMinWord">تنزيل Word</button><button type="button" class="btn" id="covMinPdf">تنزيل PDF</button><button type="button" class="btn" id="covMinClose">إغلاق</button></div></div><div class="cov-min-pages">${pagesHtml}</div>`;
+    m.innerHTML=`<div class="cov-min-bar no-print"><b>${escapeHtml(barTitle||'محضر التغطيات')}</b><span class="pill pill-gray">${count} صفحة</span><div class="cov-min-actions"><button type="button" class="btn btn-primary" id="covMinPrint">طباعة</button><button type="button" class="btn" id="covMinWord">تنزيل Word</button><button type="button" class="btn" id="covMinPdf">تنزيل PDF</button><button type="button" class="btn" id="covMinClose">إغلاق</button></div></div><div class="cov-min-pages">${pagesHtml}</div>`;
     document.body.appendChild(m);
     const st0=document.getElementById('dynamicPrintOrientation');
     covMinSaved={orient:st0?st0.textContent:'', landscape:document.body.classList.contains('print-landscape-coverage')};
