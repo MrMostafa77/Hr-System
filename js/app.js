@@ -2998,12 +2998,16 @@
   });
 
   function renderReports(){
-    const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel');
-    if(card)card.style.display=(projectMode||employeeMode)?'none':'';
+    const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel');
+    if(covPanel)covPanel.style.display=coverageMode?'':'none';
+    // أزرار الشريط العلوي خاصة بمسير الرواتب فقط
+    ['payrollRecalcBtn','payrollPreviewAllBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode)?'none':''; });
+    if(card)card.style.display=(projectMode||employeeMode||coverageMode)?'none':'';
     if(panel)panel.style.display=projectMode?'':'none';
     if(employeePanel)employeePanel.style.display=employeeMode?'':'none';
     if(projectMode){renderProjects();renderProjectCapacity();try{renderProjectDetailReport();}catch(err){console.error(err);}return;}
     if(employeeMode){renderEmployeeReports();return;}
+    if(coverageMode){renderCoverageReport();return;}
     refreshPayrollMonthOptions();refreshPayrollFilters();
     try{
       const dg=document.getElementById('payrollDiag');
@@ -4299,10 +4303,11 @@
     let list=[...coverage].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     if(fs)list=list.filter(c=>covStatusCode(c.status)===fs);
     const body=document.getElementById('covTableBody');
-    body.innerHTML=list.map(c=>`<tr><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.shift||'')}</td><td>${escapeHtml(c.location||'')}</td><td class="mono">${escapeHtml(c.date||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusText(c.status))}</td><td class="mono">${fmt(c.amount)}</td><td>${escapeHtml(c.holder||'')}</td><td>${escapeHtml(c.bank||'')}</td><td class="mono">${escapeHtml(c.accountno||'')}</td><td><button class="btn btn-sm" data-cov-edit="${c.id}">تعديل</button> <button class="btn icon-btn btn-ghost btn-danger" data-del="${c.id}" title="حذف">✕</button></td></tr>`).join('')||'<tr><td colspan="11" class="empty-note">لا توجد تغطيات مسجلة.</td></tr>';
+    body.innerHTML=list.map(c=>`<tr><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.shift||'')}</td><td>${escapeHtml(c.location||'')}</td><td class="mono">${escapeHtml(c.date||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusText(c.status))}</td><td class="mono">${fmt(c.amount)}</td><td>${escapeHtml(c.holder||'')}</td><td>${escapeHtml(c.bank||'')}</td><td class="mono">${escapeHtml(c.accountno||'')}</td><td><button class="btn btn-sm" data-cov-minute="${c.id}" title="محضر تغطية جاهز للطباعة">محضر</button> <button class="btn btn-sm" data-cov-edit="${c.id}">تعديل</button> <button class="btn icon-btn btn-ghost btn-danger" data-del="${c.id}" title="حذف">✕</button></td></tr>`).join('')||'<tr><td colspan="11" class="empty-note">لا توجد تغطيات مسجلة.</td></tr>';
     document.getElementById('covTotal').textContent=fmt(list.reduce((sum,c)=>sum+(Number(c.amount)||0),0));
     body.querySelectorAll('[data-del]').forEach(btn=>btn.onclick=()=>{if(confirm('هل تريد حذف سجل التغطية هذا؟')){const old=coverage.find(c=>c.id===btn.dataset.del); if(old) covClearAttendance(old); coverage=coverage.filter(c=>c.id!==btn.dataset.del);saveCoverage();renderCoverage();}});
     body.querySelectorAll('[data-cov-edit]').forEach(btn=>btn.onclick=()=>loadCoverageForEdit(btn.dataset.covEdit));
+    body.querySelectorAll('[data-cov-minute]').forEach(btn=>btn.onclick=()=>covOpenMinutes([coverage.find(x=>x.id===btn.dataset.covMinute)].filter(Boolean),'single'));
   }
   function loadCoverageForEdit(id){
     const c=coverage.find(x=>x.id===id); if(!c)return;
@@ -4352,6 +4357,144 @@
     const rows=coverage.map(c=>[c.guardName,c.shift,c.location,c.date,c.absentName,covStatusText(c.status),c.amount,c.holder,c.iban,c.bank,c.accountno,c.notes]); downloadCsv('coverage_export.csv',headers,rows);
   });
   resetCoverageForm();
+
+  /* ===== محضر التغطيات (جاهز للطباعة) =====
+     يُبنى من بيانات التغطية المدخلة: اسم المغطّي، الحارس الغائب، حالة الغياب، المشروع، الوردية، التاريخ،
+     المستحق وبيانات الحساب (لمن لديه صلاحية المالية)، مع خانات توقيع الموظف والمشرف المسؤول والإدارة. */
+  function covMinuteNo(c){ const d=String(c.date||'').replace(/-/g,''); const t=String(c.id||'').replace(/\D/g,'').slice(-4); return 'TG-'+(d||'00000000')+'-'+(t||'0000'); }
+  function covWeekday(iso){ try{ return new Date(iso+'T00:00:00').toLocaleDateString('ar-SA',{weekday:'long'}); }catch(_){ return ''; } }
+  function covPerson(id,name){
+    const e=employees.find(x=>id && String(x.id)===String(id)) || employees.find(x=>name && String(x.fullname||'').trim()===String(name).trim()) || null;
+    return {name:(e&&e.fullname)||name||'', code:e?.empcode||'', idnum:e?.idnum||'', job:e?.jobtitle||'', project:e?.project||'', region:e?.region||''};
+  }
+  function covSignBlock(guardName){
+    const box=(title,name)=>`<div class="cov-sign"><b>${title}</b><span>الاسم: ${name?`<u>${escapeHtml(name)}</u>`:'..............................'}</span><span>التوقيع: ..............................</span><span>التاريخ: ..............................</span></div>`;
+    return `<div class="cov-sign-row">${box('الموظف (المغطّي)',guardName)}${box('المشرف المسؤول','')}${box('الإدارة','')}</div>`;
+  }
+  function covPageShell(title,body){
+    return `<div class="fj-doc-page cov-page"><div class="fj-doc-content"><h2 class="fj-doc-title">${title}</h2><div class="fj-doc-date">${docDateLine()}</div>${body}</div></div>`;
+  }
+  // محضر مفصّل لتغطية واحدة (صفحة كاملة)
+  function covMinutePage(c){
+    const fin=pdrCanFinance();
+    const g=covPerson(c.guardId,c.guardName), a=covPerson(c.absentId,c.absentName||c.absent);
+    const proj=c.location||a.project||g.project||'';
+    const pr=projects.find(x=>String(x.name||'')===String(proj));
+    const region=(pr&&pr.region)||a.region||'';
+    const d=String(c.date||'').slice(0,10), dateTxt=d?`${covWeekday(d)} ${fmtDMY(d)}`:'';
+    const holder=(c.holder||c.guardName||'')+(c.delegated?' (تفويض)':'');
+    const t1=`<table class="doc-mini-table"><tbody>
+      <tr><th>رقم المحضر</th><td>${blank(covMinuteNo(c))}</td><th>تاريخ التغطية</th><td>${blank(dateTxt)}</td></tr>
+      <tr><th>اسم المشروع / الموقع</th><td>${blank(proj)}</td><th>المنطقة</th><td>${blank(region)}</td></tr>
+      <tr><th>الوردية</th><td>${blank(c.shift)}</td><th>حالة الغياب</th><td>${blank(covStatusText(c.status))}</td></tr></tbody></table>`;
+    const t2=`<table class="doc-mini-table cov-parties"><thead><tr><th style="width:22%"></th><th>الحارس المغطّي (القائم بالتغطية)</th><th>الحارس الغائب (الذي تمت تغطيته)</th></tr></thead><tbody>
+      <tr><th>الاسم</th><td><b>${blank(g.name)}</b></td><td><b>${blank(a.name)}</b></td></tr>
+      <tr><th>الرقم الوظيفي</th><td>${blank(g.code)}</td><td>${blank(a.code)}</td></tr>
+      <tr><th>رقم الهوية / الإقامة</th><td>${blank(g.idnum)}</td><td>${blank(a.idnum)}</td></tr>
+      <tr><th>المسمى الوظيفي</th><td>${blank(g.job)}</td><td>${blank(a.job)}</td></tr>
+      <tr><th>الحالة في يوم التغطية</th><td>${escapeHtml(covStatusLabel('ط'))}</td><td>${blank(covStatusText(c.status))}</td></tr></tbody></table>`;
+    const t3=fin?`<h3 class="cov-h">المستحق وبيانات الحساب</h3><table class="doc-mini-table"><tbody>
+      <tr><th>المستحق (ريال)</th><td>${blank(c.amount?docNum(c.amount):'')}</td><th>اسم صاحب الحساب</th><td>${blank(holder)}</td></tr>
+      <tr><th>البنك</th><td>${blank(c.bank)}</td><th>رقم الحساب</th><td dir="ltr" style="text-align:right">${blank(c.accountno)}</td></tr>
+      <tr><th>رقم الآيبان</th><td colspan="3" dir="ltr" style="text-align:center;font-weight:700;letter-spacing:1px">${c.iban?escapeHtml(c.iban):'<span class="blank">SA......................</span>'}</td></tr></tbody></table>`:'';
+    const body=`<p>تمت تغطية الغياب الموضحة بياناته أدناه${proj?` في مشروع / موقع <b>${escapeHtml(proj)}</b>`:''}${dateTxt?` بتاريخ <b>${escapeHtml(dateTxt)}</b>`:''}، وفق البيانات التالية:</p>
+      <h3 class="cov-h">بيانات التغطية</h3>${t1}
+      <h3 class="cov-h">بيانات الأطراف</h3>${t2}
+      ${t3}
+      <p class="cov-notes"><b>ملاحظات:</b> ${blank(c.notes)}</p>
+      <p>يقر الموقعون أدناه بصحة البيانات الواردة في هذا المحضر، وعليه جرى التوقيع.</p>
+      ${covSignBlock(g.name)}`;
+    return covPageShell('محضر تغطية',body);
+  }
+  // محضر مجمّع: جدول بكل التغطيات المعروضة، ثم التوقيعات في آخر صفحة
+  function covMinuteTablePages(list){
+    const fin=pdrCanFinance(), per=10, pages=Math.max(1,Math.ceil(list.length/per));
+    const out=[];
+    for(let p=0;p<pages;p++){
+      const chunk=list.slice(p*per,(p+1)*per), last=p===pages-1;
+      const rows=chunk.map((c,i)=>{
+        const d=String(c.date||'').slice(0,10);
+        return `<tr><td>${p*per+i+1}</td><td class="mono">${escapeHtml(d?fmtDMY(d):'')}</td><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusText(c.status))}</td><td>${escapeHtml(c.location||'')}</td><td>${escapeHtml(c.shift||'')}</td>${fin?`<td class="mono">${c.amount?docNum(c.amount):''}</td>`:''}<td>${escapeHtml(c.notes||'')}</td></tr>`;
+      }).join('');
+      const total=fin?`<tr><th colspan="7">إجمالي المستحقات</th><td class="mono"><b>${docNum(list.reduce((t,c)=>t+(Number(c.amount)||0),0))}</b></td><td></td></tr>`:'';
+      const dates=list.map(c=>String(c.date||'').slice(0,10)).filter(Boolean).sort();
+      const period=dates.length?(dates[0]===dates[dates.length-1]?`بتاريخ ${fmtDMY(dates[0])}`:`عن الفترة من ${fmtDMY(dates[0])} إلى ${fmtDMY(dates[dates.length-1])}`):'';
+      const body=`<p>تمت التغطيات الموضحة أدناه ${escapeHtml(period)} (عددها ${list.length}) لسد غياب الحراس، وفق التفاصيل التالية:</p>
+        <table class="doc-mini-table doc-grid-table cov-list"><thead><tr><th style="width:5%">م</th><th style="width:${fin?12:13}%">التاريخ</th><th style="width:${fin?16:18}%">اسم المغطّي</th><th style="width:${fin?16:18}%">اسم الحارس الغائب</th><th style="width:${fin?10:11}%">حالة الغياب</th><th style="width:${fin?12:13}%">اسم المشروع</th><th style="width:${fin?7:8}%">الوردية</th>${fin?'<th style="width:9%">المستحق</th>':''}<th>ملاحظات</th></tr></thead><tbody>${rows}${last?total:''}</tbody></table>
+        ${last?`<p>يقر الموقعون أدناه بصحة التغطيات المذكورة أعلاه.</p>${covSignBlock('')}`:''}
+        <div class="cov-pageno">صفحة ${p+1} من ${pages}</div>`;
+      out.push(covPageShell('محضر تغطيات',body));
+    }
+    return out.join('');
+  }
+  let covMinSaved=null;
+  function covMinClose(){
+    document.getElementById('covMinutesModal')?.remove();
+    document.body.classList.remove('cov-min-open');
+    if(covMinSaved){
+      const st=document.getElementById('dynamicPrintOrientation'); if(st) st.textContent=covMinSaved.orient;
+      if(covMinSaved.landscape) document.body.classList.add('print-landscape-coverage');
+      covMinSaved=null;
+    }
+    document.removeEventListener('keydown',covMinKey);
+  }
+  function covMinKey(ev){ if(ev.key==='Escape') covMinClose(); }
+  function covMinOpen(pagesHtml,count){
+    covMinClose();
+    const m=document.createElement('div'); m.id='covMinutesModal';
+    m.innerHTML=`<div class="cov-min-bar no-print"><b>محضر التغطيات</b><span class="pill pill-gray">${count} صفحة</span><div class="cov-min-actions"><button type="button" class="btn btn-primary" id="covMinPrint">طباعة</button><button type="button" class="btn" id="covMinClose">إغلاق</button></div></div><div class="cov-min-pages">${pagesHtml}</div>`;
+    document.body.appendChild(m);
+    const st0=document.getElementById('dynamicPrintOrientation');
+    covMinSaved={orient:st0?st0.textContent:'', landscape:document.body.classList.contains('print-landscape-coverage')};
+    document.body.classList.add('cov-min-open'); document.body.classList.remove('print-landscape-coverage');
+    let st=st0; if(!st){ st=document.createElement('style'); st.id='dynamicPrintOrientation'; document.head.appendChild(st); }
+    st.textContent='@media print { @page { size: A4 portrait !important; margin: 0 !important; } }';
+    m.querySelector('#covMinPrint').onclick=()=>window.print();
+    m.querySelector('#covMinClose').onclick=covMinClose;
+    document.addEventListener('keydown',covMinKey);
+    m.scrollTop=0;
+  }
+  // mode: 'single' = صفحة مفصّلة لكل تغطية ، 'table' = محضر مجمّع بجدول
+  function covOpenMinutes(list,mode){
+    if(!list||!list.length){ showToast('لا توجد تغطيات لإعداد المحضر'); return; }
+    const html=mode==='table'?covMinuteTablePages(list):list.map(covMinutePage).join('');
+    covMinOpen(html,(html.match(/fj-doc-page/g)||[]).length);
+  }
+  /* ===== تقارير التغطيات ===== */
+  function covReportList(){
+    const g=id=>document.getElementById(id)?.value||'';
+    const from=g('covRepFrom'), to=g('covRepTo'), pr=g('covRepProject'), st=g('covRepStatus'), q=g('covRepSearch').trim().toLowerCase();
+    return (coverage||[]).filter(c=>{
+      const d=String(c.date||'').slice(0,10);
+      if(from && d<from) return false;
+      if(to && d>to) return false;
+      if(pr && String(c.location||'').trim()!==pr) return false;
+      if(st && covStatusCode(c.status)!==st) return false;
+      if(q && ![c.guardName,c.absentName,c.absent,c.location].some(v=>String(v||'').toLowerCase().includes(q))) return false;
+      return true;
+    }).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+  }
+  function renderCoverageReport(){
+    const body=document.getElementById('covRepBody'); if(!body) return;
+    const ps=document.getElementById('covRepProject'), ss=document.getElementById('covRepStatus');
+    if(ps){ const old=ps.value, names=[...new Set((coverage||[]).map(c=>String(c.location||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ar'));
+      ps.innerHTML='<option value="">كل المشاريع</option>'+names.map(n=>`<option value="${escapeAttr(n)}">${escapeHtml(n)}</option>`).join(''); ps.value=names.includes(old)?old:''; }
+    if(ss && !ss.dataset.ready){ ss.innerHTML='<option value="">كل الحالات</option>'+COV_STATUS_CODES.map(k=>`<option value="${escapeAttr(k)}">${escapeHtml(covStatusLabel(k))}</option>`).join(''); ss.dataset.ready='1'; }
+    const fin=pdrCanFinance(), list=covReportList();
+    document.getElementById('covRepCount').textContent=`${list.length} تغطية`;
+    const th=document.getElementById('covRepAmountHead'); if(th) th.style.display=fin?'':'none';
+    body.innerHTML=list.map((c,i)=>{ const d=String(c.date||'').slice(0,10);
+      return `<tr><td class="mono">${i+1}</td><td class="mono">${escapeHtml(d?fmtDMY(d):'')}</td><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusText(c.status))}</td><td>${escapeHtml(c.location||'')}</td><td>${escapeHtml(c.shift||'')}</td>${fin?`<td class="mono">${fmt(c.amount)}</td>`:''}<td><button type="button" class="btn btn-sm" data-cov-minute="${escapeAttr(c.id)}">محضر</button></td></tr>`; }).join('')||`<tr><td colspan="${fin?9:8}" class="empty-note">لا توجد تغطيات مطابقة.</td></tr>`;
+    body.querySelectorAll('[data-cov-minute]').forEach(b=>b.onclick=()=>covOpenMinutes([coverage.find(x=>x.id===b.dataset.covMinute)].filter(Boolean),'single'));
+  }
+  ['covRepFrom','covRepTo','covRepProject','covRepStatus','covRepSearch'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('input',renderCoverageReport); el.addEventListener('change',renderCoverageReport); } });
+  document.getElementById('covRepTableBtn')?.addEventListener('click',()=>covOpenMinutes(covReportList(),'table'));
+  document.getElementById('covRepSingleBtn')?.addEventListener('click',()=>covOpenMinutes(covReportList(),'single'));
+  document.getElementById('covMinuteBtn')?.addEventListener('click',()=>{
+    const fs=document.getElementById('covFilterStatus')?.value||'';
+    const list=[...coverage].filter(c=>!fs||covStatusCode(c.status)===fs).sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+    covOpenMinutes(list,'table');
+  });
 
   function downloadCsv(filename, headers, rows){
     let csv = '\uFEFF' + headers.join(',') + '\n' + rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');

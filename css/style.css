@@ -2452,3 +2452,27 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 .pdr-pill{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700}
 .pdr-ok{background:#e6f6ec;color:#146c2e}.pdr-up{background:#fff1d6;color:#9a5b00}.pdr-down{background:#fde7e7;color:#b42318}
 .pdr-table small.pay-code{display:block;opacity:.65}
+
+/* ===== محضر التغطيات (ورق الشركة الرسمي + توقيعات) ===== */
+#covMinutesModal{position:fixed;inset:0;z-index:10000;background:#e9ecf1;overflow:auto;direction:rtl}
+.cov-min-bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:10px;padding:10px 18px;background:#fff;border-bottom:1px solid var(--border,#dde2ea)}
+.cov-min-actions{margin-inline-start:auto;display:flex;gap:8px}
+.cov-min-pages{padding:18px 0}
+.cov-page .fj-doc-content{font-size:12.5px;line-height:1.65;padding-top:40mm;padding-bottom:20mm}
+.cov-page .doc-mini-table{margin:4px 0 8px}
+.cov-page .doc-mini-table th,.cov-page .doc-mini-table td{padding:3px 7px;font-size:12px}
+.cov-page .cov-list{table-layout:fixed}
+.cov-page .cov-list th,.cov-page .cov-list td{font-size:11px;padding:3px 4px;height:auto;overflow-wrap:anywhere;word-break:break-word}
+.cov-h{margin:8px 0 2px;font-size:13.5px;font-weight:800}
+.cov-notes{max-height:16mm;overflow:hidden}
+.cov-sign-row{display:flex;gap:10px;margin-top:16px}
+.cov-sign{flex:1;border:1px solid #333;border-radius:4px;padding:6px 8px;display:flex;flex-direction:column;gap:9px;font-size:12px;min-height:34mm;background:rgba(255,255,255,.85)}
+.cov-sign b{text-align:center;border-bottom:1px solid #333;padding-bottom:3px;font-size:13px}
+.cov-pageno{margin-top:8px;text-align:center;font-size:11px;color:#444}
+@media print{
+  body.cov-min-open > *:not(#covMinutesModal){display:none!important}
+  body.cov-min-open{background:#fff!important}
+  body.cov-min-open #covMinutesModal{position:static!important;inset:auto!important;overflow:visible!important;background:#fff!important}
+  body.cov-min-open .cov-min-bar{display:none!important}
+  body.cov-min-open .cov-min-pages{padding:0!important}
+}

@@ -596,7 +596,7 @@
 
     <!-- ===== COVERAGE (تغطيات) -->
     <section id="view-coverage" style="display:none">
-      <div class="topbar"><div class="pagetitle"><h1>التغطيات</h1><p>سجل تغطية المواقع والمستحقات المترتبة عليها</p></div><div class="topbar-actions"><button class="btn mobile-menu-btn icon-btn" data-menu>☰</button><button class="btn" id="covExportBtn">تصدير CSV</button></div></div>
+      <div class="topbar"><div class="pagetitle"><h1>التغطيات</h1><p>سجل تغطية المواقع والمستحقات المترتبة عليها</p></div><div class="topbar-actions"><button class="btn mobile-menu-btn icon-btn" data-menu>☰</button><button class="btn btn-primary" id="covMinuteBtn" title="محضر مجمّع جاهز للطباعة بالتغطيات المعروضة">محضر التغطيات</button><button class="btn" id="covExportBtn">تصدير CSV</button></div></div>
       <div class="card section-card" style="margin-bottom:18px;">
         <div class="section-head-row"><h3>إضافة / تعديل تغطية</h3><button type="button" class="btn btn-sm" id="covNewBtn">+ إضافة جديدة</button></div>
         <form id="coverageForm" class="field-grid">
@@ -995,6 +995,19 @@
           <thead><tr class="pay-group-row"><th class="gh g1" colspan="4">بيانات الموظف</th><th class="gh g2" colspan="9">المستحقات</th><th class="gh g3" colspan="10">الخصومات</th><th class="gh g4">الصافي</th><th class="gh g5">الإجراء</th></tr><tr><th class="g1 st1">م</th><th class="g1 st2">الاسم</th><th class="g1">الموقع</th><th class="g1">الوظيفة</th><th class="g2">اليوم</th><th class="g2">الأساسي</th><th class="g2">بدل سكن</th><th class="g2">بدل مواصلات</th><th class="g2">بدلات أخرى</th><th class="g2 tot">الأجر الأخير</th><th class="g2">إضافي</th><th class="g2">مكافآت</th><th class="g2 tot">إجمالي الراتب</th><th class="g3">خصم عدم دوام</th><th class="g3">تأمينات اجتماعية<small class="th-note">حصة الموظف من الأساسي + السكن</small></th><th class="g3">غيابات</th><th class="g3">جزاءات</th><th class="g3">انسحاب</th><th class="g3">البدلة</th><th class="g3">الصحيفة</th><th class="g3">سلف</th><th class="g3">أخرى</th><th class="g3 tot">إجمالي الخصومات</th><th class="g4 tot">صافي الراتب</th><th class="g5">إجراء داخلي للرواتب</th></tr></thead>
           <tbody id="reportTableBody"></tbody>
         </table></div>
+      </div>
+
+      <div id="coverageReportsPanel" class="card section-card" style="display:none">
+        <div class="employee-report-toolbar"><div><h2>تقارير التغطيات — محضر تغطيات</h2><p>اختر الفترة أو المشروع ثم اطبع محضرًا مجمّعًا بجدول، أو محضرًا مفصّلًا لكل تغطية، أو اضغط «محضر» على أي سطر.</p></div><span class="pill pill-gray" id="covRepCount">0 تغطية</span></div>
+        <div class="att-toolbar payroll-toolbar" style="margin:12px 0">
+          <div class="payroll-filter-group"><label>من تاريخ</label><input type="date" id="covRepFrom"></div>
+          <div class="payroll-filter-group"><label>إلى تاريخ</label><input type="date" id="covRepTo"></div>
+          <div class="payroll-filter-group"><label>المشروع</label><select id="covRepProject"><option value="">كل المشاريع</option></select></div>
+          <div class="payroll-filter-group"><label>حالة الغياب</label><select id="covRepStatus"><option value="">كل الحالات</option></select></div>
+          <div class="payroll-filter-group payroll-search-wide"><label>بحث بالاسم</label><input type="search" id="covRepSearch" placeholder="اسم المغطّي أو الغائب أو المشروع"></div>
+        </div>
+        <div class="action-row" style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-primary" id="covRepTableBtn">محضر مجمّع للمعروض (جدول)</button><button type="button" class="btn" id="covRepSingleBtn">محضر مفصّل لكل تغطية (صفحة لكل تغطية)</button></div>
+        <div class="table-wrap"><table class="payroll-table"><thead><tr><th>م</th><th>التاريخ</th><th>اسم المغطّي</th><th>اسم الحارس الغائب</th><th>حالة الغياب</th><th>اسم المشروع</th><th>الوردية</th><th id="covRepAmountHead">المستحق</th><th></th></tr></thead><tbody id="covRepBody"></tbody></table></div>
       </div>
 
       <div id="employeeReportsPanel" class="employee-reports-panel" style="display:none">
