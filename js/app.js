@@ -4348,6 +4348,7 @@
     const data={id:document.getElementById('c_id').value||'c'+Date.now(),guardId:employee?.id||guardId,guardName:employee?.fullname||manualName,guardType:employee?'employee':'manual',shift:document.getElementById('c_shift').value,location,date:document.getElementById('c_date').value,absentId,absentName:absent.fullname,status:document.getElementById('c_status').value,amount,amountManual:document.getElementById('c_amount').dataset.manual==='1',projectGuardSalary:salary,holder:delegated?delegateHolder:(employee?.fullname||manualName),delegated,delegateHolder,iban:document.getElementById('c_iban').value.toUpperCase(),bank:document.getElementById('c_bank').value,accountno:document.getElementById('c_account').value,notes:document.getElementById('c_notes').value};
     const idx=coverage.findIndex(x=>x.id===data.id);
     if(idx>=0) covClearAttendance(coverage[idx]);          // إزالة تسميع السجل القديم لو تغيّر اليوم/الحارس/الحالة
+    if(idx>=0 && coverage[idx].minuteNo) data.minuteNo=coverage[idx].minuteNo;   // رقم المحضر ثابت عند التعديل
     if(idx>=0)coverage[idx]=data; else coverage.push(data);
     covApplyAttendance(data);
     saveCoverage(); renderCoverage(); const makeNew=document.getElementById('coverageForm').dataset.saveNew==='1'; delete document.getElementById('coverageForm').dataset.saveNew; showToast((idx>=0?'تم تحديث التغطية':'تم حفظ التغطية')+' — وسُجّل في الحضور والانصراف بتاريخ '+fmtDMY(data.date)+': «'+covStatusText(data.status)+'» للغائب و«ط» للمغطّي'); if(makeNew)resetCoverageForm();
@@ -4361,7 +4362,22 @@
   /* ===== محضر التغطيات (جاهز للطباعة) =====
      يُبنى من بيانات التغطية المدخلة: اسم المغطّي، الحارس الغائب، حالة الغياب، المشروع، الوردية، التاريخ،
      المستحق وبيانات الحساب (لمن لديه صلاحية المالية)، مع خانات توقيع الموظف والمشرف المسؤول والإدارة. */
-  function covMinuteNo(c){ const d=String(c.date||'').replace(/-/g,''); const t=String(c.id||'').replace(/\D/g,'').slice(-4); return 'TG-'+(d||'00000000')+'-'+(t||'0000'); }
+  /* رقم المحضر التسلسلي: رمز المنطقة_السنة-الشهر_تسلسل (مثال MAK_2026-10_00001) — يُحفظ مع التغطية فلا يتغير */
+  let covMinDirty=false;
+  function covRegionOf(c){
+    const pr=projects.find(x=>String(x.name||'')===String(c.location||''));
+    return (pr&&pr.region)||covPerson(c.absentId,c.absentName||c.absent).region||covPerson(c.guardId,c.guardName).region||'';
+  }
+  function covMinuteNo(c){
+    if(c.minuteNo) return c.minuteNo;
+    const ym=(String(c.date||'').slice(0,7)||todayISO().slice(0,7));
+    const prefix=regionCode(covRegionOf(c))+'_'+ym+'_';
+    let max=0; (coverage||[]).forEach(x=>{ const t=String(x.minuteNo||''); if(t.startsWith(prefix)){ const m=t.slice(prefix.length).match(/^(\d{5})$/); if(m) max=Math.max(max,Number(m[1])); } });
+    c.minuteNo=prefix+String(max+1).padStart(5,'0'); covMinDirty=true;
+    return c.minuteNo;
+  }
+  function covStatusName(status){ const k=covStatusCode(status); return k?(ATT_CODE_LABELS[k]||k):String(status||''); }
+  const COV_NO_CODE='حارس أمن تغطيات';
   function covWeekday(iso){ try{ return new Date(iso+'T00:00:00').toLocaleDateString('ar-SA',{weekday:'long'}); }catch(_){ return ''; } }
   function covPerson(id,name){
     const e=employees.find(x=>id && String(x.id)===String(id)) || employees.find(x=>name && String(x.fullname||'').trim()===String(name).trim()) || null;
@@ -4372,7 +4388,7 @@
     return `<div class="cov-sign-row">${box('الموظف (المغطّي)',guardName)}${box('المشرف المسؤول','')}${box('الإدارة','')}</div>`;
   }
   function covPageShell(title,body){
-    return `<div class="fj-doc-page cov-page"><div class="fj-doc-content"><h2 class="fj-doc-title">${title}</h2><div class="fj-doc-date">${docDateLine()}</div>${body}</div></div>`;
+    return `<div class="fj-doc-page cov-page"><div class="fj-doc-content"><h2 class="fj-doc-title">${title}</h2>${body}</div></div>`;
   }
   // محضر مفصّل لتغطية واحدة (صفحة كاملة)
   function covMinutePage(c){
@@ -4386,13 +4402,13 @@
     const t1=`<table class="doc-mini-table"><tbody>
       <tr><th>رقم المحضر</th><td>${blank(covMinuteNo(c))}</td><th>تاريخ التغطية</th><td>${blank(dateTxt)}</td></tr>
       <tr><th>اسم المشروع / الموقع</th><td>${blank(proj)}</td><th>المنطقة</th><td>${blank(region)}</td></tr>
-      <tr><th>الوردية</th><td>${blank(c.shift)}</td><th>حالة الغياب</th><td>${blank(covStatusText(c.status))}</td></tr></tbody></table>`;
+      <tr><th>الوردية</th><td>${blank(c.shift)}</td><th>حالة الغياب</th><td>${blank(covStatusName(c.status))}</td></tr></tbody></table>`;
     const t2=`<table class="doc-mini-table cov-parties"><thead><tr><th style="width:22%"></th><th>الحارس المغطّي (القائم بالتغطية)</th><th>الحارس الغائب (الذي تمت تغطيته)</th></tr></thead><tbody>
       <tr><th>الاسم</th><td><b>${blank(g.name)}</b></td><td><b>${blank(a.name)}</b></td></tr>
-      <tr><th>الرقم الوظيفي</th><td>${blank(g.code)}</td><td>${blank(a.code)}</td></tr>
+      <tr><th>الرقم الوظيفي</th><td>${escapeHtml(g.code||COV_NO_CODE)}</td><td>${escapeHtml(a.code||COV_NO_CODE)}</td></tr>
       <tr><th>رقم الهوية / الإقامة</th><td>${blank(g.idnum)}</td><td>${blank(a.idnum)}</td></tr>
       <tr><th>المسمى الوظيفي</th><td>${blank(g.job)}</td><td>${blank(a.job)}</td></tr>
-      <tr><th>الحالة في يوم التغطية</th><td>${escapeHtml(covStatusLabel('ط'))}</td><td>${blank(covStatusText(c.status))}</td></tr></tbody></table>`;
+      <tr><th>الحالة في يوم التغطية</th><td>${escapeHtml(covStatusName('ط'))}</td><td>${blank(covStatusName(c.status))}</td></tr></tbody></table>`;
     const t3=fin?`<h3 class="cov-h">المستحق وبيانات الحساب</h3><table class="doc-mini-table"><tbody>
       <tr><th>المستحق (ريال)</th><td>${blank(c.amount?docNum(c.amount):'')}</td><th>اسم صاحب الحساب</th><td>${blank(holder)}</td></tr>
       <tr><th>البنك</th><td>${blank(c.bank)}</td><th>رقم الحساب</th><td dir="ltr" style="text-align:right">${blank(c.accountno)}</td></tr>
@@ -4414,7 +4430,7 @@
       const chunk=list.slice(p*per,(p+1)*per), last=p===pages-1;
       const rows=chunk.map((c,i)=>{
         const d=String(c.date||'').slice(0,10);
-        return `<tr><td>${p*per+i+1}</td><td class="mono">${escapeHtml(d?fmtDMY(d):'')}</td><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusText(c.status))}</td><td>${escapeHtml(c.location||'')}</td><td>${escapeHtml(c.shift||'')}</td>${fin?`<td class="mono">${c.amount?docNum(c.amount):''}</td>`:''}<td>${escapeHtml(c.notes||'')}</td></tr>`;
+        return `<tr><td>${p*per+i+1}</td><td class="mono">${escapeHtml(d?fmtDMY(d):'')}</td><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusName(c.status))}</td><td>${escapeHtml(c.location||'')}</td><td>${escapeHtml(c.shift||'')}</td>${fin?`<td class="mono">${c.amount?docNum(c.amount):''}</td>`:''}<td>${escapeHtml(c.notes||'')}</td></tr>`;
       }).join('');
       const total=fin?`<tr><th colspan="7">إجمالي المستحقات</th><td class="mono"><b>${docNum(list.reduce((t,c)=>t+(Number(c.amount)||0),0))}</b></td><td></td></tr>`:'';
       const dates=list.map(c=>String(c.date||'').slice(0,10)).filter(Boolean).sort();
@@ -4442,7 +4458,7 @@
   function covMinOpen(pagesHtml,count){
     covMinClose();
     const m=document.createElement('div'); m.id='covMinutesModal';
-    m.innerHTML=`<div class="cov-min-bar no-print"><b>محضر التغطيات</b><span class="pill pill-gray">${count} صفحة</span><div class="cov-min-actions"><button type="button" class="btn btn-primary" id="covMinPrint">طباعة</button><button type="button" class="btn" id="covMinClose">إغلاق</button></div></div><div class="cov-min-pages">${pagesHtml}</div>`;
+    m.innerHTML=`<div class="cov-min-bar no-print"><b>محضر التغطيات</b><span class="pill pill-gray">${count} صفحة</span><div class="cov-min-actions"><button type="button" class="btn btn-primary" id="covMinPrint">طباعة</button><button type="button" class="btn" id="covMinWord">تنزيل Word</button><button type="button" class="btn" id="covMinPdf">تنزيل PDF</button><button type="button" class="btn" id="covMinClose">إغلاق</button></div></div><div class="cov-min-pages">${pagesHtml}</div>`;
     document.body.appendChild(m);
     const st0=document.getElementById('dynamicPrintOrientation');
     covMinSaved={orient:st0?st0.textContent:'', landscape:document.body.classList.contains('print-landscape-coverage')};
@@ -4450,13 +4466,65 @@
     let st=st0; if(!st){ st=document.createElement('style'); st.id='dynamicPrintOrientation'; document.head.appendChild(st); }
     st.textContent='@media print { @page { size: A4 portrait !important; margin: 0 !important; } }';
     m.querySelector('#covMinPrint').onclick=()=>window.print();
+    m.querySelector('#covMinWord').onclick=covMinDownloadWord;
+    m.querySelector('#covMinPdf').onclick=covMinDownloadPdf;
     m.querySelector('#covMinClose').onclick=covMinClose;
     document.addEventListener('keydown',covMinKey);
     m.scrollTop=0;
   }
+  let covMinFile='محضر_تغطية';
+  function covDownloadBlob(blob,name){ const url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); }
+  // ملف Word قابل للتعديل (HTML بصيغة Word): نفس المحتوى، هوامش علوية/سفلية تناسب الورق الرسمي
+  function covMinDownloadWord(){
+    const pages=[...document.querySelectorAll('#covMinutesModal .fj-doc-page')];
+    if(!pages.length){ showToast('لا يوجد محضر'); return; }
+    const parts=pages.map((pg,i)=>{
+      const c=pg.querySelector('.fj-doc-content').cloneNode(true);
+      c.querySelectorAll('.cov-sign-row').forEach(row=>{
+        const boxes=[...row.querySelectorAll('.cov-sign')];
+        const t=document.createElement('table'); t.className='sg'; t.setAttribute('dir','rtl');
+        t.innerHTML='<tr>'+boxes.map(b=>'<td>'+[...b.children].map(x=>x.tagName==='B'?'<p style="text-align:center"><b>'+x.innerHTML+'</b></p>':'<p>'+x.innerHTML+'</p>').join('')+'</td>').join('')+'</tr>';
+        row.replaceWith(t);
+      });
+      c.querySelectorAll('[style]').forEach(el=>{ if(!/^(TABLE|TH|TD|COL)$/.test(el.tagName)) el.removeAttribute('style'); });
+      return `<div dir="rtl" style="${i<pages.length-1?'page-break-after:always;':''}">${c.innerHTML}</div>`;
+    }).join('');
+    const css=`@page Section1{size:21cm 29.7cm;margin:4cm 1.8cm 2.2cm 1.8cm;mso-page-orientation:portrait}div.Section1{page:Section1}
+      body{font-family:Arial,Tahoma,sans-serif;font-size:12pt;direction:rtl}
+      h2.fj-doc-title{text-align:center;font-size:18pt;text-decoration:underline;margin:0 0 8pt}
+      h3.cov-h{font-size:13pt;margin:8pt 0 2pt}
+      p{margin:0 0 6pt;line-height:1.6}
+      table{border-collapse:collapse;width:100%;direction:rtl;margin:4pt 0 8pt}
+      table.doc-mini-table th,table.doc-mini-table td{border:1px solid #333;padding:3pt 5pt;font-size:11pt;text-align:right}
+      table.doc-mini-table th{background:#dde3ee}
+      table.doc-grid-table td,table.doc-grid-table th{text-align:center;font-size:10pt}
+      table.sg{margin-top:14pt}table.sg td{border:1px solid #333;width:33%;padding:5pt 7pt;vertical-align:top;font-size:11pt}
+      .blank{border-bottom:1px dotted #555}.cov-pageno{text-align:center;font-size:10pt;color:#444}`;
+    const doc=`<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>${covMinFile}</title><!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:BiDi/></w:WordDocument></xml><![endif]--><style>${css}</style></head><body dir="rtl"><div class="Section1">${parts}</div></body></html>`;
+    covDownloadBlob(new Blob(['\ufeff',doc],{type:'application/msword;charset=utf-8'}),covMinFile+'.doc');
+    showToast('تم تنزيل ملف Word');
+  }
+  // ملف PDF: كل صفحة من المحضر كصورة A4 (بنفس ورق الشركة)
+  async function covMinDownloadPdf(){
+    if(!window.html2canvas || !(window.jspdf&&window.jspdf.jsPDF)){ showToast('مكتبة PDF غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
+    const pages=[...document.querySelectorAll('#covMinutesModal .fj-doc-page')]; if(!pages.length) return;
+    const btn=document.getElementById('covMinPdf'); if(btn){ btn.disabled=true; btn.textContent='جارِ إنشاء PDF...'; }
+    try{
+      const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+      for(let i=0;i<pages.length;i++){
+        const canvas=await html2canvas(pages[i],{scale:2,backgroundColor:'#ffffff',useCORS:true});
+        if(i) pdf.addPage();
+        pdf.addImage(canvas.toDataURL('image/jpeg',0.93),'JPEG',0,0,210,297);
+      }
+      pdf.save(covMinFile+'.pdf'); showToast('تم تنزيل ملف PDF');
+    }catch(err){ console.error(err); showToast('تعذر إنشاء ملف PDF'); }
+    finally{ if(btn){ btn.disabled=false; btn.textContent='تنزيل PDF'; } }
+  }
   // mode: 'single' = صفحة مفصّلة لكل تغطية ، 'table' = محضر مجمّع بجدول
   function covOpenMinutes(list,mode){
     if(!list||!list.length){ showToast('لا توجد تغطيات لإعداد المحضر'); return; }
+    covMinDirty=false; list.forEach(covMinuteNo); if(covMinDirty){ covMinDirty=false; saveCoverage(); }   // ترقيم المحاضر وحفظ الأرقام
+    covMinFile = mode==='table' ? 'محضر_تغطيات_'+todayISO() : (list.length===1 ? 'محضر_تغطية_'+covMinuteNo(list[0]) : 'محاضر_تغطية_'+todayISO());
     const html=mode==='table'?covMinuteTablePages(list):list.map(covMinutePage).join('');
     covMinOpen(html,(html.match(/fj-doc-page/g)||[]).length);
   }

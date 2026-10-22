@@ -2470,6 +2470,8 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 .cov-sign b{text-align:center;border-bottom:1px solid #333;padding-bottom:3px;font-size:13px}
 .cov-pageno{margin-top:8px;text-align:center;font-size:11px;color:#444}
 @media print{
+  body.cov-min-open #covMinutesModal, body.cov-min-open #covMinutesModal *{visibility:visible!important}   /* يتغلب على قاعدة body *{visibility:hidden} الخاصة بالمستندات والمباشرات */
+  body.cov-min-open #covMinutesModal .cov-min-bar, body.cov-min-open #covMinutesModal .cov-min-bar *{display:none!important}
   body.cov-min-open > *:not(#covMinutesModal){display:none!important}
   body.cov-min-open{background:#fff!important}
   body.cov-min-open #covMinutesModal{position:static!important;inset:auto!important;overflow:visible!important;background:#fff!important}
