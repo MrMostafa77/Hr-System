@@ -2595,3 +2595,11 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
   body.inv-printing #view-sales #invSheet tr.inv-empty-row input.inv-in{color:transparent !important}
   body.inv-printing #view-sales #invSheet input[type=date]::-webkit-calendar-picker-indicator{display:none}
 }
+
+/* ===== فاتورة المبيعات: قوائم النوع والعميل + الأيام ===== */
+#view-sales #invSheet select.inv-sel{width:100%;font:inherit;font-size:9.5px;color:#111;background:transparent;border:0;border-bottom:1px dashed rgba(74,99,139,.45);padding:.3mm 0;appearance:none;-webkit-appearance:none;cursor:pointer;text-overflow:ellipsis}
+#view-sales #invSheet select.inv-sel:focus{outline:0;background:rgba(74,99,139,.14);border-bottom-color:#4A638B}
+#view-sales #invSheet .inv-type-cell{position:relative;text-align:center}
+#view-sales #invSheet .inv-addtype{position:absolute;left:1px;top:50%;transform:translateY(-50%);width:4.6mm;height:4.6mm;min-width:0;padding:0;border:1px solid #4A638B;border-radius:50%;background:#eef2f9;color:#1f2f4d;font-weight:700;font-size:11px;line-height:1;cursor:pointer}
+#view-sales #invSheet .inv-days{direction:rtl;font-size:9.5px;color:#1f2f4d}
+@media print{#view-sales #invSheet select.inv-sel{border-bottom:0}}

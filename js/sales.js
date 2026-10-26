@@ -7,6 +7,12 @@
   const DEFAULT_CR = '4031263286';          // السجل التجاري المذكور في نص عقود الشركة (قابل للتعديل في الفاتورة)
   const DEFAULT_COMPANY = 'شركة فخر الجزيرة للحراسات الأمنية';
 
+  const INV_PREFIX = 'INV-MAK-';
+  const BASE_TYPES = ['حارس أمن','حارسة أمن','مشرف أمن','مدير مشروع','دورية أمنية'];
+  // مفاتيح الإيرادات في تبويب المشاريع -> النوع في الفاتورة
+  const KIND_TYPE = { guards:'حارس أمن', guardsFemale:'حارسة أمن', supervisors:'مشرف أمن', managers:'مدير مشروع', patrols:'دورية أمنية' };
+  const KIND_LABEL = { devices:'أجهزة اتصالات', uniforms:'بدل أمن', extras:'أقماع وملحقات', adminEmployees:'موظفين إداريين', other:'أخرى' };
+
   const SELLER_FIELDS = [
     ['name','اسم الشركة','Company name'],['branch','اسم الفرع','Branch Name'],['bno','رقم المبنى','Building NO'],
     ['addno','الرقم الإضافي للعنوان','Additional Address NO'],['street','اسم الشارع','Address'],['city','المدينة','City'],
@@ -40,15 +46,32 @@
   const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
   const money = n => r2(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  function calcRow(it){
+  function allTypes(extra){
+    const st = (ctx && ctx.getSettings && ctx.getSettings()) || {};
+    const list = [...BASE_TYPES, ...(Array.isArray(st.invoiceTypes) ? st.invoiceTypes : [])];
+    (extra || []).forEach(t => { if(t) list.push(t); });
+    return [...new Set(list.map(x => String(x).trim()).filter(Boolean))];
+  }
+  function parseD(v){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || '')); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null; }
+  // عدد الأيام المستحقة (شامل يوم البداية والنهاية) وعامل التناسب مع أيام شهر البداية
+  function periodInfo(inv){
+    const a = parseD(inv.supply), b = parseD(inv.supplyEnd);
+    if(a == null || b == null || b < a) return { days: 0, factor: 1, ok: false };
+    const days = Math.round((b - a) / 86400000) + 1;
+    const d = new Date(a), md = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+    return { days, factor: days === md ? 1 : days / md, ok: true, monthDays: md };
+  }
+
+  function calcRow(it, factor){
     const qty = num(it.qty), price = num(it.price), disc = num(it.disc), pct = num(it.vatPct);
-    const gross = r2(qty * price);
+    const gross = r2(qty * price * (factor == null ? 1 : factor));
     const total = r2(gross - disc);
     const vat = r2(total * pct / 100);
     return { gross, disc, total, vat, net: r2(total + vat), pct, empty: !gross && !disc };
   }
   function calcAll(inv){
-    const rows = (inv.items || []).map(calcRow);
+    const f = periodInfo(inv).factor;
+    const rows = (inv.items || []).map(it => calcRow(it, f));
     const sum = k => r2(rows.reduce((a, r) => a + r[k], 0));
     const pcts = [...new Set(rows.filter(r => !r.empty).map(r => r.pct))];
     return { rows, gross: sum('gross'), disc: sum('disc'), total: sum('total'), vat: sum('vat'), net: sum('net'),
@@ -124,10 +147,14 @@
   }
 
   // ---------- نموذج الفاتورة ----------
-  const blankItem = () => ({ code: '', desc: '', qty: '', price: '', disc: '', vatPct: '15' });
+  const blankItem = () => ({ code: '', type: '', qty: '', price: '', disc: '', vatPct: '15' });
   function nextNo(){
-    const max = Math.max(0, ...ctx.getInvoices().map(i => parseInt(String(i.no || '').replace(/\D/g, ''), 10) || 0));
-    return String(max + 1).padStart(8, '0');
+    let max = 0;
+    ctx.getInvoices().forEach(i => {
+      const m = /^INV-MAK-(\d+)$/i.exec(String(i.no || '').trim());
+      if(m) max = Math.max(max, parseInt(m[1], 10));
+    });
+    return INV_PREFIX + String(max + 1).padStart(5, '0');
   }
   function blankInvoice(){
     const list = ctx.getInvoices();
@@ -137,9 +164,8 @@
       name: st.company || DEFAULT_COMPANY, branch: '', bno: '', addno: '', street: '', city: 'مكة المكرمة',
       area: '', country: 'السعودية', postal: '', vat: '', cr: st.cr || DEFAULT_CR
     };
-    const today = ctx.todayISO();
     return {
-      id: '', no: nextNo(), date: today, supply: today, desc: '', seller,
+      id: '', no: nextNo(), date: '', supply: '', supplyEnd: '', projectId: '', seller,
       customer: { name: '', bno: '', addno: '', street: '', city: '', area: '', country: 'السعودية', postal: '', vat: '', cr: '' },
       items: [blankItem()], iban: last && last.iban ? last.iban : ''
     };
@@ -149,7 +175,7 @@
     const o = Object.assign({}, b, clone(inv || {}));
     o.seller = Object.assign({}, b.seller, o.seller || {});
     o.customer = Object.assign({}, b.customer, o.customer || {});
-    o.items = Array.isArray(o.items) && o.items.length ? o.items.map(i => Object.assign(blankItem(), i)) : [blankItem()];
+    o.items = Array.isArray(o.items) && o.items.length ? o.items.map(i => { const x = Object.assign(blankItem(), i); if(!x.type && x.desc) x.type = x.desc; return x; }) : [blankItem()];
     return o;
   }
   function setPath(o, p, v){
@@ -159,17 +185,25 @@
   }
 
   // ---------- العرض ----------
+  function projectSelectHtml(path, val){
+    const names = (ctx.getProjects() || []).map(p => p && p.name ? String(p.name).trim() : '').filter(Boolean);
+    const list = [...new Set(names)];
+    if(val && !list.includes(val)) list.push(val);
+    return `<select class="inv-in inv-sel" data-p="${path}" data-proj="1"><option value="">— اختر العميل / المشروع —</option>` +
+      list.map(n => `<option value="${esc(n)}"${n === val ? ' selected' : ''}>${esc(n)}</option>`).join('') + '</select>';
+  }
   function rowHtml(path, ar, en, val, o){
     o = o || {};
     const inp = o.ta
       ? `<textarea class="inv-in inv-ta" rows="1" data-p="${path}">${esc(val)}</textarea>`
-      : `<input class="inv-in${o.ltr ? ' inv-ltr' : ''}" data-p="${path}" value="${esc(val)}"${o.list ? ' list="invCustomerList" autocomplete="off"' : ''}>`;
+      : o.projSelect ? projectSelectHtml(path, val)
+      : `<input class="inv-in${o.ltr ? ' inv-ltr' : ''}" data-p="${path}" value="${esc(val)}">`;
     return `<div class="inv-row"><span class="inv-ar">${ar}</span>${inp}<span class="inv-en">${en}</span></div>`;
   }
   function panelHtml(titleAr, titleEn, fields, obj, key){
     return `<div class="inv-panel"><div class="inv-panel-h"><span>${titleAr}</span><span class="inv-en-h">${titleEn}</span></div>` +
       fields.map(([k, ar, en]) => rowHtml(`${key}.${k}`, ar, en, obj[k] || '', {
-        ta: k === 'name' || k === 'street', list: key === 'customer' && k === 'name',
+        ta: (k === 'name' && key !== 'customer') || k === 'street', projSelect: key === 'customer' && k === 'name',
         ltr: ['vat','cr','postal','bno','addno'].includes(k)
       })).join('') + '</div>';
   }
@@ -177,7 +211,7 @@
     const n = (f, extra) => `<td><input class="inv-in inv-c ${extra || ''}" inputmode="decimal" data-p="items.${i}.${f}" value="${esc(it[f])}"></td>`;
     return `<tr data-i="${i}">
       <td><input class="inv-in inv-c" data-p="items.${i}.code" value="${esc(it.code)}"></td>
-      <td><textarea class="inv-in inv-ta" rows="1" data-p="items.${i}.desc">${esc(it.desc)}</textarea></td>
+      <td class="inv-type-cell"><select class="inv-in inv-sel" data-p="items.${i}.type"><option value="">— النوع —</option>${allTypes([it.type]).map(t => `<option value="${esc(t)}"${t === it.type ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select><button type="button" class="inv-addtype no-print" title="إضافة نوع جديد">+</button></td>
       ${n('qty')}${n('price')}${n('disc')}
       <td class="inv-calc" data-c="total"></td>
       ${n('vatPct')}
@@ -193,10 +227,11 @@
         <div class="inv-meta-col">
           ${rowHtml('no', 'رقم الفاتورة', 'Inv.No', inv.no, { ltr: true })}
           <div class="inv-row"><span class="inv-ar">تاريخ الفاتورة</span><input type="date" class="inv-in inv-ltr" data-p="date" value="${esc(inv.date)}"><span class="inv-en">Date</span></div>
+          <div class="inv-row"><span class="inv-ar">الأيام المستحقة</span><b class="inv-days" data-c="days"></b><span class="inv-en">Due days</span></div>
         </div>
         <div class="inv-meta-col">
-          ${rowHtml('desc', 'الوصف', 'Desc', inv.desc)}
-          <div class="inv-row"><span class="inv-ar">تاريخ التوريد</span><input type="date" class="inv-in inv-ltr" data-p="supply" value="${esc(inv.supply)}"><span class="inv-en">S.date</span></div>
+          <div class="inv-row"><span class="inv-ar">بداية التنفيذ</span><input type="date" class="inv-in inv-ltr" data-p="supply" value="${esc(inv.supply)}"><span class="inv-en">Start</span></div>
+          <div class="inv-row"><span class="inv-ar">نهاية التنفيذ</span><input type="date" class="inv-in inv-ltr" data-p="supplyEnd" value="${esc(inv.supplyEnd)}"><span class="inv-en">End</span></div>
         </div>
       </div>
       <div class="inv-panels">
@@ -205,7 +240,7 @@
       </div>
       <table class="inv-items">
         <thead><tr>
-          <th>الرمز<small>Item Code</small></th><th>الشرح<small>Description</small></th><th>الكمية<small>QTY</small></th>
+          <th>الرمز<small>Item Code</small></th><th>النوع<small>Type</small></th><th>الكمية<small>QTY</small></th>
           <th>السعر<small>PRICE</small></th><th>الخصم<small>Disc.</small></th><th>السعر الإجمالي<small>Total Price</small></th>
           <th>% ضريبة<small>VAT %</small></th><th>قيمة الضريبة<small>VAT</small></th><th>الصافي<small>Net Price</small></th>
         </tr></thead>
@@ -251,6 +286,8 @@
       set('vat', r.empty ? '' : money(r.vat));
       set('net-v', r.empty ? '' : money(r.net));
     });
+    const P = periodInfo(cur), dEl = s.querySelector('[data-c="days"]');
+    if(dEl) dEl.textContent = P.ok ? (P.days + ' يوم' + (P.factor !== 1 ? ' (× ' + (Math.round(P.factor * 10000) / 10000) + ' من الشهر)' : '')) : '';
     const put = (c, v) => { const el = s.querySelector(`[data-c="${c}"]`); if(el) el.textContent = v; };
     put('t-gross', money(T.gross)); put('t-disc', money(T.disc)); put('t-vat', money(T.vat)); put('t-net', money(T.net));
     put('t-vatlabel', 'VAT ' + (T.pct == null ? '' : T.pct + ' ') + '%');
@@ -289,7 +326,7 @@
   function openInvoice(id, asCopy){
     const inv = ctx.getInvoices().find(x => x.id === id); if(!inv) return;
     cur = normalize(inv);
-    if(asCopy){ cur.id = ''; cur.no = nextNo(); cur.date = ctx.todayISO(); cur.supply = cur.date; }
+    if(asCopy){ cur.id = ''; cur.no = nextNo(); cur.date = ''; cur.supply = ''; cur.supplyEnd = ''; }
     renderSheet(); renderList();
     const w = document.querySelector('.inv-sheet-wrap'); if(w) w.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
@@ -297,6 +334,7 @@
     if(!cur) return;
     if(!String(cur.customer.name || '').trim()){ ctx.toast('اكتب اسم العميل أولاً'); return; }
     if(!String(cur.no || '').trim()){ ctx.toast('رقم الفاتورة مطلوب'); return; }
+    if(!String(cur.date || '').trim()){ ctx.toast('أدخل تاريخ الفاتورة'); return; }
     const list = ctx.getInvoices();
     if(list.some(x => x.id !== cur.id && String(x.no) === String(cur.no))){ ctx.toast('رقم الفاتورة مستخدم في فاتورة أخرى'); return; }
     const rec = clone(cur); rec.updatedAt = new Date().toISOString();
@@ -315,15 +353,40 @@
     if(cur && cur.id === id){ cur = blankInvoice(); renderSheet(); }
     renderList();
   }
-  function autofillCustomer(){
-    const C = cur.customer, nm = String(C.name || '').trim(); if(!nm) return;
-    let changed = false;
-    const fill = (k, v) => { if(v && !String(C[k] || '').trim()){ C[k] = String(v); changed = true; } };
+  // اختيار العميل من المشاريع: ترحيل بياناته وبنود الإيرادات (العدد × الإيراد للفرد) — قابلة للتعديل بعد الترحيل
+  function fillFromProject(name){
+    const nm = String(name || '').trim();
+    const C = cur.customer;
+    if(!nm){ cur.projectId = ''; return; }
     const p = (ctx.getProjects() || []).find(x => String(x.name || '').trim() === nm);
-    if(p){ fill('cr', p.cr); fill('vat', p.vatNo); fill('street', p.address); fill('city', p.region); }
+    C.name = nm;
+    if(!p){ renderSheet(); return; }
+    cur.projectId = p.id || '';
+    C.cr = p.cr || ''; C.vat = p.vatNo || ''; C.street = p.address || ''; C.city = p.region || C.city || '';
     const old = [...ctx.getInvoices()].reverse().find(x => x.customer && String(x.customer.name || '').trim() === nm);
-    if(old){ ['bno','addno','street','city','area','country','postal','vat','cr'].forEach(k => fill(k, old.customer[k])); }
-    if(changed) renderSheet();
+    if(old) ['bno','addno','area','country','postal'].forEach(k => { if(old.customer[k]) C[k] = old.customer[k]; });
+    const vp = p.vatRate == null || p.vatRate === '' ? '15' : String(p.vatRate);
+    const rows = [], rv = p.revenueItems || {};
+    Object.keys(rv).forEach(k => {
+      (Array.isArray(rv[k]) ? rv[k] : []).forEach(r => {
+        const qty = Number(r.quantity || r.count || 0) || 0, unit = Number(r.unit || r.price || 0) || 0;
+        if(!qty && !unit) return;
+        const type = KIND_TYPE[k] || String(r.type || '').trim() || KIND_LABEL[k] || k;
+        rows.push(Object.assign(blankItem(), { type, qty: String(qty), price: String(unit), vatPct: vp }));
+      });
+    });
+    if(!rows.length && Number(p.guards) && Number(p.revenueGuard)){
+      rows.push(Object.assign(blankItem(), { type: 'حارس أمن', qty: String(p.guards), price: String(p.revenueGuard), vatPct: vp }));
+    }
+    if(rows.length) cur.items = rows.slice(0, MAX_ROWS);
+    if(rows.length > MAX_ROWS) ctx.toast('عدد البنود أكثر من ' + MAX_ROWS + ' — تم ترحيل أول ' + MAX_ROWS + ' فقط');
+    renderSheet();
+  }
+  function addType(){
+    const nm = (prompt('اسم النوع الجديد:') || '').trim(); if(!nm) return null;
+    const st = ctx.getSettings(); if(!Array.isArray(st.invoiceTypes)) st.invoiceTypes = [];
+    if(!allTypes().includes(nm)){ st.invoiceTypes.push(nm); ctx.save('تمت إضافة النوع'); }
+    return nm;
   }
   function print(){
     if(!cur) return;
@@ -362,11 +425,21 @@
       if(e.target.tagName === 'TEXTAREA') grow(e.target);
       refresh();
     });
-    s.addEventListener('change', e => { if(e.target.dataset && e.target.dataset.p === 'customer.name') autofillCustomer(); });
+    s.addEventListener('change', e => {
+      const t = e.target;
+      if(t.dataset && t.dataset.proj){ setPath(cur, t.dataset.p, t.value); fillFromProject(t.value); }
+      else if(t.tagName === 'SELECT' && t.dataset && t.dataset.p){ setPath(cur, t.dataset.p, t.value); }
+    });
     s.addEventListener('click', e => {
       if(e.target.closest('#invAddRow')){
         if(cur.items.length < MAX_ROWS){ cur.items.push(blankItem()); renderSheet(); }
         return;
+      }
+      const at = e.target.closest('.inv-addtype');
+      if(at){
+        const nm = addType(); if(!nm) return;
+        const tr = at.closest('tr'); if(tr) cur.items[+tr.dataset.i].type = nm;
+        renderSheet(); return;
       }
       const del = e.target.closest('[data-del]');
       if(del){
