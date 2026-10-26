@@ -2479,3 +2479,119 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
   body.cov-min-open .cov-min-bar{display:none!important}
   body.cov-min-open .cov-min-pages{padding:0!important}
 }
+
+/* ===== المبيعات: فاتورة مبيعات ضريبية على ورق فخر الجزيرة =====
+   كل قواعد الحقول مسبوقة بـ #view-sales #invSheet لأن قواعد الثيم العامة للحقول قوية (!important) */
+#view-sales .inv-sheet-wrap{overflow:auto;padding:6px 0 28px;text-align:center}
+#view-sales .inv-list-table td.empty-note{text-align:center;opacity:.7;padding:14px}
+#view-sales .inv-list-table tr.inv-active td{background:rgba(74,99,139,.18)}
+#view-sales #invSheet{
+  position:relative;box-sizing:border-box;width:210mm;height:296.6mm;margin:0 auto;
+  padding:34mm 12mm 24mm;text-align:right;direction:rtl;color:#111;overflow:hidden;
+  background:#fff url("../assets/contract-bg.jpg") center top / 100% 100% no-repeat;
+  font-family:"JF Flat Regular","JF Flat","Segoe UI",Tahoma,sans-serif;font-size:10px;line-height:1.3;
+  box-shadow:0 6px 28px rgba(0,0,0,.35);-webkit-print-color-adjust:exact;print-color-adjust:exact;
+}
+#view-sales #invSheet *{box-sizing:border-box}
+#view-sales #invSheet input.inv-in,
+#view-sales #invSheet textarea.inv-in,
+#view-sales #invSheet input.inv-in:hover,
+#view-sales #invSheet textarea.inv-in:hover,
+#view-sales #invSheet input.inv-in:focus,
+#view-sales #invSheet textarea.inv-in:focus{
+  display:block;width:100%;min-width:0;min-height:0;margin:0;padding:0 3px;border:0 !important;
+  border-bottom:1px dotted rgba(74,99,139,.6) !important;border-radius:0 !important;
+  background:transparent !important;color:#111 !important;caret-color:#111;font:inherit;font-weight:600;
+  text-align:center;box-shadow:none !important;outline:0;opacity:1;
+}
+#view-sales #invSheet input.inv-in:hover,
+#view-sales #invSheet textarea.inv-in:hover{background:rgba(74,99,139,.08) !important}
+#view-sales #invSheet input.inv-in:focus,
+#view-sales #invSheet textarea.inv-in:focus{background:rgba(74,99,139,.14) !important;border-bottom-color:#4A638B !important}
+#view-sales #invSheet input.inv-in::placeholder,
+#view-sales #invSheet textarea.inv-in::placeholder{color:rgba(0,0,0,.28) !important}
+#view-sales #invSheet .inv-ltr{direction:ltr}
+#view-sales #invSheet textarea.inv-ta{resize:none;overflow:hidden;height:auto;line-height:1.25}
+#view-sales #invSheet input[type=date]{min-height:13px}
+
+#view-sales #invSheet .inv-title{display:flex;flex-direction:column;align-items:center;width:76mm;margin:0 auto 2.5mm;padding:1.2mm 6mm;
+  border:1.6px solid #4A638B;border-radius:50%/45%;background:rgba(255,255,255,.6)}
+#view-sales #invSheet .inv-title b{font-size:16px;line-height:1.2;color:#1f2f4d}
+#view-sales #invSheet .inv-title span{font-size:9.5px;letter-spacing:.6px;color:#4A638B;direction:ltr}
+
+#view-sales #invSheet .inv-meta{display:grid;grid-template-columns:1fr 1fr;border:1px solid #4A638B;border-radius:2mm;margin-bottom:2.5mm;overflow:hidden}
+#view-sales #invSheet .inv-meta-col{padding:.4mm 2.5mm}
+#view-sales #invSheet .inv-meta-col + .inv-meta-col{border-right:1px solid #4A638B}
+
+#view-sales #invSheet .inv-row{display:grid;grid-template-columns:21mm 1fr 25mm;align-items:center;gap:1.5mm;min-height:4.9mm;padding:.2mm 0;border-bottom:1px solid rgba(74,99,139,.18)}
+#view-sales #invSheet .inv-row:last-child{border-bottom:0}
+#view-sales #invSheet .inv-ar{font-weight:700;font-size:9px;line-height:1.15;color:#1f2f4d}
+#view-sales #invSheet .inv-en{direction:ltr;text-align:left;font-size:8px;line-height:1.15;color:#333}
+
+#view-sales #invSheet .inv-panels{display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-bottom:2.5mm}
+#view-sales #invSheet .inv-panel{border:1px solid #4A638B;border-radius:2mm;overflow:hidden}
+#view-sales #invSheet .inv-panel .inv-row{padding-inline:2mm}
+#view-sales #invSheet .inv-panel-h{display:flex;justify-content:space-between;align-items:center;padding:.6mm 2.5mm;background:#4A638B;color:#fff;font-weight:700;font-size:10px}
+#view-sales #invSheet .inv-en-h{direction:ltr;font-size:9.5px}
+
+#view-sales #invSheet table.inv-items{width:100%;min-width:0;max-width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 1mm}
+#view-sales #invSheet table.inv-items th{background:#4A638B;color:#fff;font-size:9px;line-height:1.15;padding:1mm .6mm;border:1px solid #fff;text-align:center;font-weight:700;white-space:normal}
+#view-sales #invSheet table.inv-items th small{display:block;font-size:7.5px;font-weight:400;direction:ltr}
+#view-sales #invSheet table.inv-items td input.inv-in{font-size:9.5px}
+#view-sales #invSheet table.inv-items td{border:1px solid #4A638B;padding:.4mm .6mm;vertical-align:middle;text-align:center;background:rgba(255,255,255,.35);height:6.6mm;color:#111}
+#view-sales #invSheet table.inv-items th:nth-child(1){width:18mm}
+#view-sales #invSheet table.inv-items th:nth-child(3){width:11mm}
+#view-sales #invSheet table.inv-items th:nth-child(4){width:18mm}
+#view-sales #invSheet table.inv-items th:nth-child(5){width:16mm}
+#view-sales #invSheet table.inv-items th:nth-child(6){width:23mm}
+#view-sales #invSheet table.inv-items th:nth-child(7){width:11mm}
+#view-sales #invSheet table.inv-items th:nth-child(8){width:19mm}
+#view-sales #invSheet table.inv-items th:nth-child(9){width:23mm}
+#view-sales #invSheet .inv-calc{font-weight:700;direction:ltr;white-space:nowrap}
+#view-sales #invSheet .inv-net{position:relative}
+#view-sales #invSheet .inv-del{position:absolute;left:-7.5mm;top:50%;transform:translateY(-50%);width:5.5mm;height:5.5mm;min-width:0;padding:0;border:0;border-radius:50%;
+  background:#c0392b;color:#fff;font-size:9px;line-height:1;cursor:pointer}
+#view-sales #invSheet .inv-addrow{display:flex;align-items:center;gap:3mm;margin:1mm 0 1mm}
+#view-sales #invSheet .inv-addrow small{color:#a33;font-size:9px}
+#view-sales #invSheet .inv-addrow .btn{color:#1f2f4d;background:#eef2f9;border:1px solid #4A638B}
+#view-sales #invSheet .inv-addrow .btn:disabled{opacity:.45;cursor:not-allowed}
+
+#view-sales #invSheet .inv-sum{display:flex;justify-content:space-between;align-items:center;gap:6mm;margin:2.5mm 0}
+#view-sales #invSheet .inv-totals{width:92mm;border:1.2px solid #4A638B;border-radius:3.5mm;padding:.6mm 3mm;background:rgba(255,255,255,.55)}
+#view-sales #invSheet .inv-trow{display:grid;grid-template-columns:18mm 1fr 30mm;align-items:center;gap:1.5mm;min-height:5.8mm;border-bottom:1px solid rgba(74,99,139,.25)}
+#view-sales #invSheet .inv-trow:last-child{border-bottom:0}
+#view-sales #invSheet .inv-trow b{direction:ltr;text-align:left;font-size:10.5px}
+#view-sales #invSheet .inv-trow-net{background:rgba(74,99,139,.12);margin-inline:-3mm;padding-inline:3mm}
+#view-sales #invSheet .inv-trow-net b{font-size:11.5px}
+#view-sales #invSheet .inv-qr{width:30mm;height:30mm;background:#fff;padding:.5mm;border:1px solid rgba(74,99,139,.35)}
+#view-sales #invSheet .inv-qr svg{display:block;width:100%;height:100%}
+#view-sales #invSheet .inv-words{border:1px solid #4A638B;border-radius:2mm;padding:1.3mm 3mm;text-align:center;font-weight:700;font-size:10px;background:rgba(255,255,255,.55);min-height:7mm}
+#view-sales #invSheet .inv-iban{display:grid;grid-template-columns:auto 1fr;gap:3mm;align-items:center;margin-top:2mm;font-weight:700;font-size:9.5px;color:#1f2f4d}
+#view-sales #invSheet .inv-sign{margin-top:4mm;font-weight:700;font-size:10px;color:#1f2f4d}
+#view-sales #invSheet .inv-sign small{font-weight:400;direction:ltr;margin-inline-start:2mm;font-size:9px}
+
+@media print{
+  body.inv-printing .sidebar,
+  body.inv-printing .floating-actions,
+  body.inv-printing .pj-tabs-wrap,
+  body.inv-printing main > section:not(#view-sales),
+  body.inv-printing #view-sales > :not(.inv-sheet-wrap),
+  body.inv-printing .no-print{display:none !important}
+  /* يتغلب على قاعدة body *{visibility:hidden} العامة الخاصة بالمستندات والمباشرات */
+  body.inv-printing #view-sales, body.inv-printing #view-sales *{visibility:visible !important}
+  body.inv-printing .app{display:block !important}
+  body.inv-printing .main{margin:0 !important;padding:0 !important;width:auto !important;max-width:none !important}
+  body.inv-printing,body.inv-printing html{background:#fff !important}
+  body.inv-printing #view-sales .inv-sheet-wrap{padding:0 !important;overflow:visible !important}
+  body.inv-printing #view-sales #invSheet{margin:0 !important;box-shadow:none !important;page-break-after:avoid;break-after:avoid}
+  body.inv-printing #view-sales #invSheet input.inv-in,
+  body.inv-printing #view-sales #invSheet textarea.inv-in{border-bottom-color:transparent !important}
+  body.inv-printing #view-sales #invSheet input.inv-in,
+  body.inv-printing #view-sales #invSheet textarea.inv-in,
+  body.inv-printing #view-sales #invSheet input.inv-in:hover,
+  body.inv-printing #view-sales #invSheet textarea.inv-in:hover,
+  body.inv-printing #view-sales #invSheet input.inv-in:focus,
+  body.inv-printing #view-sales #invSheet textarea.inv-in:focus{background:transparent !important}
+  body.inv-printing #view-sales #invSheet tr.inv-empty-row input.inv-in{color:transparent !important}
+  body.inv-printing #view-sales #invSheet input[type=date]::-webkit-calendar-picker-indicator{display:none}
+}

@@ -30,7 +30,7 @@ service cloud.firestore {
       allow read: if isActive();
       allow write: if (isAdmin() || (isActive() && viewsOf().size() > 0))
         && request.resource.data.get('schema', 0) == 2
-        && !request.resource.data.keys().hasAny(['payrollRecords', 'projectAccounts']);
+        && !request.resource.data.keys().hasAny(['payrollRecords', 'projectAccounts', 'invoices']);
     }
     // ملفات الموظفين (مرفقات base64)
     match /hr_system/main/employee_files/{fileId} {

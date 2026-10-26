@@ -318,7 +318,7 @@ async function onRestoreFile(ev){
     try{ b = JSON.parse(await file.text()); }catch(e){ bkMsg('الملف غير صالح (ليس JSON سليماً).', 'err'); return; }
     const g = b && b.docs && b.docs.general, f = b && b.docs && b.docs.finance;
     if(!b || b.format !== 'hr-backup' || !g){ bkMsg('هذا الملف ليس نسخة احتياطية من هذا النظام.', 'err'); return; }
-    if(g.schema !== 2 || 'payrollRecords' in g || 'projectAccounts' in g){ bkMsg('نسق الملف غير مدعوم. استخدم نسخة تم تنزيلها من هذه الشاشة.', 'err'); return; }
+    if(g.schema !== 2 || 'payrollRecords' in g || 'projectAccounts' in g || 'invoices' in g){ bkMsg('نسق الملف غير مدعوم. استخدم نسخة تم تنزيلها من هذه الشاشة.', 'err'); return; }
     const nEmp = Array.isArray(g.employees) ? g.employees.length : 0;
     const nFiles = (b.docs.employeeFiles || []).length;
     const summary = `سيتم استبدال بيانات النظام الحالية بمحتوى النسخة:\n- تاريخ النسخة: ${b.createdAt || '؟'}\n- المشروع: ${b.projectId || '؟'}\n- الموظفون: ${nEmp}\n- ملفات الموظفين: ${nFiles}\n- البيانات المالية: ${f ? 'موجودة' : 'غير موجودة'}\n\nلن تتأثر حسابات المستخدمين وصلاحياتهم.\nسيتم تنزيل نسخة من الوضع الحالي تلقائياً قبل الاستبدال.\n\nاكتب كلمة: استرجاع   للتأكيد`;

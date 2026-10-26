@@ -13,6 +13,7 @@
   const COMMENCEMENT_KEY = 'hr_commencements_v1';
   const PROJECT_ACCOUNT_KEY = 'hr_project_accounts_v1';
   const PAYROLL_KEY = 'hr_payroll_v1';
+  const INVOICE_KEY = 'hr_invoices_v1';
   const ATT_CODES = ['','ح','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق'];
   let employees = [];
   let attendance = {};   // { "YYYY-MM": { empId: { day: code } } }
@@ -26,6 +27,7 @@
   let commencements = [];
   let projectAccounts = [];
   let payrollRecords = {};
+  let invoices = [];
   let currentView = 'dashboard';
   let currentProfileId = null;
   let pendingDeleteId = null;
@@ -79,7 +81,8 @@
       departments: readLocal(DEPT_KEY, []),
       contracts: readLocal(CONTRACT_KEY, []),
       commencements: readLocal(COMMENCEMENT_KEY, []),
-      projectAccounts: readLocal(PROJECT_ACCOUNT_KEY, []), payrollRecords: readLocal(PAYROLL_KEY, {})
+      projectAccounts: readLocal(PROJECT_ACCOUNT_KEY, []), payrollRecords: readLocal(PAYROLL_KEY, {}),
+      invoices: readLocal(INVOICE_KEY, [])
     };
   }
   function applyState(state){
@@ -95,6 +98,7 @@
     commencements = Array.isArray(state?.commencements) ? state.commencements : [];
     projectAccounts = Array.isArray(state?.projectAccounts) ? state.projectAccounts : [];
     payrollRecords = state?.payrollRecords && typeof state.payrollRecords==='object' ? state.payrollRecords : {};
+    invoices = Array.isArray(state?.invoices) ? state.invoices : [];
     syncEmployeeStartDates();
     normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
@@ -147,7 +151,7 @@
     }catch(_){}
   }
   function currentState(){
-    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords};
+    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords,invoices};
   }
   let cloudSaveTimer = null;
   let cloudApplying = false;
@@ -158,7 +162,7 @@
   function persistLocal(){
     writeLocal(STORAGE_KEY,employees); writeLocal(ATT_KEY,attendance);
     writeLocal(PEN_KEY,penalties); writeLocal(COV_KEY,coverage); writeLocal(SET_KEY,settings);
-    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords);
+    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords); writeLocal(INVOICE_KEY,invoices);
   }
   function persistCloud(message='تم حفظ التغييرات بنجاح'){
     persistLocal();
@@ -191,7 +195,7 @@
   function loadAux(){
     const state=localState();
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
-    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{};
+    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{}; invoices=state.invoices||[];
     syncEmployeeStartDates();
     normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
@@ -772,7 +776,7 @@
   const exportableViews=['dashboard','regions','projects','allprojects','employees','departments','add','projectpromotions','employeepromotions','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports'];
   function currentViewElement(){ return currentView ? document.getElementById('view-'+currentView) : null; }
   function exportFileBase(){
-    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
+    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',sales:'المبيعات',reports:'التقارير'};
     return titles[currentView]||'تصدير';
   }
   function exportCurrentExcel(){
@@ -818,6 +822,14 @@
   }
   installExportButtons();
 
+  /* ===== المبيعات: فاتورة مبيعات ضريبية (js/sales.js) ===== */
+  if(window.HRSales){
+    window.HRSales.init({
+      getInvoices:()=>invoices, getProjects:()=>projects, getSettings:()=>settings,
+      save:(msg)=>persistCloud(msg), toast:showToast, todayISO
+    });
+  }
+
   /* ===== navigation ===== */
   // Expose navigation and install a resilient early click handler so the
   // "إضافة موظف" screen remains reachable even if a later optional
@@ -857,7 +869,7 @@
     const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(view);
     st.textContent=`@media print { @page { size: A4 ${isLandscape?'landscape':'portrait'} !important; margin: ${isLandscape?'8mm':'10mm'} !important; } }`;
     document.head.appendChild(st);
-    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports','users'].forEach(v=>{
+    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports','sales','users'].forEach(v=>{
       document.getElementById('view-'+v).style.display = (v===view)?'':'none';
     });
     document.querySelectorAll('.navlink[data-view]').forEach(a=>{
@@ -890,6 +902,7 @@
     if(view==='commencement-list') renderCommencementList();
     if(view==='projectaccounts') renderProjectAccount();
     if(view==='reports') renderReports();
+    if(view==='sales') window.HRSales?.render();
     if(view==='users') window.HRUsers?.render();
     if(view==='reports'){
       const activeReport=document.querySelector('.nav-child[data-view="reports"].active');
@@ -903,9 +916,9 @@
   window.switchView = switchView;
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
-  const PJ_TITLES={users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',reports:'التقارير'};
+  const PJ_TITLES={users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',sales:'المبيعات',reports:'التقارير'};
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
-  const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn']};
+  const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn'],sales:['btn','saveInvoiceBtn']};
   const pjTabs={open:[],dirty:new Set()};
   // عند فتح سجل تاريخي من التقارير، نعرض شاشة الإدخال نفسها لكن للقراءة فقط.
   let hrSourceReadOnly=false;
@@ -926,6 +939,7 @@
   }
   function pjResetView(v){
     if(v==='allprojects'){ document.getElementById('allProjectsSearch')?.setAttribute('value',''); }
+    else if(v==='sales') window.HRSales?.reset();
     else if(v==='add') resetForm();
     else if(v==='projects') document.getElementById('cancelProjectBtn')?.click();
     else document.querySelectorAll('#view-'+v+' form').forEach(f=>f.reset());
@@ -963,12 +977,12 @@
   document.querySelector('main')?.addEventListener('input',e=>{
     const sec=e.target.closest('section[id^="view-"]'); if(!sec)return; const v=sec.id.slice(5);
     if(!PJ_SAVE[v]||e.target.type==='search')return;
-    if(!(e.target.closest('form')||v==='contracts'||v==='projectaccounts'))return;
+    if(!(e.target.closest('form')||v==='contracts'||v==='projectaccounts'||v==='sales'))return;
     if(!pjTabs.dirty.has(v)){ pjTabs.dirty.add(v); pjTabsRender(); }
   });
   const pjClean=e=>{ const sec=e.target.closest?.('section[id^="view-"]'); if(sec && pjTabs.dirty.delete(sec.id.slice(5))) pjTabsRender(); };
   document.addEventListener('submit',pjClean,true);
-  ['saveContractBtn','saveProjectAccountBtn'].forEach(id=>document.getElementById(id)?.addEventListener('click',pjClean));
+  ['saveContractBtn','saveProjectAccountBtn','saveInvoiceBtn'].forEach(id=>document.getElementById(id)?.addEventListener('click',pjClean));
   pjTabsSync(currentView);
   if(!window.__hrNavFallbackInstalled){
     window.__hrNavFallbackInstalled = true;
