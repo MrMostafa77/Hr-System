@@ -776,7 +776,7 @@
   const exportableViews=['dashboard','regions','projects','allprojects','employees','departments','add','projectpromotions','employeepromotions','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports'];
   function currentViewElement(){ return currentView ? document.getElementById('view-'+currentView) : null; }
   function exportFileBase(){
-    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',sales:'المبيعات',reports:'التقارير'};
+    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',reports:'التقارير'};
     return titles[currentView]||'تصدير';
   }
   function exportCurrentExcel(){
@@ -869,7 +869,7 @@
     const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(view);
     st.textContent=`@media print { @page { size: A4 ${isLandscape?'landscape':'portrait'} !important; margin: ${isLandscape?'8mm':'10mm'} !important; } }`;
     document.head.appendChild(st);
-    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports','sales','users'].forEach(v=>{
+    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports','sales','salesorder','allinvoices','users'].forEach(v=>{
       document.getElementById('view-'+v).style.display = (v===view)?'':'none';
     });
     document.querySelectorAll('.navlink[data-view]').forEach(a=>{
@@ -903,6 +903,8 @@
     if(view==='projectaccounts') renderProjectAccount();
     if(view==='reports') renderReports();
     if(view==='sales') window.HRSales?.render();
+    if(view==='salesorder') window.HRSales?.renderOrder();
+    if(view==='allinvoices') window.HRSales?.renderAll();
     if(view==='users') window.HRUsers?.render();
     if(view==='reports'){
       const activeReport=document.querySelector('.nav-child[data-view="reports"].active');
@@ -916,9 +918,9 @@
   window.switchView = switchView;
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
-  const PJ_TITLES={users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',sales:'المبيعات',reports:'التقارير'};
+  const PJ_TITLES={users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',reports:'التقارير'};
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
-  const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn'],sales:['btn','saveInvoiceBtn']};
+  const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn'],sales:['btn','saveInvoiceBtn'],salesorder:['btn','saveOrderBtn']};
   const pjTabs={open:[],dirty:new Set()};
   // عند فتح سجل تاريخي من التقارير، نعرض شاشة الإدخال نفسها لكن للقراءة فقط.
   let hrSourceReadOnly=false;
@@ -940,6 +942,8 @@
   function pjResetView(v){
     if(v==='allprojects'){ document.getElementById('allProjectsSearch')?.setAttribute('value',''); }
     else if(v==='sales') window.HRSales?.reset();
+    else if(v==='salesorder') window.HRSales?.resetOrder();
+    else if(v==='allinvoices') document.getElementById('allInvSearch')?.setAttribute('value','');
     else if(v==='add') resetForm();
     else if(v==='projects') document.getElementById('cancelProjectBtn')?.click();
     else document.querySelectorAll('#view-'+v+' form').forEach(f=>f.reset());
@@ -977,12 +981,12 @@
   document.querySelector('main')?.addEventListener('input',e=>{
     const sec=e.target.closest('section[id^="view-"]'); if(!sec)return; const v=sec.id.slice(5);
     if(!PJ_SAVE[v]||e.target.type==='search')return;
-    if(!(e.target.closest('form')||v==='contracts'||v==='projectaccounts'||v==='sales'))return;
+    if(!(e.target.closest('form')||v==='contracts'||v==='projectaccounts'||v==='sales'||v==='salesorder'))return;
     if(!pjTabs.dirty.has(v)){ pjTabs.dirty.add(v); pjTabsRender(); }
   });
   const pjClean=e=>{ const sec=e.target.closest?.('section[id^="view-"]'); if(sec && pjTabs.dirty.delete(sec.id.slice(5))) pjTabsRender(); };
   document.addEventListener('submit',pjClean,true);
-  ['saveContractBtn','saveProjectAccountBtn','saveInvoiceBtn'].forEach(id=>document.getElementById(id)?.addEventListener('click',pjClean));
+  ['saveContractBtn','saveProjectAccountBtn','saveInvoiceBtn','saveOrderBtn'].forEach(id=>document.getElementById(id)?.addEventListener('click',pjClean));
   pjTabsSync(currentView);
   if(!window.__hrNavFallbackInstalled){
     window.__hrNavFallbackInstalled = true;

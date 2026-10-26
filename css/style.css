@@ -2566,8 +2566,8 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 #view-sales #invSheet .inv-qr{width:30mm;height:30mm;background:#fff;padding:.5mm;border:1px solid rgba(74,99,139,.35)}
 #view-sales #invSheet .inv-qr svg{display:block;width:100%;height:100%}
 #view-sales #invSheet .inv-words{border:1px solid #4A638B;border-radius:2mm;padding:1.3mm 3mm;text-align:center;font-weight:700;font-size:10px;background:rgba(255,255,255,.55);min-height:7mm}
-#view-sales #invSheet .inv-iban{display:grid;grid-template-columns:auto 1fr;gap:3mm;align-items:center;margin-top:2mm;font-weight:700;font-size:9.5px;color:#1f2f4d}
-#view-sales #invSheet .inv-sign{margin-top:4mm;font-weight:700;font-size:10px;color:#1f2f4d}
+#view-sales #invSheet .inv-iban{display:grid;grid-template-columns:auto auto 1fr;gap:3mm;align-items:center;margin-top:2mm;font-weight:700;font-size:12px;color:#1f2f4d}
+#view-sales #invSheet .inv-sign{margin-top:4mm;font-weight:700;font-size:15px;color:#1f2f4d;text-align:left}
 #view-sales #invSheet .inv-sign small{font-weight:400;direction:ltr;margin-inline-start:2mm;font-size:9px}
 
 @media print{
@@ -2634,3 +2634,173 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 #view-sales #invForm .inv-addrow small{color:#c0392b}
 #view-sales #invForm details.inv-seller{margin-top:14px}
 #view-sales #invForm details.inv-seller summary{cursor:pointer;font-weight:700;margin-bottom:8px}
+
+/* ===== الآيبان والمستلم ===== */
+#view-sales #invSheet .inv-iban-l{font-size:11px}
+#view-sales #invSheet .inv-iban .inv-iban-v{font-size:13px;letter-spacing:.4px;border-bottom:0;min-height:0}
+#view-sales #invSheet .inv-iban-note{font-size:9.5px;font-weight:700;line-height:1.35;color:#4A638B}
+
+/* ===== أمر البيع: نسخة من قواعد الفاتورة ===== */
+/* ===== المبيعات: فاتورة مبيعات ضريبية على ورق فخر الجزيرة =====
+   كل قواعد الحقول مسبوقة بـ #view-salesorder #ordSheet لأن قواعد الثيم العامة للحقول قوية (!important) */
+#view-salesorder .inv-sheet-wrap{overflow:auto;padding:6px 0 28px;text-align:center}
+#view-salesorder .inv-list-table td.empty-note{text-align:center;opacity:.7;padding:14px}
+#view-salesorder .inv-list-table tr.inv-active td{background:rgba(74,99,139,.18)}
+#view-salesorder #ordSheet{
+  position:relative;box-sizing:border-box;width:210mm;height:296.6mm;margin:0 auto;
+  padding:34mm 12mm 24mm;text-align:right;direction:rtl;color:#111;overflow:hidden;
+  background:#fff url("../assets/contract-bg.jpg") center top / 100% 100% no-repeat;
+  font-family:"JF Flat Regular","JF Flat","Segoe UI",Tahoma,sans-serif;font-size:10px;line-height:1.3;
+  box-shadow:0 6px 28px rgba(0,0,0,.35);-webkit-print-color-adjust:exact;print-color-adjust:exact;
+}
+#view-salesorder #ordSheet *{box-sizing:border-box}
+#view-salesorder #ordSheet input.inv-in,
+#view-salesorder #ordSheet textarea.inv-in,
+#view-salesorder #ordSheet input.inv-in:hover,
+#view-salesorder #ordSheet textarea.inv-in:hover,
+#view-salesorder #ordSheet input.inv-in:focus,
+#view-salesorder #ordSheet textarea.inv-in:focus{
+  display:block;width:100%;min-width:0;min-height:0;margin:0;padding:0 3px;border:0 !important;
+  border-bottom:1px dotted rgba(74,99,139,.6) !important;border-radius:0 !important;
+  background:transparent !important;color:#111 !important;caret-color:#111;font:inherit;font-weight:600;
+  text-align:center;box-shadow:none !important;outline:0;opacity:1;
+}
+#view-salesorder #ordSheet input.inv-in:hover,
+#view-salesorder #ordSheet textarea.inv-in:hover{background:rgba(74,99,139,.08) !important}
+#view-salesorder #ordSheet input.inv-in:focus,
+#view-salesorder #ordSheet textarea.inv-in:focus{background:rgba(74,99,139,.14) !important;border-bottom-color:#4A638B !important}
+#view-salesorder #ordSheet input.inv-in::placeholder,
+#view-salesorder #ordSheet textarea.inv-in::placeholder{color:rgba(0,0,0,.28) !important}
+#view-salesorder #ordSheet .inv-ltr{direction:ltr}
+#view-salesorder #ordSheet textarea.inv-ta{resize:none;overflow:hidden;height:auto;line-height:1.25}
+#view-salesorder #ordSheet input[type=date]{min-height:13px}
+
+#view-salesorder #ordSheet .inv-title{display:flex;flex-direction:column;align-items:center;width:76mm;margin:0 auto 2.5mm;padding:1.2mm 6mm;
+  border:1.6px solid #4A638B;border-radius:50%/45%;background:rgba(255,255,255,.6)}
+#view-salesorder #ordSheet .inv-title b{font-size:16px;line-height:1.2;color:#1f2f4d}
+#view-salesorder #ordSheet .inv-title span{font-size:9.5px;letter-spacing:.6px;color:#4A638B;direction:ltr}
+
+#view-salesorder #ordSheet .inv-meta{display:grid;grid-template-columns:1fr 1fr;border:1px solid #4A638B;border-radius:2mm;margin-bottom:2.5mm;overflow:hidden}
+#view-salesorder #ordSheet .inv-meta-col{padding:.4mm 2.5mm}
+#view-salesorder #ordSheet .inv-meta-col + .inv-meta-col{border-right:1px solid #4A638B}
+
+#view-salesorder #ordSheet .inv-row{display:grid;grid-template-columns:21mm 1fr 25mm;align-items:center;gap:1.5mm;min-height:4.9mm;padding:.2mm 0;border-bottom:1px solid rgba(74,99,139,.18)}
+#view-salesorder #ordSheet .inv-row:last-child{border-bottom:0}
+#view-salesorder #ordSheet .inv-ar{font-weight:700;font-size:9px;line-height:1.15;color:#1f2f4d}
+#view-salesorder #ordSheet .inv-en{direction:ltr;text-align:left;font-size:8px;line-height:1.15;color:#333}
+
+#view-salesorder #ordSheet .inv-panels{display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-bottom:2.5mm}
+#view-salesorder #ordSheet .inv-panel{border:1px solid #4A638B;border-radius:2mm;overflow:hidden}
+#view-salesorder #ordSheet .inv-panel .inv-row{padding-inline:2mm}
+#view-salesorder #ordSheet .inv-panel-h{display:flex;justify-content:space-between;align-items:center;padding:.6mm 2.5mm;background:#4A638B;color:#fff;font-weight:700;font-size:10px}
+#view-salesorder #ordSheet .inv-en-h{direction:ltr;font-size:9.5px}
+
+#view-salesorder #ordSheet table.inv-items{width:100%;min-width:0;max-width:100%;border-collapse:collapse;table-layout:fixed;margin:0 0 1mm}
+#view-salesorder #ordSheet table.inv-items th{background:#4A638B;color:#fff;font-size:9px;line-height:1.15;padding:1mm .6mm;border:1px solid #fff;text-align:center;font-weight:700;white-space:normal}
+#view-salesorder #ordSheet table.inv-items th small{display:block;font-size:7.5px;font-weight:400;direction:ltr}
+#view-salesorder #ordSheet table.inv-items td input.inv-in{font-size:9.5px}
+#view-salesorder #ordSheet table.inv-items td{border:1px solid #4A638B;padding:.4mm .6mm;vertical-align:middle;text-align:center;background:rgba(255,255,255,.35);height:6.6mm;color:#111}
+#view-salesorder #ordSheet table.inv-items th:nth-child(1){width:18mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(3){width:11mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(4){width:18mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(5){width:16mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(6){width:23mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(7){width:11mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(8){width:19mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(9){width:23mm}
+#view-salesorder #ordSheet .inv-calc{font-weight:700;direction:ltr;white-space:nowrap}
+#view-salesorder #ordSheet .inv-net{position:relative}
+#view-salesorder #ordSheet .inv-del{position:absolute;left:-7.5mm;top:50%;transform:translateY(-50%);width:5.5mm;height:5.5mm;min-width:0;padding:0;border:0;border-radius:50%;
+  background:#c0392b;color:#fff;font-size:9px;line-height:1;cursor:pointer}
+#view-salesorder #ordSheet .inv-addrow{display:flex;align-items:center;gap:3mm;margin:1mm 0 1mm}
+#view-salesorder #ordSheet .inv-addrow small{color:#a33;font-size:9px}
+#view-salesorder #ordSheet .inv-addrow .btn{color:#1f2f4d;background:#eef2f9;border:1px solid #4A638B}
+#view-salesorder #ordSheet .inv-addrow .btn:disabled{opacity:.45;cursor:not-allowed}
+
+#view-salesorder #ordSheet .inv-sum{display:flex;justify-content:space-between;align-items:center;gap:6mm;margin:2.5mm 0}
+#view-salesorder #ordSheet .inv-totals{width:92mm;border:1.2px solid #4A638B;border-radius:3.5mm;padding:.6mm 3mm;background:rgba(255,255,255,.55)}
+#view-salesorder #ordSheet .inv-trow{display:grid;grid-template-columns:18mm 1fr 30mm;align-items:center;gap:1.5mm;min-height:5.8mm;border-bottom:1px solid rgba(74,99,139,.25)}
+#view-salesorder #ordSheet .inv-trow:last-child{border-bottom:0}
+#view-salesorder #ordSheet .inv-trow b{direction:ltr;text-align:left;font-size:10.5px}
+#view-salesorder #ordSheet .inv-trow-net{background:rgba(74,99,139,.12);margin-inline:-3mm;padding-inline:3mm}
+#view-salesorder #ordSheet .inv-trow-net b{font-size:11.5px}
+#view-salesorder #ordSheet .inv-qr{width:30mm;height:30mm;background:#fff;padding:.5mm;border:1px solid rgba(74,99,139,.35)}
+#view-salesorder #ordSheet .inv-qr svg{display:block;width:100%;height:100%}
+#view-salesorder #ordSheet .inv-words{border:1px solid #4A638B;border-radius:2mm;padding:1.3mm 3mm;text-align:center;font-weight:700;font-size:10px;background:rgba(255,255,255,.55);min-height:7mm}
+#view-salesorder #ordSheet .inv-iban{display:grid;grid-template-columns:auto auto 1fr;gap:3mm;align-items:center;margin-top:2mm;font-weight:700;font-size:12px;color:#1f2f4d}
+#view-salesorder #ordSheet .inv-sign{margin-top:4mm;font-weight:700;font-size:15px;color:#1f2f4d;text-align:left}
+#view-salesorder #ordSheet .inv-sign small{font-weight:400;direction:ltr;margin-inline-start:2mm;font-size:9px}
+
+@media print{
+  body.ord-printing .sidebar,
+  body.ord-printing .floating-actions,
+  body.ord-printing .pj-tabs-wrap,
+  body.ord-printing main > section:not(#view-salesorder),
+  body.ord-printing #view-salesorder > :not(.inv-sheet-wrap),
+  body.ord-printing .no-print{display:none !important}
+  /* يتغلب على قاعدة body *{visibility:hidden} العامة الخاصة بالمستندات والمباشرات */
+  body.ord-printing #view-salesorder, body.ord-printing #view-salesorder *{visibility:visible !important}
+  body.ord-printing .app{display:block !important}
+  body.ord-printing .main{margin:0 !important;padding:0 !important;width:auto !important;max-width:none !important}
+  body.ord-printing,body.ord-printing html{background:#fff !important}
+  body.ord-printing #view-salesorder .inv-sheet-wrap{padding:0 !important;overflow:visible !important}
+  body.ord-printing #view-salesorder #ordSheet{margin:0 !important;box-shadow:none !important;page-break-after:avoid;break-after:avoid}
+  body.ord-printing #view-salesorder #ordSheet input.inv-in,
+  body.ord-printing #view-salesorder #ordSheet textarea.inv-in{border-bottom-color:transparent !important}
+  body.ord-printing #view-salesorder #ordSheet input.inv-in,
+  body.ord-printing #view-salesorder #ordSheet textarea.inv-in,
+  body.ord-printing #view-salesorder #ordSheet input.inv-in:hover,
+  body.ord-printing #view-salesorder #ordSheet textarea.inv-in:hover,
+  body.ord-printing #view-salesorder #ordSheet input.inv-in:focus,
+  body.ord-printing #view-salesorder #ordSheet textarea.inv-in:focus{background:transparent !important}
+  body.ord-printing #view-salesorder #ordSheet tr.inv-empty-row input.inv-in{color:transparent !important}
+  body.ord-printing #view-salesorder #ordSheet input[type=date]::-webkit-calendar-picker-indicator{display:none}
+}
+
+/* ===== فاتورة المبيعات: قوائم النوع والعميل + الأيام ===== */
+#view-salesorder #ordSheet select.inv-sel{width:100%;font:inherit;font-size:9.5px;color:#111;background:transparent;border:0;border-bottom:1px dashed rgba(74,99,139,.45);padding:.3mm 0;appearance:none;-webkit-appearance:none;cursor:pointer;text-overflow:ellipsis}
+#view-salesorder #ordSheet select.inv-sel:focus{outline:0;background:rgba(74,99,139,.14);border-bottom-color:#4A638B}
+#view-salesorder #ordSheet .inv-type-cell{position:relative;text-align:center}
+#view-salesorder #ordSheet .inv-addtype{position:absolute;left:1px;top:50%;transform:translateY(-50%);width:4.6mm;height:4.6mm;min-width:0;padding:0;border:1px solid #4A638B;border-radius:50%;background:#eef2f9;color:#1f2f4d;font-weight:700;font-size:11px;line-height:1;cursor:pointer}
+#view-salesorder #ordSheet .inv-days{direction:rtl;font-size:9.5px;color:#1f2f4d}
+@media print{#view-salesorder #ordSheet select.inv-sel{border-bottom:0}}
+
+/* ===== فاتورة المبيعات: شاشة الإدخال + عرض الفاتورة للقراءة فقط ===== */
+#view-salesorder #ordSheet .inv-val{display:block;min-height:3.6mm;font-size:9.5px;line-height:1.25;color:#111;white-space:pre-wrap;word-break:break-word;border-bottom:1px dashed rgba(74,99,139,.25)}
+#view-salesorder #ordSheet .inv-val.inv-ltr{direction:ltr;text-align:right}
+#view-salesorder #ordSheet table.inv-items td{font-size:9.5px;word-break:break-word}
+#view-salesorder #ordSheet table.inv-items td.inv-ltr{direction:ltr}
+#view-salesorder #ordSheet table.inv-items th:nth-child(1){width:15mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(2){width:auto}
+#view-salesorder #ordSheet table.inv-items th:nth-child(3){width:11mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(4){width:17mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(5){width:10mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(6){width:14mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(7){width:22mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(8){width:11mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(9){width:17mm}
+#view-salesorder #ordSheet table.inv-items th:nth-child(10){width:22mm}
+#view-salesorder #ordForm .inv-form-hint{margin:2px 0 10px;opacity:.7;font-size:12px}
+#view-salesorder #ordForm .inv-fh{margin:16px 0 8px;font-size:14px}
+#view-salesorder #ordForm .inv-fh small{opacity:.6;font-weight:400}
+#view-salesorder #ordForm .inv-days-box{min-height:38px;display:flex;align-items:center;padding:0 10px;border:1px solid rgba(74,99,139,.5);border-radius:8px;font-weight:700}
+#view-salesorder #ordForm table.inv-form-items{width:100%;min-width:900px;border-collapse:collapse}
+#view-salesorder #ordForm table.inv-form-items th{padding:6px 4px;font-size:12px;text-align:center}
+#view-salesorder #ordForm table.inv-form-items td{padding:3px;vertical-align:middle}
+#view-salesorder #ordForm table.inv-form-items input.inv-fi{width:100%;min-width:56px;text-align:center}
+#view-salesorder #ordForm .inv-ftype{display:flex;gap:4px;align-items:center;min-width:190px}
+#view-salesorder #ordForm .inv-ftype select{flex:1;min-width:0}
+#view-salesorder #ordForm .inv-fcalc{text-align:center;font-weight:700;white-space:nowrap}
+#view-salesorder #ordForm .inv-addrow{display:flex;align-items:center;gap:10px;margin:8px 0}
+#view-salesorder #ordForm .inv-addrow small{color:#c0392b}
+#view-salesorder #ordForm details.inv-seller{margin-top:14px}
+#view-salesorder #ordForm details.inv-seller summary{cursor:pointer;font-weight:700;margin-bottom:8px}
+
+/* ===== الآيبان والمستلم ===== */
+#view-salesorder #ordSheet .inv-iban-l{font-size:11px}
+#view-salesorder #ordSheet .inv-iban .inv-iban-v{font-size:13px;letter-spacing:.4px;border-bottom:0;min-height:0}
+#view-salesorder #ordSheet .inv-iban-note{font-size:9.5px;font-weight:700;line-height:1.35;color:#4A638B}
+
+#view-allinvoices .row-actions{display:flex;gap:6px;flex-wrap:wrap}
+#view-allinvoices td.empty-note{text-align:center;opacity:.7;padding:14px}
+#view-allinvoices .inv-form-hint{margin:6px 0 10px;font-weight:700}

@@ -5,7 +5,7 @@
   const REPORTS = ['payroll','employees','projects','coverage'];
   // شاشات ليس لها رابط في القائمة الجانبية وتتبع صلاحية شاشة أخرى
   // شاشات تعتمد كلياً على بيانات مالية: لا تُفتح إلا لمن لديه صلاحية المالية
-  const FIN_ONLY = ['projectaccounts','reports:payroll','sales'];
+  const FIN_ONLY = ['projectaccounts','reports:payroll','sales','salesorder','allinvoices'];
   const ALIASES = { employees:['add','all-employees'], allprojects:['projects'], 'commencement-list':['commencements'] };
 
   const HRAuth = {

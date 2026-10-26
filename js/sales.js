@@ -7,7 +7,6 @@
   const DEFAULT_CR = '4031263286';          // السجل التجاري المذكور في نص عقود الشركة (قابل للتعديل في الفاتورة)
   const DEFAULT_COMPANY = 'شركة فخر الجزيرة للحراسات الأمنية';
 
-  const INV_PREFIX = 'INV-MAK-';
   const BASE_TYPES = ['حارس أمن','حارسة أمن','مشرف أمن','مدير مشروع','دورية أمنية'];
   // مفاتيح الإيرادات في تبويب المشاريع -> النوع في الفاتورة
   const KIND_TYPE = { guards:'حارس أمن', guardsFemale:'حارسة أمن', supervisors:'مشرف أمن', managers:'مدير مشروع', patrols:'دورية أمنية' };
@@ -27,11 +26,7 @@
   ];
 
   let ctx = null;        // { getInvoices, getProjects, getSettings, save, toast, todayISO }
-  let cur = null;        // الفاتورة المفتوحة الآن (مسودة في الذاكرة حتى الحفظ)
-  let rendered = false;
-  let bound = false;
 
-  const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const clone = o => JSON.parse(JSON.stringify(o));
 
@@ -151,18 +146,28 @@
     }catch(e){ return ''; }
   }
 
+  // ---------- مصنع المستند: نفس الشاشة للفاتورة ولأمر البيع (يختلفان في الإعدادات فقط) ----------
+  function makeDoc(cfg){
+    let cur = null;        // المستند المفتوح الآن (مسودة في الذاكرة حتى الحفظ)
+    let rendered = false;
+    let bound = false;
+    const $ = k => document.getElementById(cfg.id[k]);
+
   // ---------- نموذج الفاتورة ----------
   const blankItem = () => ({ code: '', type: '', qty: '', price: '', days: '', disc: '', vatPct: '15' });
+  const kindOf = i => i.kind || 'invoice';
+  const all = () => ctx.getInvoices();
+  const mine = () => all().filter(i => kindOf(i) === cfg.kind);
   function nextNo(){
     let max = 0;
-    ctx.getInvoices().forEach(i => {
-      const m = /^INV-MAK-(\d+)$/i.exec(String(i.no || '').trim());
+    mine().forEach(i => {
+      const m = new RegExp('^' + cfg.prefix + '(\\d+)$', 'i').exec(String(i.no || '').trim());
       if(m) max = Math.max(max, parseInt(m[1], 10));
     });
-    return INV_PREFIX + String(max + 1).padStart(5, '0');
+    return cfg.prefix + String(max + 1).padStart(5, '0');
   }
   function blankInvoice(){
-    const list = ctx.getInvoices();
+    const list = mine();
     const last = list.length ? list[list.length - 1] : null;
     const st = ctx.getSettings() || {};
     const seller = last && last.seller ? clone(last.seller) : {
@@ -170,7 +175,7 @@
       area: '', country: 'السعودية', postal: '', vat: '', cr: st.cr || DEFAULT_CR
     };
     return {
-      id: '', no: nextNo(), date: '', supply: '', supplyEnd: '', projectId: '', seller,
+      id: '', kind: cfg.kind, no: nextNo(), date: '', supply: '', supplyEnd: '', projectId: '', seller,
       customer: { name: '', bno: '', addno: '', street: '', city: '', area: '', country: 'السعودية', postal: '', vat: '', cr: '' },
       items: [blankItem()], iban: last && last.iban ? last.iban : ''
     };
@@ -217,12 +222,12 @@
     const inv = cur, C = inv.customer, S = inv.seller;
     const cf = k => CUSTOMER_FIELDS.find(x => x[0] === k);
     return `
-      <h3>إدخال الفاتورة</h3>
+      <h3>${cfg.formTitle}</h3>
       <p class="inv-form-hint">كل الإدخالات هنا فقط — والفاتورة بالأسفل تتحدّث تلقائيًا ولا تحتاج تعديل.</p>
       <h4 class="inv-fh">بيانات الفاتورة</h4>
       <div class="field-grid">
-        ${fld('no', 'رقم الفاتورة', inv.no, { ltr: true })}
-        ${fld('date', 'تاريخ الفاتورة', inv.date, { type: 'date', ltr: true })}
+        ${fld('no', cfg.noLabel, inv.no, { ltr: true })}
+        ${fld('date', cfg.dateLabel, inv.date, { type: 'date', ltr: true })}
         ${fld('supply', 'بداية التنفيذ', inv.supply, { type: 'date', ltr: true })}
         ${fld('supplyEnd', 'نهاية التنفيذ', inv.supplyEnd, { type: 'date', ltr: true })}
         <div class="field"><label>الأيام المستحقة (من التاريخين)</label><div class="inv-days-box" data-fc="days">—</div></div>
@@ -238,19 +243,19 @@
         <thead><tr><th>الرمز</th><th>النوع</th><th>العدد</th><th>السعر</th><th>الأيام</th><th>الخصم</th><th>% ضريبة</th><th>الإجمالي</th><th>الصافي</th><th></th></tr></thead>
         <tbody>${inv.items.map(formItemRow).join('')}</tbody>
       </table></div>
-      <div class="inv-addrow"><button type="button" class="btn btn-sm" id="invAddRow">+ إضافة بند</button><small id="invRowsNote"></small></div>
+      <div class="inv-addrow"><button type="button" class="btn btn-sm" id="${cfg.id.addRow}">+ إضافة بند</button><small id="${cfg.id.rowsNote}"></small></div>
       <details class="inv-seller"><summary>بيانات البائع (الشركة)</summary>
         <div class="field-grid">${SELLER_FIELDS.map(([k, ar]) => fld('seller.' + k, ar, S[k] || '', { ltr: ['vat','cr','postal','bno','addno'].includes(k) })).join('')}</div>
       </details>`;
   }
   function renderForm(){
-    const f = $('invForm'); if(!f) return;
+    const f = $('form'); if(!f) return;
     f.innerHTML = formHtml();
     refreshForm();
   }
   // يحدّث الخلايا المحسوبة وملاحظات الإدخال فقط (بدون إعادة بناء الحقول حتى لا يضيع المؤشر)
   function refreshForm(){
-    const f = $('invForm'); if(!f || !cur) return;
+    const f = $('form'); if(!f || !cur) return;
     const T = calcAll(cur);
     const put = (el, v) => { if(el) el.textContent = v; };
     put(f.querySelector('.inv-days-box'), T.P.ok ? T.P.days + ' يوم' : '—');
@@ -261,7 +266,7 @@
       put(tr.querySelector('[data-fc="net"]'), r.empty ? '' : money(r.net));
       const d = tr.querySelector('[data-p$=".days"]'); if(d) d.placeholder = T.P.ok ? String(T.P.days) : 'تلقائي';
     });
-    const add = $('invAddRow'), note = $('invRowsNote');
+    const add = $('addRow'), note = $('rowsNote');
     if(add) add.disabled = cur.items.length >= MAX_ROWS;
     if(note) note.textContent = cur.items.length >= MAX_ROWS ? `الحد الأقصى ${MAX_ROWS} بنود في الصفحة الواحدة` : '';
   }
@@ -283,9 +288,9 @@
       <td class="inv-calc">${r.empty ? '' : money(r.total)}</td><td class="inv-ltr">${esc(it.vatPct)}</td>
       <td class="inv-calc">${r.empty ? '' : money(r.vat)}</td><td class="inv-calc inv-net">${r.empty ? '' : money(r.net)}</td></tr>`).join('');
     return `
-      <div class="inv-title"><b>فاتورة مبيعات ضريبية</b><span>Tax Invoice</span></div>
+      <div class="inv-title"><b>${cfg.titleAr}</b><span>${cfg.titleEn}</span></div>
       <div class="inv-meta">
-        <div class="inv-meta-col">${srow('رقم الفاتورة', 'Inv.No', inv.no, true)}${srow('تاريخ الفاتورة', 'Date', inv.date, true)}</div>
+        <div class="inv-meta-col">${srow(cfg.noLabel, cfg.noEn, inv.no, true)}${srow(cfg.dateLabel, 'Date', inv.date, true)}</div>
         <div class="inv-meta-col">${srow('بداية التنفيذ', 'Start', inv.supply, true)}${srow('نهاية التنفيذ', 'End', inv.supplyEnd, true)}</div>
       </div>
       <div class="inv-panels">
@@ -307,19 +312,19 @@
           <div class="inv-trow"><span class="inv-ar">الضرائب</span><span class="inv-en">VAT ${T.pct == null ? '' : T.pct + ' '}%</span><b>${money(T.vat)}</b></div>
           <div class="inv-trow inv-trow-net"><span class="inv-ar">الصافي</span><span class="inv-en">Net Amount</span><b>${money(T.net)}</b></div>
         </div>
-        <div class="inv-qr">${qrSvg(zatcaPayload(inv, T))}</div>
+        ${cfg.qr ? `<div class="inv-qr">${qrSvg(zatcaPayload(inv, T))}</div>` : ''}
       </div>
       <div class="inv-words">${esc(tafqeet(T.net))}</div>
-      <div class="inv-iban"><span>رقم الحساب الدولي (IBAN)</span><span class="inv-val inv-ltr">${esc(inv.iban)}</span></div>
-      <div class="inv-sign"><span>المستلم <small>Receiver</small></span></div>`;
+      <div class="inv-iban"><span class="inv-iban-l">رقم الحساب الدولي (IBAN)</span><span class="inv-val inv-ltr inv-iban-v">${esc(inv.iban)}</span><span class="inv-iban-note">${cfg.ibanNote}</span></div>
+      <div class="inv-sign"><span>المستلم</span></div>`;
   }
-  function renderSheet(){ const s = $('invSheet'); if(!s || !cur) return; s.innerHTML = sheetHtml(); rendered = true; }
+  function renderSheet(){ const s = $('sheet'); if(!s || !cur) return; s.innerHTML = sheetHtml(); rendered = true; }
   function renderAll(){ renderForm(); renderSheet(); }
   function growAll(){}
 
   function renderList(){
-    const body = $('invListBody'); if(!body) return;
-    const list = [...ctx.getInvoices()].sort((a, b) => String(b.no).localeCompare(String(a.no)));
+    const body = $('listBody'); if(!body) return;
+    const list = [...mine()].sort((a, b) => String(b.no).localeCompare(String(a.no)));
     body.innerHTML = list.length ? list.map(inv => {
       const T = calcAll(inv);
       return `<tr${cur && cur.id === inv.id ? ' class="inv-active"' : ''}>
@@ -328,46 +333,40 @@
         <td><button type="button" class="btn btn-sm" data-inv-open="${esc(inv.id)}">فتح</button>
             <button type="button" class="btn btn-sm" data-inv-copy="${esc(inv.id)}">نسخ</button>
             <button type="button" class="btn btn-sm btn-danger" data-inv-del="${esc(inv.id)}">حذف</button></td></tr>`;
-    }).join('') : '<tr><td colspan="5" class="empty-note">لا توجد فواتير محفوظة بعد</td></tr>';
+    }).join('') : `<tr><td colspan="5" class="empty-note">${cfg.emptyList}</td></tr>`;
 
-    const dl = $('invCustomerList');
-    if(dl){
-      const names = new Set();
-      (ctx.getProjects() || []).forEach(p => { if(p && p.name) names.add(String(p.name).trim()); });
-      ctx.getInvoices().forEach(i => { if(i.customer && i.customer.name) names.add(String(i.customer.name).trim()); });
-      dl.innerHTML = [...names].filter(Boolean).map(n => `<option value="${esc(n)}"></option>`).join('');
-    }
   }
 
   // ---------- عمليات ----------
   function newInvoice(){ cur = blankInvoice(); renderAll(); renderList(); }
   function openInvoice(id, asCopy){
-    const inv = ctx.getInvoices().find(x => x.id === id); if(!inv) return;
+    const inv = all().find(x => x.id === id); if(!inv) return;
     cur = normalize(inv);
     if(asCopy){ cur.id = ''; cur.no = nextNo(); cur.date = ''; cur.supply = ''; cur.supplyEnd = ''; }
     renderAll(); renderList();
-    const w = $('invForm'); if(w) w.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const w = $('form'); if(w) w.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function save(){
     if(!cur) return;
     if(!String(cur.customer.name || '').trim()){ ctx.toast('اكتب اسم العميل أولاً'); return; }
-    if(!String(cur.no || '').trim()){ ctx.toast('رقم الفاتورة مطلوب'); return; }
-    if(!String(cur.date || '').trim()){ ctx.toast('أدخل تاريخ الفاتورة'); return; }
-    const list = ctx.getInvoices();
-    if(list.some(x => x.id !== cur.id && String(x.no) === String(cur.no))){ ctx.toast('رقم الفاتورة مستخدم في فاتورة أخرى'); return; }
+    if(!String(cur.no || '').trim()){ ctx.toast(cfg.noMsg); return; }
+    if(!String(cur.date || '').trim()){ ctx.toast(cfg.dateMsg); return; }
+    const list = all();
+    if(mine().some(x => x.id !== cur.id && String(x.no) === String(cur.no))){ ctx.toast(cfg.dupMsg); return; }
     const rec = clone(cur); rec.updatedAt = new Date().toISOString();
-    if(!rec.id) rec.id = 'inv' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    rec.kind = cfg.kind;
+    if(!rec.id) rec.id = (cfg.kind === 'order' ? 'ord' : 'inv') + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
     const i = list.findIndex(x => x.id === rec.id);
     if(i >= 0) list[i] = rec; else list.push(rec);
     cur.id = rec.id;
-    ctx.save('تم حفظ الفاتورة');
+    ctx.save(cfg.savedMsg);
     renderList();
   }
   function remove(id){
-    if(!confirm('حذف هذه الفاتورة نهائياً؟')) return;
-    const list = ctx.getInvoices(), i = list.findIndex(x => x.id === id); if(i < 0) return;
+    if(!confirm(cfg.delConfirm)) return;
+    const list = all(), i = list.findIndex(x => x.id === id); if(i < 0) return;
     list.splice(i, 1);
-    ctx.save('تم حذف الفاتورة');
+    ctx.save(cfg.delMsg);
     if(cur && cur.id === id){ cur = blankInvoice(); renderAll(); }
     renderList();
   }
@@ -381,7 +380,7 @@
     if(!p){ renderAll(); return; }
     cur.projectId = p.id || '';
     C.cr = p.cr || ''; C.vat = p.vatNo || ''; C.street = p.address || ''; C.city = p.region || C.city || '';
-    const old = [...ctx.getInvoices()].reverse().find(x => x.customer && String(x.customer.name || '').trim() === nm);
+    const old = [...mine()].reverse().find(x => x.customer && String(x.customer.name || '').trim() === nm);
     if(old) ['bno','addno','area','country','postal'].forEach(k => { if(old.customer[k]) C[k] = old.customer[k]; });
     const vp = p.vatRate == null || p.vatRate === '' ? '15' : String(p.vatRate);
     const rows = [], rv = p.revenueItems || {};
@@ -414,11 +413,11 @@
     st.textContent = '@media print{@page{size:A4 portrait !important;margin:0 !important}}';
     document.head.appendChild(st);
     const oldTitle = document.title;
-    document.title = 'فاتورة-' + (cur.no || '');
-    document.body.classList.add('inv-printing');
+    document.title = cfg.printTitle + (cur.no || '');
+    document.body.classList.add(cfg.printClass);
     growAll();
     const done = () => {
-      document.body.classList.remove('inv-printing'); st.remove(); document.title = oldTitle;
+      document.body.classList.remove(cfg.printClass); st.remove(); document.title = oldTitle;
       window.removeEventListener('afterprint', done);
     };
     window.addEventListener('afterprint', done);
@@ -427,16 +426,16 @@
 
   function bind(){
     if(bound) return; bound = true;
-    $('newInvoiceBtn')?.addEventListener('click', newInvoice);
-    $('saveInvoiceBtn')?.addEventListener('click', save);
-    $('printInvoiceBtn')?.addEventListener('click', print);
-    $('invListBody')?.addEventListener('click', e => {
+    $('newBtn')?.addEventListener('click', newInvoice);
+    $('saveBtn')?.addEventListener('click', save);
+    $('printBtn')?.addEventListener('click', print);
+    $('listBody')?.addEventListener('click', e => {
       const o = e.target.closest('[data-inv-open]'), c = e.target.closest('[data-inv-copy]'), d = e.target.closest('[data-inv-del]');
       if(o) openInvoice(o.dataset.invOpen);
       else if(c) openInvoice(c.dataset.invCopy, true);
       else if(d) remove(d.dataset.invDel);
     });
-    const f = $('invForm'); if(!f) return;
+    const f = $('form'); if(!f) return;
     f.addEventListener('input', e => {
       const t = e.target, p = t.dataset && t.dataset.p;
       if(!p || !cur || t.tagName === 'SELECT') return;
@@ -450,7 +449,7 @@
       if(t.dataset.proj) fillFromProject(t.value); else { refreshForm(); renderSheet(); }
     });
     f.addEventListener('click', e => {
-      if(e.target.closest('#invAddRow')){
+      if(e.target.closest('#' + cfg.id.addRow)){
         if(cur.items.length < MAX_ROWS){ cur.items.push(blankItem()); renderAll(); }
         return;
       }
@@ -469,12 +468,82 @@
     });
   }
 
+
+  const api = {
+    bind, render(){ if(!ctx) return; if(!cur) cur = blankInvoice(); renderList(); if(!rendered) renderAll(); },
+    reset(){ cur = null; rendered = false; const s = $('sheet'); if(s) s.innerHTML = ''; const f = $('form'); if(f) f.innerHTML = ''; },
+    open(id, asCopy){ openInvoice(id, asCopy); }
+  };
+  return api;
+  }
+
+  const CFG = {
+    invoice: {
+      kind: 'invoice', prefix: 'INV-MAK-', titleAr: 'فاتورة مبيعات ضريبية', titleEn: 'Tax Invoice', qr: true,
+      noLabel: 'رقم الفاتورة', noEn: 'Inv.No', dateLabel: 'تاريخ الفاتورة', formTitle: 'إدخال الفاتورة',
+      ibanNote: 'نرجو تحويل المبلغ المستحق على حساب الايبان الظاهر في الفاتورة',
+      savedMsg: 'تم حفظ الفاتورة', delMsg: 'تم حذف الفاتورة', delConfirm: 'حذف هذه الفاتورة نهائياً؟',
+      dupMsg: 'رقم الفاتورة مستخدم في فاتورة أخرى', noMsg: 'رقم الفاتورة مطلوب', dateMsg: 'أدخل تاريخ الفاتورة',
+      emptyList: 'لا توجد فواتير محفوظة بعد', printTitle: 'فاتورة-', printClass: 'inv-printing',
+      id: { sheet: 'invSheet', form: 'invForm', listBody: 'invListBody', addRow: 'invAddRow', rowsNote: 'invRowsNote', newBtn: 'newInvoiceBtn', saveBtn: 'saveInvoiceBtn', printBtn: 'printInvoiceBtn' }
+    },
+    order: {
+      kind: 'order', prefix: 'SO-MAK-', titleAr: 'أمر بيع', titleEn: 'Sales Order', qr: false,
+      noLabel: 'رقم الأمر', noEn: 'Order No', dateLabel: 'تاريخ الأمر', formTitle: 'إدخال أمر البيع',
+      ibanNote: 'نرجو تحويل المبلغ المستحق على حساب الايبان الظاهر في أمر البيع',
+      savedMsg: 'تم حفظ أمر البيع', delMsg: 'تم حذف أمر البيع', delConfirm: 'حذف أمر البيع هذا نهائياً؟',
+      dupMsg: 'رقم الأمر مستخدم في أمر آخر', noMsg: 'رقم الأمر مطلوب', dateMsg: 'أدخل تاريخ الأمر',
+      emptyList: 'لا توجد أوامر بيع محفوظة بعد', printTitle: 'أمر-بيع-', printClass: 'ord-printing',
+      id: { sheet: 'ordSheet', form: 'ordForm', listBody: 'ordListBody', addRow: 'ordAddRow', rowsNote: 'ordRowsNote', newBtn: 'newOrderBtn', saveBtn: 'saveOrderBtn', printBtn: 'printOrderBtn' }
+    }
+  };
+  let inv = null, ord = null, allBound = false;
+  const invKind = i => i.kind || 'invoice';
+
+  // ---------- تبويب «كل الفواتير» ----------
+  function renderAllInvoices(){
+    const body = document.getElementById('allInvListBody'); if(!body || !ctx) return;
+    const q = String((document.getElementById('allInvSearch') || {}).value || '').trim().toLowerCase();
+    const list = ctx.getInvoices().filter(i => invKind(i) === 'invoice')
+      .filter(i => !q || [i.no, i.date, i.customer && i.customer.name].join(' ').toLowerCase().includes(q))
+      .sort((a, b) => String(b.no).localeCompare(String(a.no)));
+    let sum = 0;
+    body.innerHTML = list.length ? list.map(x => {
+      const T = calcAll(x); sum += T.net;
+      return `<tr><td class="mono">${esc(x.no)}</td><td class="mono">${esc(x.date)}</td><td>${esc(x.customer && x.customer.name)}</td>
+        <td class="mono">${esc(x.supply || '')}${x.supplyEnd ? ' → ' + esc(x.supplyEnd) : ''}</td><td class="mono">${money(T.vat)}</td><td class="mono"><b>${money(T.net)}</b></td>
+        <td><div class="row-actions"><button type="button" class="btn btn-sm btn-primary" data-all-edit="${esc(x.id)}">تعديل</button>
+        <button type="button" class="btn btn-sm" data-all-copy="${esc(x.id)}">نسخ</button>
+        <button type="button" class="btn btn-sm btn-danger" data-all-del="${esc(x.id)}">حذف</button></div></td></tr>`;
+    }).join('') : '<tr><td colspan="7" class="empty-note">لا توجد فواتير محفوظة</td></tr>';
+    const t = document.getElementById('allInvTotal');
+    if(t) t.textContent = list.length ? `${list.length} فاتورة — إجمالي الصافي: ${money(sum)} ر.س` : '';
+  }
+  function bindAll(){
+    if(allBound) return; allBound = true;
+    document.getElementById('allInvSearch')?.addEventListener('input', renderAllInvoices);
+    document.getElementById('allInvListBody')?.addEventListener('click', e => {
+      const ed = e.target.closest('[data-all-edit]'), cp = e.target.closest('[data-all-copy]'), dl = e.target.closest('[data-all-del]');
+      const go = (id, copy) => { if(root.switchView) root.switchView('sales'); inv.open(id, copy); };
+      if(ed) go(ed.dataset.allEdit, false);
+      else if(cp) go(cp.dataset.allCopy, true);
+      else if(dl){
+        if(!confirm('حذف هذه الفاتورة نهائياً؟')) return;
+        const l = ctx.getInvoices(), i = l.findIndex(x => x.id === dl.dataset.allDel); if(i < 0) return;
+        l.splice(i, 1); ctx.save('تم حذف الفاتورة'); renderAllInvoices();
+      }
+    });
+  }
+
   root.HRSales = {
-    init(c){ ctx = c; bind(); },
+    init(c){ ctx = c; inv = makeDoc(CFG.invoice); ord = makeDoc(CFG.order); inv.bind(); ord.bind(); bindAll(); },
     // يُستدعى عند فتح التبويب: يحافظ على المسودة المفتوحة عند التنقل بين التبويبات
-    render(){ if(!ctx) return; if(!cur) cur = blankInvoice(); renderList(); if(!rendered) renderAll(); },
+    render(){ inv && inv.render(); },
+    renderOrder(){ ord && ord.render(); },
+    renderAll: renderAllInvoices,
     // عند إغلاق التبويب: نبدأ من مسودة جديدة
-    reset(){ cur = null; rendered = false; const s = $('invSheet'); if(s) s.innerHTML = ''; const f = $('invForm'); if(f) f.innerHTML = ''; },
+    reset(){ inv && inv.reset(); },
+    resetOrder(){ ord && ord.reset(); },
     _calc: calcAll, _tafqeet: tafqeet, _num: num
   };
 })(typeof window !== 'undefined' ? window : globalThis);
