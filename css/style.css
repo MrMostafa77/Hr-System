@@ -2603,3 +2603,34 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 #view-sales #invSheet .inv-addtype{position:absolute;left:1px;top:50%;transform:translateY(-50%);width:4.6mm;height:4.6mm;min-width:0;padding:0;border:1px solid #4A638B;border-radius:50%;background:#eef2f9;color:#1f2f4d;font-weight:700;font-size:11px;line-height:1;cursor:pointer}
 #view-sales #invSheet .inv-days{direction:rtl;font-size:9.5px;color:#1f2f4d}
 @media print{#view-sales #invSheet select.inv-sel{border-bottom:0}}
+
+/* ===== فاتورة المبيعات: شاشة الإدخال + عرض الفاتورة للقراءة فقط ===== */
+#view-sales #invSheet .inv-val{display:block;min-height:3.6mm;font-size:9.5px;line-height:1.25;color:#111;white-space:pre-wrap;word-break:break-word;border-bottom:1px dashed rgba(74,99,139,.25)}
+#view-sales #invSheet .inv-val.inv-ltr{direction:ltr;text-align:right}
+#view-sales #invSheet table.inv-items td{font-size:9.5px;word-break:break-word}
+#view-sales #invSheet table.inv-items td.inv-ltr{direction:ltr}
+#view-sales #invSheet table.inv-items th:nth-child(1){width:15mm}
+#view-sales #invSheet table.inv-items th:nth-child(2){width:auto}
+#view-sales #invSheet table.inv-items th:nth-child(3){width:11mm}
+#view-sales #invSheet table.inv-items th:nth-child(4){width:17mm}
+#view-sales #invSheet table.inv-items th:nth-child(5){width:10mm}
+#view-sales #invSheet table.inv-items th:nth-child(6){width:14mm}
+#view-sales #invSheet table.inv-items th:nth-child(7){width:22mm}
+#view-sales #invSheet table.inv-items th:nth-child(8){width:11mm}
+#view-sales #invSheet table.inv-items th:nth-child(9){width:17mm}
+#view-sales #invSheet table.inv-items th:nth-child(10){width:22mm}
+#view-sales #invForm .inv-form-hint{margin:2px 0 10px;opacity:.7;font-size:12px}
+#view-sales #invForm .inv-fh{margin:16px 0 8px;font-size:14px}
+#view-sales #invForm .inv-fh small{opacity:.6;font-weight:400}
+#view-sales #invForm .inv-days-box{min-height:38px;display:flex;align-items:center;padding:0 10px;border:1px solid rgba(74,99,139,.5);border-radius:8px;font-weight:700}
+#view-sales #invForm table.inv-form-items{width:100%;min-width:900px;border-collapse:collapse}
+#view-sales #invForm table.inv-form-items th{padding:6px 4px;font-size:12px;text-align:center}
+#view-sales #invForm table.inv-form-items td{padding:3px;vertical-align:middle}
+#view-sales #invForm table.inv-form-items input.inv-fi{width:100%;min-width:56px;text-align:center}
+#view-sales #invForm .inv-ftype{display:flex;gap:4px;align-items:center;min-width:190px}
+#view-sales #invForm .inv-ftype select{flex:1;min-width:0}
+#view-sales #invForm .inv-fcalc{text-align:center;font-weight:700;white-space:nowrap}
+#view-sales #invForm .inv-addrow{display:flex;align-items:center;gap:10px;margin:8px 0}
+#view-sales #invForm .inv-addrow small{color:#c0392b}
+#view-sales #invForm details.inv-seller{margin-top:14px}
+#view-sales #invForm details.inv-seller summary{cursor:pointer;font-weight:700;margin-bottom:8px}

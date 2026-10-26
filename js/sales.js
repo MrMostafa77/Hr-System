@@ -53,28 +53,33 @@
     return [...new Set(list.map(x => String(x).trim()).filter(Boolean))];
   }
   function parseD(v){ const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(v || '')); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null; }
-  // عدد الأيام المستحقة (شامل يوم البداية والنهاية) وعامل التناسب مع أيام شهر البداية
+  // الفترة العامة للفاتورة: من بداية التنفيذ إلى نهايته (شامل اليومين) + عدد أيام شهر البداية
   function periodInfo(inv){
     const a = parseD(inv.supply), b = parseD(inv.supplyEnd);
-    if(a == null || b == null || b < a) return { days: 0, factor: 1, ok: false };
-    const days = Math.round((b - a) / 86400000) + 1;
-    const d = new Date(a), md = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-    return { days, factor: days === md ? 1 : days / md, ok: true, monthDays: md };
+    const monthDays = a != null ? new Date(Date.UTC(new Date(a).getUTCFullYear(), new Date(a).getUTCMonth() + 1, 0)).getUTCDate() : 30;
+    const days = (a != null && b != null && b >= a) ? Math.round((b - a) / 86400000) + 1 : 0;
+    return { days, monthDays, ok: days > 0 };
   }
-
-  function calcRow(it, factor){
+  // أيام البند: ما كتبته يدويًا إن وُجد، وإلا أيام الفترة العامة
+  function itemDays(it, P){
+    const v = String(it.days == null ? '' : it.days).trim();
+    return v !== '' ? num(v) : P.days;
+  }
+  function calcRow(it, P){
     const qty = num(it.qty), price = num(it.price), disc = num(it.disc), pct = num(it.vatPct);
-    const gross = r2(qty * price * (factor == null ? 1 : factor));
+    const days = itemDays(it, P);
+    const factor = days > 0 ? (days === P.monthDays ? 1 : days / P.monthDays) : 1;
+    const gross = r2(qty * price * factor);
     const total = r2(gross - disc);
     const vat = r2(total * pct / 100);
-    return { gross, disc, total, vat, net: r2(total + vat), pct, empty: !gross && !disc };
+    return { gross, disc, total, vat, net: r2(total + vat), pct, days, factor, empty: !gross && !disc };
   }
   function calcAll(inv){
-    const f = periodInfo(inv).factor;
-    const rows = (inv.items || []).map(it => calcRow(it, f));
+    const P = periodInfo(inv);
+    const rows = (inv.items || []).map(it => calcRow(it, P));
     const sum = k => r2(rows.reduce((a, r) => a + r[k], 0));
     const pcts = [...new Set(rows.filter(r => !r.empty).map(r => r.pct))];
-    return { rows, gross: sum('gross'), disc: sum('disc'), total: sum('total'), vat: sum('vat'), net: sum('net'),
+    return { rows, P, gross: sum('gross'), disc: sum('disc'), total: sum('total'), vat: sum('vat'), net: sum('net'),
              pct: pcts.length === 1 ? pcts[0] : (pcts.length ? null : 15) };
   }
 
@@ -147,7 +152,7 @@
   }
 
   // ---------- نموذج الفاتورة ----------
-  const blankItem = () => ({ code: '', type: '', qty: '', price: '', disc: '', vatPct: '15' });
+  const blankItem = () => ({ code: '', type: '', qty: '', price: '', days: '', disc: '', vatPct: '15' });
   function nextNo(){
     let max = 0;
     ctx.getInvoices().forEach(i => {
@@ -184,120 +189,133 @@
     t[k[k.length - 1]] = v;
   }
 
-  // ---------- العرض ----------
-  function projectSelectHtml(path, val){
-    const names = (ctx.getProjects() || []).map(p => p && p.name ? String(p.name).trim() : '').filter(Boolean);
-    const list = [...new Set(names)];
-    if(val && !list.includes(val)) list.push(val);
-    return `<select class="inv-in inv-sel" data-p="${path}" data-proj="1"><option value="">— اختر العميل / المشروع —</option>` +
-      list.map(n => `<option value="${esc(n)}"${n === val ? ' selected' : ''}>${esc(n)}</option>`).join('') + '</select>';
-  }
-  function rowHtml(path, ar, en, val, o){
+  // ---------- شاشة الإدخال (فوق الفاتورة) ----------
+  function fld(path, label, val, o){
     o = o || {};
-    const inp = o.ta
-      ? `<textarea class="inv-in inv-ta" rows="1" data-p="${path}">${esc(val)}</textarea>`
-      : o.projSelect ? projectSelectHtml(path, val)
-      : `<input class="inv-in${o.ltr ? ' inv-ltr' : ''}" data-p="${path}" value="${esc(val)}">`;
-    return `<div class="inv-row"><span class="inv-ar">${ar}</span>${inp}<span class="inv-en">${en}</span></div>`;
+    const inp = o.select ? `<select data-p="${path}"${o.proj ? ' data-proj="1"' : ''}>${o.select}</select>`
+      : `<input${o.type ? ` type="${o.type}"` : ''} data-p="${path}" value="${esc(val)}"${o.ltr ? ' dir="ltr"' : ''}${o.ph ? ` placeholder="${esc(o.ph)}"` : ''}>`;
+    return `<div class="field"><label>${label}</label>${inp}</div>`;
   }
-  function panelHtml(titleAr, titleEn, fields, obj, key){
-    return `<div class="inv-panel"><div class="inv-panel-h"><span>${titleAr}</span><span class="inv-en-h">${titleEn}</span></div>` +
-      fields.map(([k, ar, en]) => rowHtml(`${key}.${k}`, ar, en, obj[k] || '', {
-        ta: (k === 'name' && key !== 'customer') || k === 'street', projSelect: key === 'customer' && k === 'name',
-        ltr: ['vat','cr','postal','bno','addno'].includes(k)
-      })).join('') + '</div>';
+  function projectOptions(val){
+    const list = [...new Set((ctx.getProjects() || []).map(p => p && p.name ? String(p.name).trim() : '').filter(Boolean))];
+    if(val && !list.includes(val)) list.push(val);
+    return `<option value="">— اختر العميل / المشروع —</option>` + list.map(n => `<option value="${esc(n)}"${n === val ? ' selected' : ''}>${esc(n)}</option>`).join('');
   }
-  function itemRowHtml(it, i){
-    const n = (f, extra) => `<td><input class="inv-in inv-c ${extra || ''}" inputmode="decimal" data-p="items.${i}.${f}" value="${esc(it[f])}"></td>`;
+  function typeOptions(val){
+    return `<option value="">— النوع —</option>` + allTypes([val]).map(t => `<option value="${esc(t)}"${t === val ? ' selected' : ''}>${esc(t)}</option>`).join('');
+  }
+  function formItemRow(it, i){
+    const n = (f, ph) => `<td><input class="inv-fi" inputmode="decimal" data-p="items.${i}.${f}" value="${esc(it[f])}"${ph ? ' placeholder=""' : ''}></td>`;
     return `<tr data-i="${i}">
-      <td><input class="inv-in inv-c" data-p="items.${i}.code" value="${esc(it.code)}"></td>
-      <td class="inv-type-cell"><select class="inv-in inv-sel" data-p="items.${i}.type"><option value="">— النوع —</option>${allTypes([it.type]).map(t => `<option value="${esc(t)}"${t === it.type ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select><button type="button" class="inv-addtype no-print" title="إضافة نوع جديد">+</button></td>
-      ${n('qty')}${n('price')}${n('disc')}
-      <td class="inv-calc" data-c="total"></td>
-      ${n('vatPct')}
-      <td class="inv-calc" data-c="vat"></td>
-      <td class="inv-calc inv-net" data-c="net"><span data-c="net-v"></span><button type="button" class="inv-del no-print" data-del="${i}" title="حذف البند">✕</button></td>
-    </tr>`;
+      <td><input class="inv-fi" data-p="items.${i}.code" value="${esc(it.code)}"></td>
+      <td class="inv-ftype"><select data-p="items.${i}.type">${typeOptions(it.type)}</select><button type="button" class="btn btn-sm inv-addtype" title="إضافة نوع جديد">+</button></td>
+      ${n('qty')}${n('price')}${n('days')}${n('disc')}${n('vatPct')}
+      <td class="mono inv-fcalc" data-fc="total"></td><td class="mono inv-fcalc" data-fc="net"></td>
+      <td><button type="button" class="btn btn-sm btn-danger" data-del="${i}" title="حذف البند">✕</button></td></tr>`;
   }
-  function sheetHtml(){
-    const inv = cur;
+  function formHtml(){
+    const inv = cur, C = inv.customer, S = inv.seller;
+    const cf = k => CUSTOMER_FIELDS.find(x => x[0] === k);
     return `
-      <div class="inv-title"><b>فاتورة مبيعات ضريبية</b><span>Tax Invoice</span></div>
-      <div class="inv-meta">
-        <div class="inv-meta-col">
-          ${rowHtml('no', 'رقم الفاتورة', 'Inv.No', inv.no, { ltr: true })}
-          <div class="inv-row"><span class="inv-ar">تاريخ الفاتورة</span><input type="date" class="inv-in inv-ltr" data-p="date" value="${esc(inv.date)}"><span class="inv-en">Date</span></div>
-          <div class="inv-row"><span class="inv-ar">الأيام المستحقة</span><b class="inv-days" data-c="days"></b><span class="inv-en">Due days</span></div>
-        </div>
-        <div class="inv-meta-col">
-          <div class="inv-row"><span class="inv-ar">بداية التنفيذ</span><input type="date" class="inv-in inv-ltr" data-p="supply" value="${esc(inv.supply)}"><span class="inv-en">Start</span></div>
-          <div class="inv-row"><span class="inv-ar">نهاية التنفيذ</span><input type="date" class="inv-in inv-ltr" data-p="supplyEnd" value="${esc(inv.supplyEnd)}"><span class="inv-en">End</span></div>
-        </div>
+      <h3>إدخال الفاتورة</h3>
+      <p class="inv-form-hint">كل الإدخالات هنا فقط — والفاتورة بالأسفل تتحدّث تلقائيًا ولا تحتاج تعديل.</p>
+      <h4 class="inv-fh">بيانات الفاتورة</h4>
+      <div class="field-grid">
+        ${fld('no', 'رقم الفاتورة', inv.no, { ltr: true })}
+        ${fld('date', 'تاريخ الفاتورة', inv.date, { type: 'date', ltr: true })}
+        ${fld('supply', 'بداية التنفيذ', inv.supply, { type: 'date', ltr: true })}
+        ${fld('supplyEnd', 'نهاية التنفيذ', inv.supplyEnd, { type: 'date', ltr: true })}
+        <div class="field"><label>الأيام المستحقة (من التاريخين)</label><div class="inv-days-box" data-fc="days">—</div></div>
+        ${fld('iban', 'رقم الحساب الدولي (IBAN)', inv.iban, { ltr: true, ph: 'SA…' })}
       </div>
-      <div class="inv-panels">
-        ${panelHtml('بيانات البائع', 'Seller Info', SELLER_FIELDS, inv.seller, 'seller')}
-        ${panelHtml('بيانات العميل', 'Customer Info', CUSTOMER_FIELDS, inv.customer, 'customer')}
+      <h4 class="inv-fh">العميل <small>(من تبويب المشاريع)</small></h4>
+      <div class="field-grid">
+        ${fld('customer.name', 'اسم العميل / المشروع', C.name, { select: projectOptions(C.name), proj: true })}
+        ${['cr','vat','bno','addno','street','city','area','country','postal'].map(k => fld('customer.' + k, cf(k)[1], C[k] || '', { ltr: ['vat','cr','postal','bno','addno'].includes(k) })).join('')}
       </div>
-      <table class="inv-items">
-        <thead><tr>
-          <th>الرمز<small>Item Code</small></th><th>النوع<small>Type</small></th><th>الكمية<small>QTY</small></th>
-          <th>السعر<small>PRICE</small></th><th>الخصم<small>Disc.</small></th><th>السعر الإجمالي<small>Total Price</small></th>
-          <th>% ضريبة<small>VAT %</small></th><th>قيمة الضريبة<small>VAT</small></th><th>الصافي<small>Net Price</small></th>
-        </tr></thead>
-        <tbody>${inv.items.map(itemRowHtml).join('')}</tbody>
-      </table>
-      <div class="inv-addrow no-print"><button type="button" class="btn btn-sm" id="invAddRow">+ إضافة بند</button><small id="invRowsNote"></small></div>
-      <div class="inv-sum">
-        <div class="inv-totals">
-          <div class="inv-trow"><span class="inv-ar">الاجمالي</span><span class="inv-en">Amount</span><b data-c="t-gross"></b></div>
-          <div class="inv-trow"><span class="inv-ar">الخصم</span><span class="inv-en">Discount</span><b data-c="t-disc"></b></div>
-          <div class="inv-trow"><span class="inv-ar">الضرائب</span><span class="inv-en" data-c="t-vatlabel">VAT 15 %</span><b data-c="t-vat"></b></div>
-          <div class="inv-trow inv-trow-net"><span class="inv-ar">الصافي</span><span class="inv-en">Net Amount</span><b data-c="t-net"></b></div>
-        </div>
-        <div class="inv-qr" data-c="qr"></div>
-      </div>
-      <div class="inv-words" data-c="words"></div>
-      <div class="inv-iban"><span>رقم الحساب الدولي (IBAN)</span><input class="inv-in inv-ltr" data-p="iban" value="${esc(inv.iban)}" placeholder="SA…"></div>
-      <div class="inv-sign"><span>المستلم <small>Receiver</small></span></div>`;
+      <h4 class="inv-fh">البنود</h4>
+      <div class="table-wrap"><table class="inv-form-items">
+        <thead><tr><th>الرمز</th><th>النوع</th><th>العدد</th><th>السعر</th><th>الأيام</th><th>الخصم</th><th>% ضريبة</th><th>الإجمالي</th><th>الصافي</th><th></th></tr></thead>
+        <tbody>${inv.items.map(formItemRow).join('')}</tbody>
+      </table></div>
+      <div class="inv-addrow"><button type="button" class="btn btn-sm" id="invAddRow">+ إضافة بند</button><small id="invRowsNote"></small></div>
+      <details class="inv-seller"><summary>بيانات البائع (الشركة)</summary>
+        <div class="field-grid">${SELLER_FIELDS.map(([k, ar]) => fld('seller.' + k, ar, S[k] || '', { ltr: ['vat','cr','postal','bno','addno'].includes(k) })).join('')}</div>
+      </details>`;
   }
-
-  function grow(el){ el.style.height = 'auto'; el.style.height = (el.scrollHeight + 1) + 'px'; }
-  function growAll(){ const s = $('invSheet'); if(s) s.querySelectorAll('textarea.inv-ta').forEach(grow); }
-
-  function renderSheet(){
-    const s = $('invSheet'); if(!s) return;
-    s.innerHTML = sheetHtml();
-    rendered = true;
-    refresh();
-    growAll();
-    setTimeout(growAll, 250);
-    if(document.fonts && document.fonts.ready) document.fonts.ready.then(growAll).catch(() => {});
+  function renderForm(){
+    const f = $('invForm'); if(!f) return;
+    f.innerHTML = formHtml();
+    refreshForm();
   }
-
-  // يحدّث الخلايا المحسوبة فقط (بدون إعادة بناء الحقول حتى لا يضيع المؤشر)
-  function refresh(){
-    const s = $('invSheet'); if(!s || !cur) return;
+  // يحدّث الخلايا المحسوبة وملاحظات الإدخال فقط (بدون إعادة بناء الحقول حتى لا يضيع المؤشر)
+  function refreshForm(){
+    const f = $('invForm'); if(!f || !cur) return;
     const T = calcAll(cur);
+    const put = (el, v) => { if(el) el.textContent = v; };
+    put(f.querySelector('.inv-days-box'), T.P.ok ? T.P.days + ' يوم' : '—');
     cur.items.forEach((it, i) => {
-      const tr = s.querySelector(`tr[data-i="${i}"]`); if(!tr) return;
-      const r = T.rows[i], set = (c, v) => { const el = tr.querySelector(`[data-c="${c}"]`); if(el) el.textContent = v; };
-      tr.classList.toggle('inv-empty-row', r.empty);
-      set('total', r.empty ? '' : money(r.total));
-      set('vat', r.empty ? '' : money(r.vat));
-      set('net-v', r.empty ? '' : money(r.net));
+      const tr = f.querySelector(`tr[data-i="${i}"]`); if(!tr) return;
+      const r = T.rows[i];
+      put(tr.querySelector('[data-fc="total"]'), r.empty ? '' : money(r.total));
+      put(tr.querySelector('[data-fc="net"]'), r.empty ? '' : money(r.net));
+      const d = tr.querySelector('[data-p$=".days"]'); if(d) d.placeholder = T.P.ok ? String(T.P.days) : 'تلقائي';
     });
-    const P = periodInfo(cur), dEl = s.querySelector('[data-c="days"]');
-    if(dEl) dEl.textContent = P.ok ? (P.days + ' يوم' + (P.factor !== 1 ? ' (× ' + (Math.round(P.factor * 10000) / 10000) + ' من الشهر)' : '')) : '';
-    const put = (c, v) => { const el = s.querySelector(`[data-c="${c}"]`); if(el) el.textContent = v; };
-    put('t-gross', money(T.gross)); put('t-disc', money(T.disc)); put('t-vat', money(T.vat)); put('t-net', money(T.net));
-    put('t-vatlabel', 'VAT ' + (T.pct == null ? '' : T.pct + ' ') + '%');
-    put('words', tafqeet(T.net));
-    const qr = s.querySelector('[data-c="qr"]');
-    if(qr) qr.innerHTML = qrSvg(zatcaPayload(cur, T));
     const add = $('invAddRow'), note = $('invRowsNote');
     if(add) add.disabled = cur.items.length >= MAX_ROWS;
     if(note) note.textContent = cur.items.length >= MAX_ROWS ? `الحد الأقصى ${MAX_ROWS} بنود في الصفحة الواحدة` : '';
   }
+
+  // ---------- الفاتورة نفسها (عرض فقط) ----------
+  function srow(ar, en, val, ltr){
+    return `<div class="inv-row"><span class="inv-ar">${ar}</span><span class="inv-val${ltr ? ' inv-ltr' : ''}">${esc(val)}</span><span class="inv-en">${en}</span></div>`;
+  }
+  function spanel(titleAr, titleEn, fields, obj){
+    return `<div class="inv-panel"><div class="inv-panel-h"><span>${titleAr}</span><span class="inv-en-h">${titleEn}</span></div>` +
+      fields.map(([k, ar, en]) => srow(ar, en, obj[k] || '', ['vat','cr','postal','bno','addno'].includes(k))).join('') + '</div>';
+  }
+  function sheetHtml(){
+    const inv = cur, T = calcAll(inv);
+    const shown = inv.items.map((it, i) => ({ it, r: T.rows[i] })).filter(x => !x.r.empty || x.it.type || x.it.code);
+    const rowsHtml = shown.map(({ it, r }) => `<tr>
+      <td>${esc(it.code)}</td><td>${esc(it.type)}</td><td class="inv-ltr">${esc(it.qty)}</td><td class="inv-ltr">${esc(it.price)}</td>
+      <td class="inv-ltr">${r.days > 0 ? esc(String(Math.round(r.days * 100) / 100)) : ''}</td><td class="inv-ltr">${esc(it.disc)}</td>
+      <td class="inv-calc">${r.empty ? '' : money(r.total)}</td><td class="inv-ltr">${esc(it.vatPct)}</td>
+      <td class="inv-calc">${r.empty ? '' : money(r.vat)}</td><td class="inv-calc inv-net">${r.empty ? '' : money(r.net)}</td></tr>`).join('');
+    return `
+      <div class="inv-title"><b>فاتورة مبيعات ضريبية</b><span>Tax Invoice</span></div>
+      <div class="inv-meta">
+        <div class="inv-meta-col">${srow('رقم الفاتورة', 'Inv.No', inv.no, true)}${srow('تاريخ الفاتورة', 'Date', inv.date, true)}</div>
+        <div class="inv-meta-col">${srow('بداية التنفيذ', 'Start', inv.supply, true)}${srow('نهاية التنفيذ', 'End', inv.supplyEnd, true)}</div>
+      </div>
+      <div class="inv-panels">
+        ${spanel('بيانات البائع', 'Seller Info', SELLER_FIELDS, inv.seller)}
+        ${spanel('بيانات العميل', 'Customer Info', CUSTOMER_FIELDS, inv.customer)}
+      </div>
+      <table class="inv-items">
+        <thead><tr>
+          <th>الرمز<small>Item Code</small></th><th>النوع<small>Type</small></th><th>العدد<small>QTY</small></th>
+          <th>السعر<small>PRICE</small></th><th>الأيام<small>Days</small></th><th>الخصم<small>Disc.</small></th><th>السعر الإجمالي<small>Total Price</small></th>
+          <th>% ضريبة<small>VAT %</small></th><th>قيمة الضريبة<small>VAT</small></th><th>الصافي<small>Net Price</small></th>
+        </tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+      <div class="inv-sum">
+        <div class="inv-totals">
+          <div class="inv-trow"><span class="inv-ar">الاجمالي</span><span class="inv-en">Amount</span><b>${money(T.gross)}</b></div>
+          <div class="inv-trow"><span class="inv-ar">الخصم</span><span class="inv-en">Discount</span><b>${money(T.disc)}</b></div>
+          <div class="inv-trow"><span class="inv-ar">الضرائب</span><span class="inv-en">VAT ${T.pct == null ? '' : T.pct + ' '}%</span><b>${money(T.vat)}</b></div>
+          <div class="inv-trow inv-trow-net"><span class="inv-ar">الصافي</span><span class="inv-en">Net Amount</span><b>${money(T.net)}</b></div>
+        </div>
+        <div class="inv-qr">${qrSvg(zatcaPayload(inv, T))}</div>
+      </div>
+      <div class="inv-words">${esc(tafqeet(T.net))}</div>
+      <div class="inv-iban"><span>رقم الحساب الدولي (IBAN)</span><span class="inv-val inv-ltr">${esc(inv.iban)}</span></div>
+      <div class="inv-sign"><span>المستلم <small>Receiver</small></span></div>`;
+  }
+  function renderSheet(){ const s = $('invSheet'); if(!s || !cur) return; s.innerHTML = sheetHtml(); rendered = true; }
+  function renderAll(){ renderForm(); renderSheet(); }
+  function growAll(){}
 
   function renderList(){
     const body = $('invListBody'); if(!body) return;
@@ -322,13 +340,13 @@
   }
 
   // ---------- عمليات ----------
-  function newInvoice(){ cur = blankInvoice(); renderSheet(); renderList(); }
+  function newInvoice(){ cur = blankInvoice(); renderAll(); renderList(); }
   function openInvoice(id, asCopy){
     const inv = ctx.getInvoices().find(x => x.id === id); if(!inv) return;
     cur = normalize(inv);
     if(asCopy){ cur.id = ''; cur.no = nextNo(); cur.date = ''; cur.supply = ''; cur.supplyEnd = ''; }
-    renderSheet(); renderList();
-    const w = document.querySelector('.inv-sheet-wrap'); if(w) w.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    renderAll(); renderList();
+    const w = $('invForm'); if(w) w.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   function save(){
     if(!cur) return;
@@ -350,7 +368,7 @@
     const list = ctx.getInvoices(), i = list.findIndex(x => x.id === id); if(i < 0) return;
     list.splice(i, 1);
     ctx.save('تم حذف الفاتورة');
-    if(cur && cur.id === id){ cur = blankInvoice(); renderSheet(); }
+    if(cur && cur.id === id){ cur = blankInvoice(); renderAll(); }
     renderList();
   }
   // اختيار العميل من المشاريع: ترحيل بياناته وبنود الإيرادات (العدد × الإيراد للفرد) — قابلة للتعديل بعد الترحيل
@@ -360,7 +378,7 @@
     if(!nm){ cur.projectId = ''; return; }
     const p = (ctx.getProjects() || []).find(x => String(x.name || '').trim() === nm);
     C.name = nm;
-    if(!p){ renderSheet(); return; }
+    if(!p){ renderAll(); return; }
     cur.projectId = p.id || '';
     C.cr = p.cr || ''; C.vat = p.vatNo || ''; C.street = p.address || ''; C.city = p.region || C.city || '';
     const old = [...ctx.getInvoices()].reverse().find(x => x.customer && String(x.customer.name || '').trim() === nm);
@@ -380,7 +398,7 @@
     }
     if(rows.length) cur.items = rows.slice(0, MAX_ROWS);
     if(rows.length > MAX_ROWS) ctx.toast('عدد البنود أكثر من ' + MAX_ROWS + ' — تم ترحيل أول ' + MAX_ROWS + ' فقط');
-    renderSheet();
+    renderAll();
   }
   function addType(){
     const nm = (prompt('اسم النوع الجديد:') || '').trim(); if(!nm) return null;
@@ -418,34 +436,35 @@
       else if(c) openInvoice(c.dataset.invCopy, true);
       else if(d) remove(d.dataset.invDel);
     });
-    const s = $('invSheet'); if(!s) return;
-    s.addEventListener('input', e => {
-      const p = e.target.dataset && e.target.dataset.p; if(!p || !cur) return;
-      setPath(cur, p, e.target.value);
-      if(e.target.tagName === 'TEXTAREA') grow(e.target);
-      refresh();
+    const f = $('invForm'); if(!f) return;
+    f.addEventListener('input', e => {
+      const t = e.target, p = t.dataset && t.dataset.p;
+      if(!p || !cur || t.tagName === 'SELECT') return;
+      setPath(cur, p, t.value);
+      refreshForm(); renderSheet();
     });
-    s.addEventListener('change', e => {
-      const t = e.target;
-      if(t.dataset && t.dataset.proj){ setPath(cur, t.dataset.p, t.value); fillFromProject(t.value); }
-      else if(t.tagName === 'SELECT' && t.dataset && t.dataset.p){ setPath(cur, t.dataset.p, t.value); }
+    f.addEventListener('change', e => {
+      const t = e.target, p = t.dataset && t.dataset.p;
+      if(!p || !cur || t.tagName !== 'SELECT') return;
+      setPath(cur, p, t.value);
+      if(t.dataset.proj) fillFromProject(t.value); else { refreshForm(); renderSheet(); }
     });
-    s.addEventListener('click', e => {
+    f.addEventListener('click', e => {
       if(e.target.closest('#invAddRow')){
-        if(cur.items.length < MAX_ROWS){ cur.items.push(blankItem()); renderSheet(); }
+        if(cur.items.length < MAX_ROWS){ cur.items.push(blankItem()); renderAll(); }
         return;
       }
       const at = e.target.closest('.inv-addtype');
       if(at){
         const nm = addType(); if(!nm) return;
         const tr = at.closest('tr'); if(tr) cur.items[+tr.dataset.i].type = nm;
-        renderSheet(); return;
+        renderAll(); return;
       }
       const del = e.target.closest('[data-del]');
       if(del){
         const i = +del.dataset.del;
         if(cur.items.length > 1) cur.items.splice(i, 1); else cur.items[0] = blankItem();
-        renderSheet();
+        renderAll();
       }
     });
   }
@@ -453,9 +472,9 @@
   root.HRSales = {
     init(c){ ctx = c; bind(); },
     // يُستدعى عند فتح التبويب: يحافظ على المسودة المفتوحة عند التنقل بين التبويبات
-    render(){ if(!ctx) return; if(!cur) cur = blankInvoice(); renderList(); if(!rendered) renderSheet(); },
+    render(){ if(!ctx) return; if(!cur) cur = blankInvoice(); renderList(); if(!rendered) renderAll(); },
     // عند إغلاق التبويب: نبدأ من مسودة جديدة
-    reset(){ cur = null; rendered = false; const s = $('invSheet'); if(s) s.innerHTML = ''; },
+    reset(){ cur = null; rendered = false; const s = $('invSheet'); if(s) s.innerHTML = ''; const f = $('invForm'); if(f) f.innerHTML = ''; },
     _calc: calcAll, _tafqeet: tafqeet, _num: num
   };
 })(typeof window !== 'undefined' ? window : globalThis);
