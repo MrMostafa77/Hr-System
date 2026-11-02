@@ -4169,7 +4169,7 @@
     ev.preventDefault();
     const emp=actEmp();
     if(!$a('p_project').value){ showToast('اختر المشروع'); return; }
-    if(!emp){ showToast('اختر الحارس'); return; }
+    if(!emp){ showToast('اختر الموظف'); return; }
     const rec=actFormRec();
     if(!rec.type) rec.type=ATT_CODE_LABELS[rec.code]||'';
     if(['غ','س','ج'].includes(rec.code) && rec.manualAmount==null && !(Number(rec.days)>0) && !(policyItemByName(policyForProjectName(rec.project),rec.type)?.fixed && !rec.manualDays)){
@@ -5255,9 +5255,11 @@
     const job=String(e?.jobtitle||'').trim().toLowerCase();
     return /حارس|حارسة|guard|security guard/.test(job);
   }
+  // كل موظفي الموقع (حراس ومشرفون ومدراء مشاريع وغيرهم) — الحراس أولاً ثم بقية المسميات
   function guardsForProject(projectName){
     const pn=String(projectName||'').trim();
-    return employees.filter(e=>String(e.project||'').trim()===pn && isGuardEmployee(e));
+    return employees.filter(e=>String(e.project||'').trim()===pn)
+      .sort((x,y)=>(isGuardEmployee(y)-isGuardEmployee(x))||String(x.fullname||'').localeCompare(String(y.fullname||''),'ar'));
   }
   function contractForEmployeeProject(e, projectName){
     const pn=String(projectName||e?.project||'').trim();
@@ -5302,7 +5304,7 @@
     const p=document.getElementById('comm_project'), sel=document.getElementById('comm_employee'); if(!p||!sel)return;
     const cur=sel.value, list=guardsForProject(p.value);
     sel.disabled=!p.value||commViewOnly;
-    sel.innerHTML='<option value="">'+(p.value?'اختر الحارس':'اختر الموقع أولاً')+'</option>'+list.map(e=>{
+    sel.innerHTML='<option value="">'+(p.value?'اختر الموظف':'اختر الموقع أولاً')+'</option>'+list.map(e=>{
       const c=contractForEmployeeProject(e,p.value);
       return `<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'')} — ${escapeHtml(e.empcode||'')}${c?'':' — بدون عقد'}</option>`;
     }).join('');
@@ -5324,12 +5326,12 @@
     if(alert){alert.style.display='none';alert.textContent='';alert.className='comm-alert';}
     if(!e){
       document.getElementById('comm_jobtitle').value='';
-      document.getElementById('commPaperStatus').textContent='اختر الموقع والحارس لتعبئة النموذج';
+      document.getElementById('commPaperStatus').textContent='اختر الموقع والموظف لتعبئة النموذج';
       ['paper_name','paper_project','paper_job','paper_date_g','paper_date_h','paper_guard_line_name','paper_id','paper_guard_name'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
       setPaperTypes([]); return;
     }
     const c=contractForEmployeeProject(e,project);
-    if(!c && alert){alert.style.display='block';alert.className='comm-alert danger';alert.textContent='تنبيه: هذا الحارس مسجل على الموقع المختار ولكن لا يوجد له عقد محفوظ على هذا الموقع. لا يمكن حفظ المباشرة قبل إنشاء العقد.';}
+    if(!c && alert){alert.style.display='block';alert.className='comm-alert danger';alert.textContent='تنبيه: هذا الموظف مسجل على الموقع المختار ولكن لا يوجد له عقد محفوظ على هذا الموقع. لا يمكن حفظ المباشرة قبل إنشاء العقد.';}
     document.getElementById('comm_jobtitle').value=e.jobtitle||'';
     const existing=commencements.find(x=>x.empId===e.id && String(x.project||'').trim()===String(project).trim());
     const date=document.getElementById('comm_startdate');
@@ -5343,7 +5345,7 @@
     const vals={paper_name:e.fullname||'',paper_project:project,paper_job:e.jobtitle||'',paper_date_g:g,paper_date_h:h,paper_guard_line_name:e.fullname||'',paper_id:e.idnum||'',paper_guard_name:e.fullname||''};
     Object.entries(vals).forEach(([k,v])=>{const el=document.getElementById(k);if(el)el.value=v;});
     setPaperTypes(types);
-    document.getElementById('commPaperStatus').textContent=c?'تمت تعبئة النموذج تلقائياً من بيانات الموظف والعقد':'الحارس بدون عقد — النموذج للمعاينة فقط';
+    document.getElementById('commPaperStatus').textContent=c?'تمت تعبئة النموذج تلقائياً من بيانات الموظف والعقد':'الموظف بدون عقد — النموذج للمعاينة فقط';
   }
   function renderCommencementPaper(){
     const d=document.getElementById('comm_startdate')?.value||'';
@@ -5392,8 +5394,8 @@
   document.getElementById('saveCommencementBtn')?.addEventListener('click',()=>{
     if(commViewOnly) return;
     const empId=document.getElementById('comm_employee')?.value||'', project=document.getElementById('comm_project')?.value||'', startDate=document.getElementById('comm_startdate')?.value||'';
-    const e=employees.find(x=>x.id===empId);if(!project||!e){showToast('اختر الموقع والحارس أولاً');return;}
-    const contract=contractForEmployeeProject(e,project);if(!contract){showToast('لا يمكن حفظ المباشرة: الحارس بدون عقد على الموقع المختار');return;}
+    const e=employees.find(x=>x.id===empId);if(!project||!e){showToast('اختر الموقع والموظف أولاً');return;}
+    const contract=contractForEmployeeProject(e,project);if(!contract){showToast('لا يمكن حفظ المباشرة: الموظف بدون عقد على الموقع المختار');return;}
     if(!startDate){showToast('اختر تاريخ المباشرة');return;}
     const types=selectedCommTypes();if(types.length!==1){showToast('اختر نوع المباشرة');return;}
     const existingIndex=commencements.findIndex(x=>x.empId===e.id && String(x.project||'').trim()===String(project).trim());
