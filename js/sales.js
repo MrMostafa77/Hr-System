@@ -535,12 +535,59 @@
     });
   }
 
+
+  // ---------- تقارير «أوامر البيع» و«الفواتير» ----------
+  const reportBound = {};
+  function reportDetailsHtml(x){
+    const T = calcAll(x);
+    const rows = (x.items || []).map((it, i) => ({ it, r: T.rows[i] })).filter(o => !o.r.empty);
+    const per = (x.supply || x.supplyEnd) ? `<div class="rep-det-meta">فترة التنفيذ: <span class="mono">${esc(x.supply || '')}${x.supplyEnd ? ' → ' + esc(x.supplyEnd) : ''}</span></div>` : '';
+    if(!rows.length) return per + '<div class="empty-note">لا توجد بنود</div>';
+    return per + `<table class="rep-det-table"><thead><tr><th>#</th><th>البند</th><th>الكمية</th><th>السعر</th><th>الأيام</th><th>الخصم</th><th>الخاضع</th><th>الضريبة</th><th>الإجمالي</th></tr></thead><tbody>` +
+      rows.map((o, n) => `<tr><td>${n + 1}</td><td>${esc(o.it.type || o.it.desc || o.it.code || '')}</td><td class="mono">${esc(o.it.qty)}</td><td class="mono">${money(num(o.it.price))}</td>
+        <td class="mono">${o.r.days || ''}</td><td class="mono">${money(o.r.disc)}</td><td class="mono">${money(o.r.total)}</td><td class="mono">${money(o.r.vat)}</td><td class="mono">${money(o.r.net)}</td></tr>`).join('') +
+      '</tbody></table>';
+  }
+  function renderReport(kind, p, label){
+    const body = document.getElementById(p + 'Body'); if(!body || !ctx) return;
+    const val = id => String((document.getElementById(p + id) || {}).value || '').trim();
+    const q = val('Search').toLowerCase(), from = val('From'), to = val('To');
+    const list = ctx.getInvoices().filter(i => invKind(i) === kind)
+      .filter(i => !q || [i.no, i.customer && i.customer.name].join(' ').toLowerCase().includes(q))
+      .filter(i => (!from || String(i.date || '') >= from) && (!to || String(i.date || '') <= to))
+      .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) || String(b.no).localeCompare(String(a.no)));
+    let sT = 0, sV = 0, sN = 0;
+    body.innerHTML = list.length ? list.map(x => {
+      const T = calcAll(x); sT += T.total; sV += T.vat; sN += T.net;
+      return `<tr><td class="mono">${esc(x.no)}</td><td>${esc(x.customer && x.customer.name)}</td><td class="mono">${esc(x.date || '')}</td>
+        <td class="mono">${money(T.total)}</td><td class="mono">${money(T.vat)}</td><td class="mono"><b>${money(T.net)}</b></td>
+        <td><button type="button" class="btn btn-sm" data-rep-det="${esc(x.id)}">تفاصيل</button></td></tr>
+        <tr class="rep-det-row" data-rep-row="${esc(x.id)}" style="display:none"><td colspan="7">${reportDetailsHtml(x)}</td></tr>`;
+    }).join('') + `<tr class="rep-total-row"><td colspan="3">الإجمالي (${list.length})</td><td class="mono">${money(sT)}</td><td class="mono">${money(sV)}</td><td class="mono"><b>${money(sN)}</b></td><td></td></tr>`
+      : `<tr><td colspan="7" class="empty-note">لا توجد ${label} مطابقة</td></tr>`;
+    const t = document.getElementById(p + 'Total');
+    if(t) t.textContent = list.length ? `${list.length} ${label} — الخاضع: ${money(sT)} — الضريبة: ${money(sV)} — الإجمالي: ${money(sN)} ر.س` : '';
+    if(!reportBound[p]){
+      reportBound[p] = true;
+      ['Search', 'From', 'To'].forEach(k => document.getElementById(p + k)?.addEventListener('input', () => renderReport(kind, p, label)));
+      body.addEventListener('click', e => {
+        const b = e.target.closest('[data-rep-det]'); if(!b) return;
+        const row = body.querySelector('[data-rep-row="' + b.dataset.repDet + '"]'); if(!row) return;
+        const open = row.style.display === 'none';
+        row.style.display = open ? '' : 'none';
+        b.textContent = open ? 'إخفاء' : 'تفاصيل';
+      });
+    }
+  }
+
   root.HRSales = {
     init(c){ ctx = c; inv = makeDoc(CFG.invoice); ord = makeDoc(CFG.order); inv.bind(); ord.bind(); bindAll(); },
     // يُستدعى عند فتح التبويب: يحافظ على المسودة المفتوحة عند التنقل بين التبويبات
     render(){ inv && inv.render(); },
     renderOrder(){ ord && ord.render(); },
     renderAll: renderAllInvoices,
+    renderOrderReport(){ renderReport('order', 'repOrd', 'أمر بيع'); },
+    renderInvoiceReport(){ renderReport('invoice', 'repInv', 'فاتورة'); },
     // عند إغلاق التبويب: نبدأ من مسودة جديدة
     reset(){ inv && inv.reset(); },
     resetOrder(){ ord && ord.reset(); },

@@ -2804,3 +2804,11 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 #view-allinvoices .row-actions{display:flex;gap:6px;flex-wrap:wrap}
 #view-allinvoices td.empty-note{text-align:center;opacity:.7;padding:14px}
 #view-allinvoices .inv-form-hint{margin:6px 0 10px;font-weight:700}
+
+/* تقارير أوامر البيع والفواتير */
+.rep-sales-table td.empty-note,.rep-det-table td.empty-note,.rep-det-row .empty-note{text-align:center;opacity:.7;padding:14px}
+.rep-total-row td{font-weight:700;background:rgba(74,99,139,.12)}
+.rep-det-row > td{background:rgba(74,99,139,.06);padding:10px 14px !important}
+.rep-det-meta{margin-bottom:8px;font-size:12.5px}
+.rep-det-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.rep-det-table th,.rep-det-table td{padding:5px 8px;border-bottom:1px solid rgba(128,128,128,.25);text-align:right}
