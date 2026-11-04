@@ -339,6 +339,7 @@
     background:var(--surface); color:var(--ink);
   }
   .att-select.code-ح{background:var(--teal-soft); color:var(--teal); border-color:var(--teal);}
+  .att-select[class*="code--"]{background:#ECEFF3; color:#4A5565; border-color:#9AA5B5;}
   .att-select.code-غ{background:var(--red-soft); color:var(--red); border-color:var(--red);}
   .att-select.code-ج{background:#F6E0DA; color:#8A3A22; border-color:#C1522F;}
   .att-select.code-ط{background:#E7EBF0; color:#365C91; border-color:#7C8FD6;}

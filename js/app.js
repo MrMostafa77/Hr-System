@@ -14,7 +14,7 @@
   const PROJECT_ACCOUNT_KEY = 'hr_project_accounts_v1';
   const PAYROLL_KEY = 'hr_payroll_v1';
   const INVOICE_KEY = 'hr_invoices_v1';
-  const ATT_CODES = ['','ح','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق'];
+  const ATT_CODES = ['','ح','-','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق'];   // (-) = لم يحضر: لا حضور ولا غياب، يُخصم يومه من الراتب بدون جزاء
   let employees = [];
   let attendance = {};   // { "YYYY-MM": { empId: { day: code } } }
   let penalties = [];    // [{id, empId, date, type, days, notes}]
@@ -2612,7 +2612,7 @@
   // الدوام = كل الأيام المسجلة بأي حرف (ح + أي إجراء) على أساس أيام الشهر الفعلية
   function attWorkDays(cols, empId){
     if(!cols.length) return 0;
-    let coded=0; cols.forEach(c=>{ if(attCodeAt(c.ym, empId, c.d)) coded++; });
+    let coded=0; cols.forEach(c=>{ const k=attCodeAt(c.ym, empId, c.d); if(k && k!=='-') coded++; });
     return Math.min(payMonthDaysFor(cols), coded);
   }
   function payrollAdjustmentFor(ym, empId){
@@ -2661,7 +2661,7 @@
      حتى لو تغيّر راتب الموظف أو لائحة المشروع، إلا إذا تغيّر حضور الموظف في ذلك الشهر
      أو إجراءاته أو تعديلات المسير (مكافأة/خصومات...) — وعندها يُعاد الحساب بنفس الراتب المثبّت. */
   const PAY_SNAP_KEYS=['day','basic','housing','transport','otherAllow','monthlyGross','overtime','bonus','totalEarned','nonWorkDays','nonWorkDed','absenceDays','absence','penalty','withdrawal','gosi','uniform','newspaper','advance','other','deduction','net','insuranceBase','workDays'];
-  const PAY_SUM_ZERO={'ح':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
+  const PAY_SUM_ZERO={'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
   function payCanFreeze(){ return !(window.HRAuth&&typeof window.HRAuth.canFinance==='function') || !!window.HRAuth.canFinance(); }
   // الموظف يدخل مسير الشهر فقط إذا باشر في هذا الشهر أو قبله (أول حضور له لا يقع بعد نهاية الشهر)
   function employeeInPayrollMonth(e,ym){ return employeeEligibleForHR(e) && !employeeNotStartedFor(e,monthCols(ym)); }
@@ -2735,8 +2735,8 @@
     const periodOpen=cols.length>0 && cols[cols.length-1].iso>todayISO();
     let nonWorkDays;
     if(notStarted) nonWorkDays=MD;
-    else if(periodOpen){ const st=attStartDateFor(e.id)||'', td=todayISO(); let el=0; cols.forEach(c=>{ if(c.iso<=td && (!st||c.iso>=st)) el++; }); nonWorkDays=MD-Math.min(MD,el); }
-    else nonWorkDays=nonAttendanceDaysForCols(e,cols);
+    else if(periodOpen){ const st=attStartDateFor(e.id)||'', td=todayISO(); let el=0, dash=0; cols.forEach(c=>{ if(c.iso<=td && (!st||c.iso>=st)){ el++; if(attCodeAt(c.ym,e.id,c.d)==='-') dash++; } }); nonWorkDays=Math.min(MD, MD-Math.min(MD,el)+dash); }
+    else nonWorkDays=Math.min(MD, nonAttendanceDaysForCols(e,cols)+(sum['-']||0));   // (-) يُخصم يومه كأنه لم يحضر، ولا يدخل في الغياب
     const paidDays=MD-nonWorkDays, nonWorkDed=notStarted?r2(monthlyGross):r2(nonWorkDays*day);
     const ded=attDeductionsFor(e,cols,day), penalty=ded.penalty, withdrawal=ded.withdrawal;
     // الغياب (غ) حسب لائحة المشروع، والانكشاف (ش) يوم بأجر اليوم الإجمالي
@@ -3161,7 +3161,7 @@
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
   }
   const ATT_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
-  const ATT_CODE_LABELS = {'':'—','ح':'حضور','غ':'غياب','ش':'انكشاف','ج':'جزاء','راحة':'راحة','ط':'تغطية','ض':'إضافي','س':'انسحاب','جمع':'جمع','عيد':'عيد','ق':'تطبيق'};
+  const ATT_CODE_LABELS = {'':'—','ح':'حضور','غ':'غياب','ش':'انكشاف','ج':'جزاء','راحة':'راحة','ط':'تغطية','ض':'إضافي','س':'انسحاب','جمع':'جمع','عيد':'عيد','ق':'تطبيق','-':'لم يحضر (بدون غياب)'};
   function monthLabel(ym){
     if(!ym) return '';
     const [y,m] = ym.split('-').map(Number);
@@ -3224,7 +3224,7 @@
   }
   function attSummaryFor(ym, empId){
     const rec = effectiveAttendanceRecord(ym, empId);
-    const counts = {'ح':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
+    const counts = {'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
     Object.values(rec).forEach(code=>{ if(Object.prototype.hasOwnProperty.call(counts,code)) counts[code]++; });
     return counts;
   }
@@ -3262,7 +3262,7 @@
     return autoAttendanceCode(ym, empId, day);
   }
   function attSummaryForCols(cols, empId){
-    const counts = {'ح':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
+    const counts = {'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
     cols.forEach(c=>{ const code=attCodeAt(c.ym, empId, c.d); if(Object.prototype.hasOwnProperty.call(counts,code)) counts[code]++; });
     return counts;
   }
