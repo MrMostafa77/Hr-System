@@ -2812,3 +2812,12 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 .rep-det-meta{margin-bottom:8px;font-size:12.5px}
 .rep-det-table{width:100%;border-collapse:collapse;font-size:12.5px}
 .rep-det-table th,.rep-det-table td{padding:5px 8px;border-bottom:1px solid rgba(128,128,128,.25);text-align:right}
+
+/* حالة الموظف */
+.emp-status-box{display:flex;flex-wrap:wrap;gap:10px 22px;padding:12px 14px;border:1px solid var(--line,#d9e2e6);border-radius:10px;background:rgba(0,0,0,.02)}
+.emp-status-box label{display:inline-flex;align-items:center;gap:7px;font-weight:600;cursor:pointer;margin:0}
+.emp-status-box input[type=checkbox]{width:17px;height:17px;margin:0;cursor:pointer}
+.emp-status-hint{display:block;margin-top:6px;color:var(--ink-soft,#5b6b73);font-size:11.5px;line-height:1.6}
+#reportTableBody tr.pay-held td{background-image:linear-gradient(rgba(255,193,7,.16),rgba(255,193,7,.16))}
+.pay-status-note{display:block;margin-bottom:4px;font-size:11px;font-weight:700;color:#8a5a00}
+.pay-status-note.held{color:#b42318}

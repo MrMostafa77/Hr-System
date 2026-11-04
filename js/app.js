@@ -2221,6 +2221,7 @@
     const housingPct=document.getElementById('f_housing_pct'), transportPct=document.getElementById('f_transport_pct'), otherPct=document.getElementById('f_otherallow_pct');
     if(housingPct) housingPct.value='25'; if(transportPct) transportPct.value='38.5'; if(otherPct) otherPct.value='0'; const payHint=document.getElementById('payAutoHint'); if(payHint) payHint.hidden=true;
     const delMemo=document.getElementById('f_delegate_memo'); if(delMemo){delMemo.value=''; delete delMemo.dataset.value;} const delName=document.getElementById('f_delegate_name'); if(delName) delName.value=''; const delMemoName=document.getElementById('delegateMemoName'); if(delMemoName) delMemoName.textContent=''; syncBankAccountType(); const photoEl=document.getElementById('f_idphoto'); if(photoEl){ photoEl.value=''; delete photoEl.dataset.value; } const photoName=document.getElementById('idPhotoName'); if(photoName) photoName.textContent=''; const personalRadio=document.querySelector('input[name=bankAccountType][value="حساب شخصي"]'); if(personalRadio) personalRadio.checked=true;
+    document.querySelectorAll('#empForm input[name=empStatus]').forEach(x=>{ x.checked=false; });
     document.getElementById('formTitle').textContent = 'إضافة موظف جديد';
     syncStartDateAction();
     fillNationalityAndIssueRegion(); refreshDepartmentJobSelects(); refreshEmployeeProjectSelect(''); composeFullName(); updateBankFromIBAN(); syncAllowancePercentagesFromData(); clearValidation();
@@ -2239,6 +2240,7 @@
     const photoEl=document.getElementById('f_idphoto'); if(photoEl){ photoEl.value=''; if(e.idphoto) photoEl.dataset.value=e.idphoto; else delete photoEl.dataset.value; } const photoName=document.getElementById('idPhotoName'); if(photoName) photoName.textContent=e.idphoto?'صورة هوية محفوظة':''; const bankRadio=document.querySelector(`input[name=bankAccountType][value=\"${e.bankAccountType||'حساب شخصي'}\"]`); if(bankRadio) bankRadio.checked=true; syncBankAccountType(); updateLastWage();
     syncEmployeeContractStatus(e.id);
     syncAllowancePercentagesFromData();
+    { const st=Array.isArray(e.statuses)?e.statuses:[]; document.querySelectorAll('#empForm input[name=empStatus]').forEach(x=>{ x.checked=st.includes(x.value); }); }
     document.getElementById('formTitle').textContent = 'تعديل بيانات: ' + (e.fullname||'');
     refreshDepartmentJobSelects(e.dept||'', e.jobtitle||''); fillNationalityAndIssueRegion(); refreshEmployeeProjectSelect(e.region||''); const projectEl=document.getElementById('f_project'); if(projectEl) projectEl.value=e.project||''; composeFullName(); updateBankFromIBAN();
     { const sd=document.getElementById('f_startdate'); const cd=String(commencementForEmployee(e.id)?.startDate||'').slice(0,10); if(sd && cd) sd.value=cd; else if(sd && !sd.value) sd.value=commencementDateForEmployee(e.id); }
@@ -2439,6 +2441,7 @@
     data.delegate_name=document.getElementById('f_delegate_name')?.value||'';
     const dm=document.getElementById('f_delegate_memo'); data.delegate_memo=dm?.dataset.value||data.delegate_memo||''; data.delegate_memo_name=dm?.files?.[0]?.name || data.delegate_memo_name || '';
     data.lastwage=Number(data.basicsalary||0)+Number(data.housing||0)+Number(data.transport||0)+Number(data.otherallow||0);
+    data.statuses=[...document.querySelectorAll('#empForm input[name=empStatus]:checked')].map(x=>x.value);
     delete data.contracttype; delete data.contractstatus; delete data.contractduration; delete data.contractend; delete data.gosi;
     const errors={};
     if(!data.firstname) errors.firstname='الاسم مطلوب.';
@@ -2680,14 +2683,14 @@
     const rec=payrollRecords[ym][empId]=payrollRecords[ym][empId]||{bonus:0,uniform:0,newspaper:0,advance:0,other:0,internalAction:'',note:''};
     const p={}; PAY_SNAP_KEYS.forEach(k=>{ if(st[k]) p[k]=st[k]; });
     const sum={}; Object.keys(st.sum||{}).forEach(k=>{ if(st.sum[k]) sum[k]=st.sum[k]; });
-    rec.snap={v:2,fp,p,sum,ded:st.dedItems||[],at:new Date().toISOString()};
+    rec.snap={v:2,fp,p,sum,ded:st.dedItems||[],held:st.held?1:0,stt:st.statusText||'',at:new Date().toISOString()};
     clearTimeout(paySnapTimer); paySnapTimer=setTimeout(()=>persistCloud(null),700);
   }
   function payStatementFromSnap(snap,cols,a){
     const st={ym:cols[0].ym,notStarted:false,frozen:true};
     PAY_SNAP_KEYS.forEach(k=>{ st[k]=Number(snap.p&&snap.p[k])||0; });
     st.sum=Object.assign({},PAY_SUM_ZERO,snap.sum||{});
-    st.dedItems=Array.isArray(snap.ded)?snap.ded:[]; st.adjustment=a;
+    st.dedItems=Array.isArray(snap.ded)?snap.ded:[]; st.adjustment=a; st.held=!!snap.held; st.statusText=snap.stt||'';
     return st;
   }
   function payrollStatementForCols(e,cols,sumIn){
@@ -2706,6 +2709,21 @@
     let n=0; const m=payrollRecords[ym]||{};
     Object.keys(m).forEach(id=>{ if(m[id]&&m[id].snap){ delete m[id].snap; n++; } });
     return n;
+  }
+  /* ===== حالة الموظف وأثرها على المسير =====
+     كل الحالات عدا الإجازة المرضية = الراتب يُحسب ويظهر في سطر الموظف لكنه لا يدخل في إجمالي المسير.
+     الإجازة المرضية = حساب عادي وتظهر الحالة في الملاحظات. */
+  const EMP_STATUS_LIST=[
+    {k:'stop',label:'إيقاف عن العمل',hold:true},
+    {k:'annual',label:'إجازة سنوية',hold:true},
+    {k:'sick',label:'إجازة مرضية',hold:false},
+    {k:'mgmt',label:'إيقاف الإدارة',hold:true},
+    {k:'resign',label:'استقالة',hold:true},
+    {k:'absent',label:'تغيب عن العمل',hold:true}
+  ];
+  function empStatusInfo(e){
+    const s=Array.isArray(e&&e.statuses)?e.statuses:[], list=EMP_STATUS_LIST.filter(x=>s.includes(x.k)), held=list.some(x=>x.hold);
+    return {held, text:list.length?((held?'راتب موقوف: ':'')+list.map(x=>x.label).join('، ')):''};
   }
   function payrollComputeStatement(e,cols,sumIn){
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
@@ -2729,7 +2747,8 @@
     const gosi=(project?.siEnabled && !notStarted) ? r2(insuranceBase*(Number(project.siGuardRate)||SI_GUARD_RATE)/100*paidDays/MD) : 0;
     const uniform=Number(a.uniform)||0,newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0,other=Number(a.other)||0;
     const deduction=r2(nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance+other);
-    return {ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
+    const stI=empStatusInfo(e);
+    return {held:stI.held,statusText:stI.text,ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
   }
   function payrollStatementFor(e){
     const ym=document.getElementById('payrollMonth')?.value||payrollAvailableMonths()[0]||currentMonthStr();
@@ -2861,7 +2880,7 @@
         ['خصم عدم المباشرة',fmt(p.nonWorkDed)],['التأمينات',fmt(p.gosi)],['خصم الغياب',fmt(p.absence)],['الجزاءات',fmt(p.penalty)],
         ['الانسحاب',fmt(p.withdrawal)],['السلف',fmt(a.advance)],['خصومات أخرى',fmt((Number(a.uniform)||0)+(Number(a.newspaper)||0)+(Number(a.other)||0))],['إجمالي الخصومات',fmt(p.deduction)],
         ['صافي الراتب',fmt(p.net)]
-      ].map(x=>`<div><small>${escapeHtml(x[0])}</small><b class="mono">${escapeHtml(x[1])}</b></div>`).join('')}</div><div class="employee-payroll-note">${escapeHtml(a.internalAction||a.note||'لا توجد ملاحظات على المسير')}</div></div>`;
+      ].map(x=>`<div><small>${escapeHtml(x[0])}</small><b class="mono">${escapeHtml(x[1])}</b></div>`).join('')}</div><div class="employee-payroll-note">${escapeHtml([p.statusText,a.internalAction||a.note].filter(Boolean).join(' — ')||'لا توجد ملاحظات على المسير')}</div></div>`;
       return `<tr class="employee-history-month" data-history-kind="payroll" data-history-month="${escapeAttr(ym)}"><td><span class="employee-row-chevron">▸</span><b>${escapeHtml(monthLabel(ym))}</b></td><td class="mono">${fmt(p.monthlyGross)}</td><td class="mono">${fmt(p.deduction)}</td><td class="mono"><b>${fmt(p.net)}</b></td></tr><tr class="employee-history-detail employee-payroll-history-detail" style="display:none"><td colspan="4">${detail}</td></tr>`;
     }).join('');
     const covRows=empCov.map(x=>`<tr><td class="mono">${escapeHtml(x.date||'—')}</td><td>${escapeHtml(x.guardName||'—')}</td><td>${escapeHtml(x.absentName||x.absent||'—')}</td><td>${escapeHtml(x.location||x.project||'—')}</td><td>${escapeHtml(covStatusText(x.status)||'—')}</td><td class="mono">${fmt(x.amount)}</td><td>${escapeHtml(x.notes||'—')}</td></tr>`).join('');
@@ -3054,7 +3073,7 @@
     body.innerHTML=list.map((e,i)=>{
       const p=payrollStatementForCols(e,monthCols(ym)),a=p.adjustment||{},action=a.internalAction||'';
       const red=v=>Number(v)>0?' style="color:#b42318;font-weight:700"':'';
-      return `<tr data-pay-row="${escapeAttr(e.id)}">
+      return `<tr data-pay-row="${escapeAttr(e.id)}"${p.held?' class="pay-held"':''}>
       <td class="mono g1 st1">${i+1}</td><td class="g1 st2"><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td class="g1">${escapeHtml(e.project||e.region||'—')}</td><td class="g1">${escapeHtml(e.jobtitle||'—')}</td>
       <td class="mono g2">${fmt(p.day)}</td><td class="mono g2">${fmt(p.basic)}</td><td class="mono g2">${fmt(p.housing)}</td><td class="mono g2">${fmt(p.transport)}</td><td class="mono g2">${fmt(p.otherAllow)}</td><td class="mono g2 tot">${fmt(p.monthlyGross)}</td>
       <td class="mono g2">${fmt(p.overtime)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
@@ -3065,7 +3084,7 @@
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="advance" data-emp="${escapeAttr(e.id)}" value="${Number(a.advance)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="other" data-emp="${escapeAttr(e.id)}" value="${Number(a.other)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="mono g3 tot" ${red(p.deduction)}>${fmt(p.deduction)}</td><td class="mono g4 tot" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
-      <td class="g5"><select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
+      <td class="g5">${p.statusText?`<small class="pay-status-note${p.held?' held':''}">${escapeHtml(p.statusText)}</small>`:''}<select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
       </tr>`;
     }).join('')||'<tr><td colspan="25" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
@@ -3545,7 +3564,7 @@
     {h:'الأجر الأخير',k:r=>r.p.monthlyGross,t:'n',sum:1,b:1,tot:1},{h:'إضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'مكافآت',k:r=>r.p.bonus,t:'n',sum:1},{h:'إجمالي الراتب',k:r=>r.p.totalEarned,t:'n',sum:1,b:1,tot:1},
     {h:'خصم عدم دوام',k:r=>r.p.nonWorkDed,t:'n',sum:1},{h:'تأمينات اجتماعية',k:r=>r.p.gosi,t:'n',sum:1},{h:'غيابات',k:r=>r.p.absence,t:'n',sum:1},{h:'جزاءات',k:r=>r.p.penalty,t:'n',sum:1},{h:'انسحاب',k:r=>r.p.withdrawal,t:'n',sum:1},
     {h:'البدلة',k:r=>r.p.uniform,t:'n',sum:1},{h:'الصحيفة',k:r=>r.p.newspaper,t:'n',sum:1},{h:'سلف',k:r=>r.p.advance,t:'n',sum:1},{h:'أخرى',k:r=>r.p.other,t:'n',sum:1},{h:'إجمالي الخصومات',k:r=>r.p.deduction,t:'n',sum:1,b:1,tot:1},{h:'صافي الراتب',k:r=>r.p.net,t:'n',sum:1,b:1,net:1,tot:1},
-    {h:'إجراء داخلي',k:r=>r.p.adjustment?.internalAction||'',t:'s',w:22}
+    {h:'إجراء داخلي',k:r=>[r.p.statusText,r.p.adjustment?.internalAction].filter(Boolean).join(' — '),t:'s',w:22}
   ];
   function ppNf(n){return(Math.round((Number(n)||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});}
   function ppFmt(col,v){return col.t==='n'?ppNf(v):(col.t==='i'?String(Number(v)||0):String(v==null?'':v));}
@@ -3553,10 +3572,10 @@
     const first=cols[0],last=cols[cols.length-1],isMonth=first.d===1&&first.ym===last.ym&&cols.length===daysInMonth(first.ym),periodLabel=isMonth?`شهر ${monthLabel(first.ym)}`:`الفترة من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)}`;
     const projs=[...new Set(list.map(e=>e.project).filter(Boolean))],scope=single?`الموظف: ${list[0].fullname||''}`:(projs.length===1?`المشروع: ${projs[0]}`:'كل المشاريع');
     const rows=list.map((e,i)=>({i:i+1,name:e.fullname||'',location:e.project||e.region||'',job:e.jobtitle||'',p:payrollStatementForCols(e,cols)}));
-    const totals=PP_COLS.map(c=>c.sum?r2(rows.reduce((a,r)=>a+(Number(c.k(r))||0),0)):null);
+    const totals=PP_COLS.map(c=>c.sum?r2(rows.reduce((a,r)=>a+(r.p.held?0:(Number(c.k(r))||0)),0)):null), heldCount=rows.filter(r=>r.p.held).length;
     const title=`${single?'مسير راتب':'مسير رواتب'} ${periodLabel}`,sub=`${scope} — من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)} — أساس الحساب ${payMonthDaysFor(cols)} يوم${single?'':` — عدد الموظفين: ${rows.length}`} — تاريخ الإعداد: ${fmtDMY(todayISO())}`;
     const fileBase=`مسير_${single?(list[0].fullname||'موظف'):(projs.length===1?projs[0]:'كل_المشاريع')}_${isMonth?monthLabel(first.ym):fmtDMY(first.iso)+'_'+fmtDMY(last.iso)}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
-    return {title,sub,rows,totals,single,fileBase,cls:'pay-paper',monthDays:payMonthDaysFor(cols)};
+    return {title,sub,rows,totals,heldCount,single,fileBase,cls:'pay-paper',monthDays:payMonthDaysFor(cols)};
   }
   // رقم مجموعة اللون لكل عمود (تدرج لوني حسب أقسام الجدول)
   function ppColGroups(){ const g=[]; PP_GROUPS.forEach(([t,n],gi)=>{ for(let k=0;k<n;k++) g.push(gi+1); }); return g; }
@@ -3574,7 +3593,7 @@
     if(!m.single){
       h+='</tbody><tfoot><tr><td colspan="5">الإجمالي</td>'+PP_COLS.slice(5).map((c,i)=>`<td class="pg${cg[i+5]}${c.tot?' ptot':''}">${m.totals[i+5]==null?'':escapeHtml(ppFmt(c,m.totals[i+5]))}</td>`).join('')+'</tr></tfoot>';
     } else h+='</tbody>';
-    h+=`</table><div class="pay-footnote"><b>ملاحظات:</b> جميع المبالغ بالريال السعودي — أساس احتساب الشهر ${m.monthDays||''} يومًا (أيام الشهر الفعلية).</div><div class="pay-signatures"><div>إعداد<i></i></div><div>مراجعة<i></i></div><div>اعتماد<i></i></div></div>`;
+    h+=`</table><div class="pay-footnote"><b>ملاحظات:</b> جميع المبالغ بالريال السعودي — أساس احتساب الشهر ${m.monthDays||''} يومًا (أيام الشهر الفعلية).${!m.single&&m.heldCount?`<br>الرواتب الموقوفة (${m.heldCount} موظف) تظهر في سطر الموظف ولا تدخل في الإجمالي.`:''}</div><div class="pay-signatures"><div>إعداد<i></i></div><div>مراجعة<i></i></div><div>اعتماد<i></i></div></div>`;
     return h;
   }
   function ppHTML(m){ return m.html ? m.html() : ppPaperHTML(m); }
