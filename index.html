@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://db.onlinewebfonts.com">
 <link href="https://db.onlinewebfonts.com/c/7d411bb0357d6fd29347455b7d207995?family=JF+Flat+Regular" rel="stylesheet">
 <script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('hr_theme_v1')==='light'?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}</script>
-<link rel="stylesheet" href="css/style.css?v=20261104c">
+<link rel="stylesheet" href="css/style.css?v=20261105a">
 </head>
 <body>
 
@@ -1117,6 +1117,8 @@
           </button>
           <button class="btn" id="payrollRecalcBtn" title="للشهور المنتهية فقط: يعيد الحساب بالرواتب الحالية ويثبّته من جديد">إعادة احتساب الشهر</button>
           <button class="btn" id="payrollPreviewAllBtn">معاينة المسير</button>
+          <button class="btn" id="payrollBankAllBtn" title="تصدير كشف البنك (Excel) لكل موظفي الشهر المعروضين">ترحيل الرواتب كلها</button>
+          <button class="btn" id="payrollBankSelBtn" title="اختيار موظفين بعينهم وترحيلهم على كشف البنك">ترحيل موظفين معينين</button>
           <button class="btn" id="printReportBtn">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-5a1 1 0 011-1h16a1 1 0 011 1v5a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
             طباعة الكشف
@@ -1133,8 +1135,9 @@
         </div>
         <div class="payroll-info-note">تظهر هنا الأشهر من تاريخ أول مباشرة حتى الشهر الحالي (الحضور التلقائي «ح» + أي تعديلات يدوية).</div>
         <div class="payroll-info-note" id="payrollDiag" style="font-size:12px;opacity:.85"></div>
+        <div class="pay-sel-bar" id="paySelBar" style="display:none"><span>حدّد الموظفين من الخانات بجانب أسمائهم — <b id="paySelCount">0</b> محدد</span><button class="btn btn-sm btn-primary" id="paySelExportBtn">ترحيل المحدد على كشف البنك</button><button class="btn btn-sm" id="paySelCancelBtn">إلغاء</button></div>
         <div class="table-wrap"><table class="payroll-table payroll-statement-table">
-          <thead><tr class="pay-group-row"><th class="gh g1" colspan="4">بيانات الموظف</th><th class="gh g2" colspan="9">المستحقات</th><th class="gh g3" colspan="10">الخصومات</th><th class="gh g4">الصافي</th><th class="gh g5">الإجراء</th></tr><tr><th class="g1 st1">م</th><th class="g1 st2">الاسم</th><th class="g1">المشروع</th><th class="g1">الوظيفة</th><th class="g2">اليوم</th><th class="g2">الأساسي</th><th class="g2">بدل سكن</th><th class="g2">بدل مواصلات</th><th class="g2">بدلات أخرى</th><th class="g2 tot">الأجر الأخير</th><th class="g2">إضافي</th><th class="g2">مكافآت</th><th class="g2 tot">إجمالي الراتب</th><th class="g3">خصم عدم دوام</th><th class="g3">تأمينات اجتماعية<small class="th-note">حصة الموظف من الأساسي + السكن</small></th><th class="g3">غيابات</th><th class="g3">جزاءات</th><th class="g3">انسحاب</th><th class="g3">البدلة</th><th class="g3">الصحيفة</th><th class="g3">سلف</th><th class="g3">أخرى</th><th class="g3 tot">إجمالي الخصومات</th><th class="g4 tot">صافي الراتب</th><th class="g5">إجراء داخلي للرواتب</th></tr></thead>
+          <thead><tr class="pay-group-row"><th class="gh g1" colspan="4">بيانات الموظف</th><th class="gh g2" colspan="9">المستحقات</th><th class="gh g3" colspan="10">الخصومات</th><th class="gh g4">الصافي</th><th class="gh g5">الإجراء</th></tr><tr><th class="g1 st1">م</th><th class="g1 st2"><label class="pay-sel pay-sel-all"><input type="checkbox" id="paySelAll"> الكل</label> الاسم</th><th class="g1">المشروع</th><th class="g1">الوظيفة</th><th class="g2">اليوم</th><th class="g2">الأساسي</th><th class="g2">بدل سكن</th><th class="g2">بدل مواصلات</th><th class="g2">بدلات أخرى</th><th class="g2 tot">الأجر الأخير</th><th class="g2">إضافي</th><th class="g2">مكافآت</th><th class="g2 tot">إجمالي الراتب</th><th class="g3">خصم عدم دوام</th><th class="g3">تأمينات اجتماعية<small class="th-note">حصة الموظف من الأساسي + السكن</small></th><th class="g3">غيابات</th><th class="g3">جزاءات</th><th class="g3">انسحاب</th><th class="g3">البدلة</th><th class="g3">الصحيفة</th><th class="g3">سلف</th><th class="g3">أخرى</th><th class="g3 tot">إجمالي الخصومات</th><th class="g4 tot">صافي الراتب</th><th class="g5">إجراء داخلي للرواتب</th></tr></thead>
           <tbody id="reportTableBody"></tbody>
         </table></div>
       </div>
@@ -1247,7 +1250,7 @@
 <script src="js/access.js?v=20261026a" type="module"></script>
 <script src="js/data.js?v=20261011f" defer></script>
 <script src="js/sales.js?v=20261102a" defer></script>
-<script src="js/app.js?v=20261104c" defer></script>
+<script src="js/app.js?v=20261105a" defer></script>
 <script>
 (function(){
   function fallbackEmployeeCancel(e){

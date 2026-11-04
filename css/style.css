@@ -2324,32 +2324,28 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 .age-badge{text-align:center;font-weight:700}
 @media(max-width:600px){.personal-identity-row{grid-template-columns:1fr!important}.dob-age-row{grid-template-columns:1fr}}
 
-/* ===== payroll statement: blue / navy palette, white numbers, red deductions ===== */
+/* ===== payroll statement: same look as the attendance sheet (follows light/dark theme) ===== */
 .payroll-statement-table{min-width:2650px!important;border-collapse:separate!important;border-spacing:0}
-.payroll-statement-table .g1{--g:#2c6db8;--h:#1f5596;--hl:#2b68b0;--b:#12335e;--t:#1c4a80}
-.payroll-statement-table .g2{--g:#245ea6;--h:#194a86;--hl:#2360a0;--b:#0f2c53;--t:#18406f}
-.payroll-statement-table .g3{--g:#1c4f8f;--h:#143f75;--hl:#1d5089;--b:#0c2444;--t:#15355e}
-.payroll-statement-table .g4{--g:#174580;--h:#10366a;--hl:#184880;--b:#0a2140;--t:#143a68}
-.payroll-statement-table .g5{--g:#133a6b;--h:#0d2d57;--hl:#0d2d57;--b:#081b36;--t:#081b36}
-.payroll-statement-table th,.payroll-statement-table td{border-bottom:1px solid #3d6aa3;border-left:1px solid #3d6aa3}
-.payroll-statement-table thead th{background:var(--h)!important;background-image:none!important;color:#fff!important;font-size:12px}
-.payroll-statement-table thead th.tot{background:var(--hl)!important}
-.payroll-statement-table thead th.gh{background:var(--g)!important;font-size:13px;font-weight:800;text-align:center!important;min-width:0!important}
-.payroll-statement-table .th-note{display:block;font-weight:400;font-size:9.5px;color:#cfe0f5;white-space:normal;max-width:130px;margin:2px auto 0;line-height:1.3}
-.payroll-statement-table tbody td{background:var(--b)!important;background-image:none!important;color:#fff!important;font-weight:600}
-.payroll-statement-table tbody td.tot{background:var(--t)!important;font-weight:800}
-.payroll-statement-table tbody tr:hover td{filter:brightness(1.22)}
-.payroll-statement-table tbody td.g3{color:#ff6b6b!important;font-weight:700}
-.payroll-statement-table tbody td.g4{color:#fff!important;font-weight:800}
-.payroll-statement-table .pay-code{color:#bcd0ea}
-.payroll-statement-table .pay-red-note{color:#ff9a9a}
-.payroll-statement-table tbody tr[data-pay-row] td.pay-input-cell input{background:rgba(255,255,255,.10)!important;border:1px solid rgba(255,255,255,.35)!important;color:#fff!important}
-.payroll-statement-table tbody tr[data-pay-row] td.g3.pay-input-cell input{color:#ff6b6b!important;font-weight:700}
-.payroll-statement-table tbody tr[data-pay-row] td.g5 select,.payroll-statement-table tbody tr[data-pay-row] td.g5 input{background:#0f2c53!important;color:#fff!important;border:1px solid rgba(255,255,255,.35)!important}
+.payroll-statement-table th,.payroll-statement-table td{padding:6px 8px;text-align:center;border-bottom:1px solid var(--border-soft);border-left:1px solid var(--border-soft)}
+.payroll-statement-table thead th{background:var(--border-soft)!important;background-image:none!important;color:var(--ink)!important;font-size:12px;font-weight:700}
+.payroll-statement-table thead th.gh{background:var(--border)!important;font-size:13px;font-weight:800;text-align:center!important;min-width:0!important}
+.payroll-statement-table .th-note{display:block;font-weight:400;font-size:9.5px;color:var(--ink-soft);white-space:normal;max-width:130px;margin:2px auto 0;line-height:1.3}
+.payroll-statement-table tbody td{background-color:var(--surface);color:var(--ink);font-weight:600}
+.payroll-statement-table tbody td.tot{background-color:var(--border-soft);font-weight:800}
+.payroll-statement-table tbody tr:hover td{background-color:var(--border-soft)}
+.payroll-statement-table tbody td.g3{color:var(--red);font-weight:700}
+.payroll-statement-table tbody td.g4{font-weight:800}
+.payroll-statement-table .pay-code{color:var(--ink-soft)}
+.payroll-statement-table .pay-red-note{color:var(--red)}
 .payroll-statement-table .st1,.payroll-statement-table .st2{position:sticky;z-index:3}
 .payroll-statement-table .st1{right:0;width:46px;min-width:46px;max-width:46px}
-.payroll-statement-table .st2{right:46px;min-width:200px;text-align:right;box-shadow:-8px 0 10px -8px rgba(0,0,0,.5)}
+.payroll-statement-table .st2{right:46px;min-width:200px;text-align:right;box-shadow:2px 0 0 var(--border)}
 .payroll-statement-table thead th.st1,.payroll-statement-table thead th.st2{z-index:5}
+/* اختيار موظفين لترحيل كشف البنك */
+.pay-sel{display:none;align-items:center;gap:5px;margin-inline-end:8px;cursor:pointer;font-weight:700}
+.pay-select-mode .pay-sel{display:inline-flex}
+.pay-sel input{width:16px;height:16px;margin:0;cursor:pointer}
+.pay-sel-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border:1px solid var(--teal);border-radius:8px;background:var(--teal-soft);color:var(--ink);font-size:13px}
 
 
 /* ===== Employee reports: expandable roster and complete employee dossier ===== */

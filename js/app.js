@@ -15,6 +15,7 @@
   const PAYROLL_KEY = 'hr_payroll_v1';
   const INVOICE_KEY = 'hr_invoices_v1';
   const ATT_CODES = ['','ح','-','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق'];   // (-) = لم يحضر: لا حضور ولا غياب، يُخصم يومه من الراتب بدون جزاء
+  let paySelMode=false; const paySelected=new Set();   // وضع اختيار موظفين لترحيل كشف البنك
   const EMP_STATUS_LIST=[
     {k:'stop',label:'إيقاف عن العمل',hold:true,code:'-'},
     {k:'annual',label:'إجازة سنوية',hold:true,code:'ق'},
@@ -3111,8 +3112,9 @@
     const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel');
     if(covPanel)covPanel.style.display=coverageMode?'':'none';
     // أزرار الشريط العلوي خاصة بمسير الرواتب فقط
-    ['payrollRecalcBtn','payrollPreviewAllBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode)?'none':''; });
+    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode)?'none':''; });
     if(card)card.style.display=(projectMode||employeeMode||coverageMode)?'none':'';
+    { const sb=document.getElementById('paySelBar'); if(sb&&(projectMode||employeeMode||coverageMode)) sb.style.display='none'; }
     if(panel)panel.style.display=projectMode?'':'none';
     if(employeePanel)employeePanel.style.display=employeeMode?'':'none';
     if(projectMode){renderProjects();renderProjectCapacity();try{renderProjectDetailReport();}catch(err){console.error(err);}return;}
@@ -3136,7 +3138,7 @@
       const p=payrollStatementForCols(e,monthCols(ym)),a=p.adjustment||{},action=a.internalAction||'';
       const red=v=>Number(v)>0?' style="color:#b42318;font-weight:700"':'';
       return `<tr data-pay-row="${escapeAttr(e.id)}"${p.held?' class="pay-held"':''}>
-      <td class="mono g1 st1">${i+1}</td><td class="g1 st2"><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td class="g1">${escapeHtml(e.project||e.region||'—')}</td><td class="g1">${escapeHtml(e.jobtitle||'—')}</td>
+      <td class="mono g1 st1">${i+1}</td><td class="g1 st2"><label class="pay-sel"><input type="checkbox" data-pay-sel="${escapeAttr(e.id)}" ${paySelected.has(String(e.id))?'checked':''}></label><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td class="g1">${escapeHtml(e.project||e.region||'—')}</td><td class="g1">${escapeHtml(e.jobtitle||'—')}</td>
       <td class="mono g2">${fmt(p.day)}</td><td class="mono g2">${fmt(p.basic)}</td><td class="mono g2">${fmt(p.housing)}</td><td class="mono g2">${fmt(p.transport)}</td><td class="mono g2">${fmt(p.otherAllow)}</td><td class="mono g2 tot">${fmt(p.monthlyGross)}</td>
       <td class="mono g2">${fmt(p.overtime)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
       <td class="mono g3" ${red(p.nonWorkDed)}>${fmt(p.nonWorkDed)}${p.nonWorkDays?`<small class="pay-red-note">${p.nonWorkDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.gosi)}</td>
@@ -3150,6 +3152,8 @@
       </tr>`;
     }).join('')||'<tr><td colspan="25" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
+    body.querySelectorAll('[data-pay-sel]').forEach(cb=>cb.addEventListener('change',()=>{ cb.checked?paySelected.add(cb.dataset.paySel):paySelected.delete(cb.dataset.paySel); paySelRefresh(); }));
+    paySelRefresh();
   }
   const payrollMonth=document.getElementById('payrollMonth'); if(payrollMonth)payrollMonth.addEventListener('change',renderReports);
   ['payrollSearch','payrollProjectFilter','payrollRegionFilter'].forEach(id=>{document.getElementById(id)?.addEventListener('input',renderReports);document.getElementById(id)?.addEventListener('change',renderReports);});
@@ -3175,6 +3179,84 @@
     ppPrint(model);
   });
 
+  /* ===== ترحيل الرواتب على كشف البنك (Excel) ===== */
+  function payrollFilteredList(ym){
+    const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(),pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
+    return payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+  }
+  function paySelRefresh(){
+    const tbl=document.querySelector('.payroll-statement-table'); if(tbl) tbl.classList.toggle('pay-select-mode',paySelMode);
+    const bar=document.getElementById('paySelBar'); if(bar) bar.style.display=paySelMode?'':'none';
+    const n=document.getElementById('paySelCount'); if(n) n.textContent=String(paySelected.size);
+    const all=document.getElementById('paySelAll'), boxes=[...document.querySelectorAll('#reportTableBody [data-pay-sel]')];
+    if(all){ all.checked=boxes.length>0&&boxes.every(b=>b.checked); all.indeterminate=boxes.some(b=>b.checked)&&!boxes.every(b=>b.checked); }
+    const btn=document.getElementById('payrollBankSelBtn'); if(btn) btn.classList.toggle('btn-primary',paySelMode);
+  }
+  const BANK_HEADERS=['اسم الموظف','المشروع','الايبان البنكي','رمز البنك','اسم البنك','الهوية','الراتب الأساسي','البدلات','صافي الراتب'];
+  // يبني ملفات xlsx (نص XML) لكشف البنك — منفصل عن التحميل ليسهل اختباره
+  function bankSheetFiles(rows,title){
+    const esc=t=>String(t==null?'':t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    const colName=n=>{ let s=''; n++; while(n>0){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); } return s; };
+    const N=BANK_HEADERS.length, merges=[`A1:${colName(N-1)}1`], widths=[30,24,32,11,24,15,16,14,16];
+    const sc=(r,c,t,st)=>`<c r="${colName(c)}${r}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${esc(t)}</t></is></c>`;
+    const nc=(r,c,v,st)=>`<c r="${colName(c)}${r}" s="${st}"><v>${Number(v)||0}</v></c>`;
+    const blank=(r,c,st)=>`<c r="${colName(c)}${r}" s="${st}"/>`;
+    const xr=[];
+    xr.push(`<row r="1" ht="26" customHeight="1">${sc(1,0,title,1)}${Array.from({length:N-1},(_,i)=>blank(1,i+1,1)).join('')}</row>`);
+    xr.push(`<row r="2" ht="22" customHeight="1">${BANK_HEADERS.map((h,i)=>sc(2,i,h,2)).join('')}</row>`);
+    let r=3; const tot={basic:0,allow:0,net:0};
+    rows.forEach(x=>{
+      xr.push(`<row r="${r}">${sc(r,0,x.name,3)}${sc(r,1,x.project,3)}${sc(r,2,x.iban,4)}${sc(r,3,x.bankcode,4)}${sc(r,4,x.bankname,4)}${sc(r,5,x.idnum,4)}${nc(r,6,x.basic,5)}${nc(r,7,x.allow,5)}${nc(r,8,x.net,5)}</row>`);
+      tot.basic+=Number(x.basic)||0; tot.allow+=Number(x.allow)||0; tot.net+=Number(x.net)||0; r++;
+    });
+    xr.push(`<row r="${r}">${sc(r,0,'الإجمالي',6)}${[1,2,3,4,5].map(i=>blank(r,i,6)).join('')}${nc(r,6,tot.basic,7)}${nc(r,7,tot.allow,7)}${nc(r,8,tot.net,7)}</row>`); merges.push(`A${r}:F${r}`);
+    const cols=widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('');
+    const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView rightToLeft="1" workbookViewId="0"><pane ySplit="2" topLeftCell="A3" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${cols}</cols><sheetData>${xr.join('')}</sheetData><mergeCells count="${merges.length}">${merges.map(x=>`<mergeCell ref="${x}"/>`).join('')}</mergeCells><pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+    const bd='<border><left style="thin"><color rgb="FF6B7780"/></left><right style="thin"><color rgb="FF6B7780"/></right><top style="thin"><color rgb="FF6B7780"/></top><bottom style="thin"><color rgb="FF6B7780"/></bottom><diagonal/></border>';
+    const xf=(num,font,fill,border,h,wrap)=>`<xf numFmtId="${num}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="${h}" vertical="center"${wrap?' wrapText="1"':''}/></xf>`;
+    const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font><font><b/><sz val="14"/><name val="Arial"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9E2EC"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEEF3F4"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>${bd}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="8">${xf(0,0,0,0,'center')}${xf(0,2,0,0,'center')}${xf(0,1,2,1,'center',1)}${xf(0,0,0,1,'right')}${xf(49,0,0,1,'center')}${xf(4,0,0,1,'center')}${xf(0,1,3,1,'center')}${xf(4,1,3,1,'center')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;
+    return {
+      '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+      '_rels/.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+      'xl/workbook.xml':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets><sheet name="كشف البنك" sheetId="1" r:id="rId1"/></sheets></workbook>',
+      'xl/_rels/workbook.xml.rels':'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>',
+      'xl/styles.xml':styles,'xl/worksheets/sheet1.xml':sheet
+    };
+  }
+  async function payrollBankExport(list,ym,opts){
+    opts=opts||{};
+    if(!pdrCanFinance()){ showToast('ترحيل الرواتب يحتاج صلاحية المالية'); return; }
+    if(!window.JSZip){ showToast('مكتبة Excel غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
+    const cols=monthCols(ym); let held=0, zero=0, noIban=0; const rows=[];
+    list.forEach(e=>{
+      const p=payrollStatementForCols(e,cols);
+      if(opts.skipHeld && p.held){ held++; return; }          // الراتب الموقوف لا يُرحّل في «الكل» (مثل إجمالي المسير)
+      if(!(p.net>0)){ zero++; return; }                       // لا يُرحّل صافي صفر أو سالب
+      const iban=String(e.iban||'').replace(/\s+/g,'').toUpperCase(); if(!iban) noIban++;
+      rows.push({name:e.fullname||'',project:e.project||'',iban,bankcode:e.bankcode||'',bankname:e.bankname||'',idnum:e.idnum||'',basic:p.basic,allow:r2((Number(p.housing)||0)+(Number(p.transport)||0)+(Number(p.otherAllow)||0)),net:p.net});
+    });
+    if(!rows.length){ showToast('لا يوجد موظفون لهم صافي راتب لترحيلهم'); return; }
+    const files=bankSheetFiles(rows,`كشف البنك — ${monthLabel(ym)}`), zip=new JSZip();
+    Object.keys(files).forEach(k=>zip.file(k,files[k]));
+    const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    ppDownloadBlob(blob,`كشف_البنك_${monthLabel(ym).replace(/\s+/g,'_')}${opts.selected?'_موظفين_محددين':''}.xlsx`);
+    const notes=[]; if(held) notes.push(`${held} راتب موقوف لم يُرحّل`); if(zero) notes.push(`${zero} بصافي صفر لم يُرحّل`); if(noIban) notes.push(`${noIban} بدون آيبان`);
+    showToast(`تم ترحيل ${rows.length} موظف على كشف البنك`+(notes.length?` — (${notes.join('، ')})`:''));
+  }
+  document.getElementById('payrollBankAllBtn')?.addEventListener('click',()=>{
+    const ym=document.getElementById('payrollMonth')?.value; if(!ym){ showToast('لا يوجد شهر مسير متاح'); return; }
+    const list=payrollFilteredList(ym); if(!list.length){ showToast('لا يوجد موظفون مطابقون للترحيل'); return; }
+    payrollBankExport(list,ym,{skipHeld:true});
+  });
+  document.getElementById('payrollBankSelBtn')?.addEventListener('click',()=>{ paySelMode=!paySelMode; if(!paySelMode) paySelected.clear(); document.querySelectorAll('#reportTableBody [data-pay-sel]').forEach(b=>{ b.checked=paySelected.has(b.dataset.paySel); }); paySelRefresh(); });
+  document.getElementById('paySelCancelBtn')?.addEventListener('click',()=>{ paySelMode=false; paySelected.clear(); document.querySelectorAll('#reportTableBody [data-pay-sel]').forEach(b=>{ b.checked=false; }); paySelRefresh(); });
+  document.getElementById('paySelAll')?.addEventListener('change',ev=>{ document.querySelectorAll('#reportTableBody [data-pay-sel]').forEach(b=>{ b.checked=ev.target.checked; ev.target.checked?paySelected.add(b.dataset.paySel):paySelected.delete(b.dataset.paySel); }); paySelRefresh(); });
+  document.getElementById('paySelExportBtn')?.addEventListener('click',()=>{
+    const ym=document.getElementById('payrollMonth')?.value; if(!ym){ showToast('لا يوجد شهر مسير متاح'); return; }
+    const list=payrollFilteredList(ym).filter(e=>paySelected.has(String(e.id)));
+    if(!list.length){ showToast('حدّد موظفًا واحدًا على الأقل من الخانات بجانب الأسماء'); return; }
+    payrollBankExport(list,ym,{selected:true});
+  });
   /* ===== export / import ===== */
   document.getElementById('exportBtn')?.addEventListener('click', ()=>{
     const headers = ['الرقم الوظيفي','الاسم الكامل','رقم الهوية','القسم','المسمى الوظيفي','حالة العقد','الراتب الأساسي','بدل السكن','بدل المواصلات','بدلات أخرى','الخصومات','صافي الراتب','رقم الآيبان','البنك','الهاتف','البريد الإلكتروني'];
@@ -3733,7 +3815,7 @@
     const zip=new JSZip();
     zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
     zip.file('_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
-    zip.file('xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView rightToLeft="1"/></bookViews><sheets><sheet name="المسير" sheetId="1" r:id="rId1"/></sheets></workbook>');
+    zip.file('xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets><sheet name="المسير" sheetId="1" r:id="rId1"/></sheets></workbook>');
     zip.file('xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
     zip.file('xl/styles.xml',styles); zip.file('xl/worksheets/sheet1.xml',sheet);
     const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
