@@ -2822,3 +2822,18 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 #reportTableBody tr.pay-held td{background-image:linear-gradient(rgba(255,193,7,.16),rgba(255,193,7,.16))}
 .pay-status-note{display:block;margin-bottom:4px;font-size:11px;font-weight:700;color:#8a5a00}
 .pay-status-note.held{color:#b42318}
+
+/* حالة الموظف داخل ملفه (عمودي) */
+.emp-status-vlist{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.emp-status-item{border:1px solid var(--line,#d9e2e6);border-radius:10px;padding:9px 12px;background:rgba(0,0,0,.02)}
+.emp-status-item.is-on{border-color:var(--accent,#0b6b5c);background:rgba(11,107,92,.06)}
+.emp-status-check{display:flex;align-items:center;gap:8px;font-weight:700;cursor:pointer;margin:0}
+.emp-status-check input[type=checkbox]{width:17px;height:17px;margin:0;cursor:pointer}
+.emp-status-periods{display:flex;flex-direction:column;gap:6px;margin-top:9px;padding-inline-start:25px}
+.emp-status-period{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.emp-status-period label{display:inline-flex;align-items:center;gap:6px;margin:0;font-weight:600}
+.emp-status-period input[type=date]{min-width:140px}
+.emp-status-add{align-self:flex-start}
+.emp-status-actions{display:flex;align-items:center;gap:12px;margin-top:10px}
+.emp-status-msg{font-size:12.5px;color:var(--ink-soft,#5b6b73)}
+.emp-status-msg.bad{color:#b42318;font-weight:700}

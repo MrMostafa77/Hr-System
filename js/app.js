@@ -15,6 +15,15 @@
   const PAYROLL_KEY = 'hr_payroll_v1';
   const INVOICE_KEY = 'hr_invoices_v1';
   const ATT_CODES = ['','ح','-','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق'];   // (-) = لم يحضر: لا حضور ولا غياب، يُخصم يومه من الراتب بدون جزاء
+  const EMP_STATUS_LIST=[
+    {k:'stop',label:'إيقاف عن العمل',hold:true,code:'-'},
+    {k:'annual',label:'إجازة سنوية',hold:true,code:'ق'},
+    {k:'sick',label:'إجازة مرضية',hold:false,code:'ق'},
+    {k:'mgmt',label:'إيقاف الإدارة',hold:true,code:'-'},
+    {k:'resign',label:'استقالة',hold:true,code:'-'},
+    {k:'absent',label:'تغيب عن العمل',hold:true,code:'غ'}
+  ];
+  const EMP_STATUS_PRIORITY=['resign','stop','mgmt','absent','annual','sick'];
   let employees = [];
   let attendance = {};   // { "YYYY-MM": { empId: { day: code } } }
   let penalties = [];    // [{id, empId, date, type, days, notes}]
@@ -2221,7 +2230,6 @@
     const housingPct=document.getElementById('f_housing_pct'), transportPct=document.getElementById('f_transport_pct'), otherPct=document.getElementById('f_otherallow_pct');
     if(housingPct) housingPct.value='25'; if(transportPct) transportPct.value='38.5'; if(otherPct) otherPct.value='0'; const payHint=document.getElementById('payAutoHint'); if(payHint) payHint.hidden=true;
     const delMemo=document.getElementById('f_delegate_memo'); if(delMemo){delMemo.value=''; delete delMemo.dataset.value;} const delName=document.getElementById('f_delegate_name'); if(delName) delName.value=''; const delMemoName=document.getElementById('delegateMemoName'); if(delMemoName) delMemoName.textContent=''; syncBankAccountType(); const photoEl=document.getElementById('f_idphoto'); if(photoEl){ photoEl.value=''; delete photoEl.dataset.value; } const photoName=document.getElementById('idPhotoName'); if(photoName) photoName.textContent=''; const personalRadio=document.querySelector('input[name=bankAccountType][value="حساب شخصي"]'); if(personalRadio) personalRadio.checked=true;
-    document.querySelectorAll('#empForm input[name=empStatus]').forEach(x=>{ x.checked=false; });
     document.getElementById('formTitle').textContent = 'إضافة موظف جديد';
     syncStartDateAction();
     fillNationalityAndIssueRegion(); refreshDepartmentJobSelects(); refreshEmployeeProjectSelect(''); composeFullName(); updateBankFromIBAN(); syncAllowancePercentagesFromData(); clearValidation();
@@ -2240,7 +2248,6 @@
     const photoEl=document.getElementById('f_idphoto'); if(photoEl){ photoEl.value=''; if(e.idphoto) photoEl.dataset.value=e.idphoto; else delete photoEl.dataset.value; } const photoName=document.getElementById('idPhotoName'); if(photoName) photoName.textContent=e.idphoto?'صورة هوية محفوظة':''; const bankRadio=document.querySelector(`input[name=bankAccountType][value=\"${e.bankAccountType||'حساب شخصي'}\"]`); if(bankRadio) bankRadio.checked=true; syncBankAccountType(); updateLastWage();
     syncEmployeeContractStatus(e.id);
     syncAllowancePercentagesFromData();
-    { const st=Array.isArray(e.statuses)?e.statuses:[]; document.querySelectorAll('#empForm input[name=empStatus]').forEach(x=>{ x.checked=st.includes(x.value); }); }
     document.getElementById('formTitle').textContent = 'تعديل بيانات: ' + (e.fullname||'');
     refreshDepartmentJobSelects(e.dept||'', e.jobtitle||''); fillNationalityAndIssueRegion(); refreshEmployeeProjectSelect(e.region||''); const projectEl=document.getElementById('f_project'); if(projectEl) projectEl.value=e.project||''; composeFullName(); updateBankFromIBAN();
     { const sd=document.getElementById('f_startdate'); const cd=String(commencementForEmployee(e.id)?.startDate||'').slice(0,10); if(sd && cd) sd.value=cd; else if(sd && !sd.value) sd.value=commencementDateForEmployee(e.id); }
@@ -2441,7 +2448,7 @@
     data.delegate_name=document.getElementById('f_delegate_name')?.value||'';
     const dm=document.getElementById('f_delegate_memo'); data.delegate_memo=dm?.dataset.value||data.delegate_memo||''; data.delegate_memo_name=dm?.files?.[0]?.name || data.delegate_memo_name || '';
     data.lastwage=Number(data.basicsalary||0)+Number(data.housing||0)+Number(data.transport||0)+Number(data.otherallow||0);
-    data.statuses=[...document.querySelectorAll('#empForm input[name=empStatus]:checked')].map(x=>x.value);
+    { const oldE=employees.find(x=>String(x.id)===String(id)); data.statuses=Array.isArray(oldE?.statuses)?oldE.statuses:[]; if(Array.isArray(oldE?.statusPeriods)) data.statusPeriods=oldE.statusPeriods; }   // الحالة تُدار من ملف الموظف فقط
     delete data.contracttype; delete data.contractstatus; delete data.contractduration; delete data.contractend; delete data.gosi;
     const errors={};
     if(!data.firstname) errors.firstname='الاسم مطلوب.';
@@ -2673,6 +2680,7 @@
     cols.forEach(c=>{ s+=(attCodeAt(c.ym,e.id,c.d)||'-')+','; });
     (penalties||[]).forEach(x=>{ if(String(x.empId)===String(e.id) && String(x.date||'').slice(0,7)===ym) s+='|'+JSON.stringify(x); });
     s+='#'+['bonus','uniform','newspaper','advance','other'].map(k=>Number(a[k])||0).join(':');
+    { const stx=empStatusInfo(e,cols); if(stx.text) s+='@'+stx.text; }
     let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0;
     return (h>>>0).toString(36)+'.'+s.length.toString(36);
   }
@@ -2713,17 +2721,33 @@
   /* ===== حالة الموظف وأثرها على المسير =====
      كل الحالات عدا الإجازة المرضية = الراتب يُحسب ويظهر في سطر الموظف لكنه لا يدخل في إجمالي المسير.
      الإجازة المرضية = حساب عادي وتظهر الحالة في الملاحظات. */
-  const EMP_STATUS_LIST=[
-    {k:'stop',label:'إيقاف عن العمل',hold:true},
-    {k:'annual',label:'إجازة سنوية',hold:true},
-    {k:'sick',label:'إجازة مرضية',hold:false},
-    {k:'mgmt',label:'إيقاف الإدارة',hold:true},
-    {k:'resign',label:'استقالة',hold:true},
-    {k:'absent',label:'تغيب عن العمل',hold:true}
-  ];
-  function empStatusInfo(e){
-    const s=Array.isArray(e&&e.statuses)?e.statuses:[], list=EMP_STATUS_LIST.filter(x=>s.includes(x.k)), held=list.some(x=>x.hold);
-    return {held, text:list.length?((held?'راتب موقوف: ':'')+list.map(x=>x.label).join('، ')):''};
+  // فترات الحالة: [{k, from, to}] — to فارغ = مفتوحة. الحالات القديمة بلا تواريخ (statuses) تُعامل كفترة بلا تاريخ (تؤثر على المسير فقط كما كانت)
+  function empStatusPeriods(e){
+    const out=[]; if(!e) return out;
+    (Array.isArray(e.statusPeriods)?e.statusPeriods:[]).forEach(x=>{ if(x && EMP_STATUS_LIST.some(s=>s.k===x.k)) out.push({k:x.k,from:String(x.from||'').slice(0,10),to:String(x.to||'').slice(0,10)}); });
+    (Array.isArray(e.statuses)?e.statuses:[]).forEach(k=>{ if(EMP_STATUS_LIST.some(s=>s.k===k) && !out.some(x=>x.k===k)) out.push({k,from:'',to:''}); });
+    return out;
+  }
+  function empStatusRangeText(p){ return (p.from||p.to)?` (${p.from?'من '+fmtDMY(p.from):''}${p.to?' إلى '+fmtDMY(p.to):' — مفتوحة'})`:''; }
+  function empStatusInfo(e,cols){
+    const per=empStatusPeriods(e); if(!per.length) return {held:false,text:''};
+    const a=cols&&cols.length?cols[0].iso:'', b=cols&&cols.length?cols[cols.length-1].iso:'';
+    const hit=per.filter(p=>!a || ((!p.to||p.to>=a) && (!p.from||p.from<=b)));
+    const held=hit.some(p=>EMP_STATUS_LIST.find(s=>s.k===p.k).hold);
+    return {held, text:hit.length?((held?'راتب موقوف: ':'')+hit.map(p=>EMP_STATUS_LIST.find(s=>s.k===p.k).label+empStatusRangeText(p)).join('، ')):''};
+  }
+  // رمز الحضور الذي تفرضه الحالة في يوم معيّن (للفترات المؤرّخة فقط): استقالة/إيقاف ← (-) ، تغيب ← (غ) ، إجازة ← (ق)
+  function attStatusCodeAt(empId,iso){
+    const e=employees.find(x=>String(x.id)===String(empId)); if(!e) return '';
+    const hit=empStatusPeriods(e).filter(p=>p.from && iso>=p.from && (!p.to||iso<=p.to)); if(!hit.length) return '';
+    hit.sort((x,y)=>EMP_STATUS_PRIORITY.indexOf(x.k)-EMP_STATUS_PRIORITY.indexOf(y.k));
+    return EMP_STATUS_LIST.find(s=>s.k===hit[0].k).code;
+  }
+  function attStatusOverride(empId,iso,raw){
+    if(!(raw===undefined||raw===''||raw==='ح')) return '';      // أي رمز آخر مُدخل يدويًا (غياب/جزاء/تغطية...) يبقى كما هو
+    if(iso>todayISO()) return '';
+    const st=attStartDateFor(empId); if(!st||iso<st) return '';
+    return attStatusCodeAt(empId,iso);
   }
   function payrollComputeStatement(e,cols,sumIn){
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
@@ -2747,7 +2771,7 @@
     const gosi=(project?.siEnabled && !notStarted) ? r2(insuranceBase*(Number(project.siGuardRate)||SI_GUARD_RATE)/100*paidDays/MD) : 0;
     const uniform=Number(a.uniform)||0,newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0,other=Number(a.other)||0;
     const deduction=r2(nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance+other);
-    const stI=empStatusInfo(e);
+    const stI=empStatusInfo(e,cols);
     return {held:stI.held,statusText:stI.text,ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
   }
   function payrollStatementFor(e){
@@ -2852,6 +2876,43 @@
     setTimeout(()=>document.addEventListener('click',()=>menu.remove(),{once:true}),0);
   }
 
+  /* ===== حالة الموظف داخل ملفه: خانات عمودية، كل حالة لها فترة (من - إلى) تؤثر على المسير والحضور ===== */
+  function renderEmployeeStatusSection(modal,e){
+    const host=modal.querySelector('[data-status-host]'); if(!host) return;
+    const canEdit=!window.HRAuth || typeof window.HRAuth.canView!=='function' || window.HRAuth.canView('add');
+    let draft=empStatusPeriods(e).map(p=>({...p}));
+    const draw=(msg,bad)=>{
+      host.innerHTML=`<h3>حالة الموظف <span class="employee-section-count">تؤثر تلقائيًا على المسير والحضور والانصراف</span></h3>
+        <div class="emp-status-vlist">${EMP_STATUS_LIST.map(s=>{
+          const mine=draft.map((p,i)=>({p,i})).filter(x=>x.p.k===s.k);
+          return `<div class="emp-status-item${mine.length?' is-on':''}"><label class="emp-status-check"><input type="checkbox" data-st-toggle="${s.k}" ${mine.length?'checked':''} ${canEdit?'':'disabled'}> <span>${escapeHtml(s.label)}</span></label>${mine.length?`<div class="emp-status-periods">${mine.map(x=>`<div class="emp-status-period"><label>من <input type="date" data-st-from="${x.i}" value="${escapeAttr(x.p.from)}" ${canEdit?'':'disabled'}></label><label>إلى <input type="date" data-st-to="${x.i}" value="${escapeAttr(x.p.to)}" ${canEdit?'':'disabled'}></label>${canEdit?`<button type="button" class="btn btn-sm" data-st-del="${x.i}" title="حذف الفترة">✕</button>`:''}</div>`).join('')}${canEdit?`<button type="button" class="btn btn-sm emp-status-add" data-st-add="${s.k}">+ فترة أخرى</button>`:''}</div>`:''}</div>`;
+        }).join('')}</div>
+        ${canEdit?`<div class="emp-status-actions"><button type="button" class="btn btn-sm btn-primary" data-st-save>حفظ الحالة</button><span class="emp-status-msg${bad?' bad':''}">${escapeHtml(msg||'')}</span></div>`:''}
+        <small class="emp-status-hint">«إلى» اختياري (يُترك فارغًا إذا الحالة مستمرة). أيام الفترة تظهر في الحضور: استقالة/إيقاف ← (-) ، تغيب ← (غ) ، إجازة ← (ق). أي حالة عدا «إجازة مرضية» لا يدخل راتب الشهر المتأثر في إجمالي المسير، و«إجازة مرضية» تظهر في الملاحظات فقط.</small>`;
+      host.querySelectorAll('[data-st-toggle]').forEach(cb=>cb.addEventListener('change',()=>{
+        const k=cb.dataset.stToggle;
+        if(cb.checked) draft.push({k,from:todayISO(),to:''}); else draft=draft.filter(p=>p.k!==k);
+        draw('تم التعديل — اضغط «حفظ الحالة» لتطبيقه.');
+      }));
+      host.querySelectorAll('[data-st-from]').forEach(el=>el.addEventListener('change',()=>{ draft[Number(el.dataset.stFrom)].from=el.value; }));
+      host.querySelectorAll('[data-st-to]').forEach(el=>el.addEventListener('change',()=>{ draft[Number(el.dataset.stTo)].to=el.value; }));
+      host.querySelectorAll('[data-st-add]').forEach(b=>b.addEventListener('click',()=>{ draft.push({k:b.dataset.stAdd,from:todayISO(),to:''}); draw(); }));
+      host.querySelectorAll('[data-st-del]').forEach(b=>b.addEventListener('click',()=>{ draft.splice(Number(b.dataset.stDel),1); draw('تم التعديل — اضغط «حفظ الحالة» لتطبيقه.'); }));
+      host.querySelector('[data-st-save]')?.addEventListener('click',()=>{
+        for(const p of draft){
+          const lbl=EMP_STATUS_LIST.find(s=>s.k===p.k).label;
+          if(!p.from){ draw(`حدد تاريخ البداية (من) لحالة «${lbl}».`,true); return; }
+          if(p.to && p.to<p.from){ draw(`تاريخ النهاية قبل البداية في حالة «${lbl}».`,true); return; }
+        }
+        const target=employees.find(x=>String(x.id)===String(e.id)); if(!target) return;
+        target.statusPeriods=draft.map(p=>({k:p.k,from:p.from,to:p.to||''})); target.statuses=[];
+        saveEmployees();
+        try{renderAttendance();}catch(_){} try{renderReports();}catch(_){} try{renderEmployeeReports();}catch(_){}
+        draw('تم حفظ الحالة وتحديث المسير والحضور.');
+      });
+    };
+    draw();
+  }
   function employeeReportFullProfile(empId){
     const e=employees.find(x=>String(x.id)===String(empId)); if(!e)return;
     const ci=employeeContractInfo(e.id), c=ci.contract, cm=employeeCommencementInfo(e), alerts=employeeAlertList(e), att=reportAttendanceRows(e);
@@ -2888,8 +2949,9 @@
     const alertHtml=alerts.length?alerts.map(a=>`<span class="employee-alert-chip">⚠ ${escapeHtml(a)}</span>`).join(''):'<span class="employee-ok-chip">لا توجد تنبيهات مسجلة حاليًا</span>';
     document.getElementById('employeeProfileModal')?.remove();
     const modal=document.createElement('div'); modal.id='employeeProfileModal'; modal.className='employee-profile-modal';
-    modal.innerHTML=`<div class="employee-profile-backdrop" data-profile-close></div><article class="employee-profile-dialog" role="dialog" aria-modal="true" aria-label="الملف الشامل للموظف"><header class="employee-profile-header"><div><span class="employee-profile-kicker">ملف الموظف الشامل</span><h2>${escapeHtml(e.fullname||'—')}</h2><p>${escapeHtml(e.empcode||'—')} · ${escapeHtml(e.jobtitle||'—')} · ${escapeHtml(e.project||'—')}</p></div><button type="button" class="btn icon-btn" data-profile-close aria-label="إغلاق">✕</button></header><div class="employee-profile-content"><section class="employee-profile-section employee-source-section" data-source-action="personal" title="كليك يمين لفتح شاشة إدخال الموظف"><div class="employee-profile-fields">${personal.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section employee-source-section" data-source-action="contract" title="كليك يمين لفتح بيانات العقد"><div class="employee-profile-fields">${contractFields.map(x=>kv(x[0],x[1])).join('')}${kv('تاريخ المباشرة',cm?.startDate?fmtDMY(cm.startDate):'لا توجد مباشرة')}${kv('المشروع في المباشرة',cm?.project||'—')}</div></section><section class="employee-profile-section employee-source-section" data-source-action="personal" title="كليك يمين لفتح شاشة إدخال الموظف"><div class="employee-profile-fields">${bankFields.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section"><h3>الحضور والانصراف <span class="employee-section-count">${monthNames.length} شهر</span></h3><div class="employee-attendance-summary">${Object.entries(attendanceCounts).map(([code,count])=>`<span><b>${count}</b> ${escapeHtml(attCodeLabel(code)||code)}</span>`).join('')||'لا توجد سجلات ضمن الفترة'}</div>${table(['الشهر','عدد الأيام المسجلة','التفصيل'],attendanceRows,'لا توجد سجلات حضور من تاريخ المباشرة حتى اليوم')}</section><section class="employee-profile-section"><h3>مسيرات الرواتب <span class="employee-section-count">${months.length} شهر</span></h3><p class="employee-history-hint">اضغط على الشهر لعرض المسير، أو كليك يمين لفتح مسير الإدخال للعرض فقط.</p>${table(['الشهر','إجمالي المستحقات','إجمالي الخصومات','صافي الراتب'],payrollRows,'لا توجد أشهر رواتب ضمن الفترة')}</section><section class="employee-profile-section"><h3>سجل التغطيات <span class="employee-section-count">${empCov.length} سجل</span></h3>${table(['التاريخ','المغطّي','الغائب','الموقع / المشروع','الحالة','المستحق','ملاحظات'],covRows,'لا توجد تغطيات مرتبطة بهذا الموظف')}</section><section class="employee-profile-section"><h3>إجراءات الموظف <span class="employee-section-count">${empActs.length} إجراء</span></h3>${table(['التاريخ','الرمز','الإجراء','الأيام','ملاحظات'],actRows,'لا توجد إجراءات مسجلة')}</section><section class="employee-profile-section"><h3>التنبيهات والملاحظات</h3><div class="employee-alert-list">${alertHtml}</div>${e.notes?`<p class="employee-profile-notes">${escapeHtml(e.notes)}</p>`:''}</section></div></article>`;
+    modal.innerHTML=`<div class="employee-profile-backdrop" data-profile-close></div><article class="employee-profile-dialog" role="dialog" aria-modal="true" aria-label="الملف الشامل للموظف"><header class="employee-profile-header"><div><span class="employee-profile-kicker">ملف الموظف الشامل</span><h2>${escapeHtml(e.fullname||'—')}</h2><p>${escapeHtml(e.empcode||'—')} · ${escapeHtml(e.jobtitle||'—')} · ${escapeHtml(e.project||'—')}</p></div><button type="button" class="btn icon-btn" data-profile-close aria-label="إغلاق">✕</button></header><div class="employee-profile-content"><section class="employee-profile-section employee-status-section" data-status-host></section><section class="employee-profile-section employee-source-section" data-source-action="personal" title="كليك يمين لفتح شاشة إدخال الموظف"><div class="employee-profile-fields">${personal.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section employee-source-section" data-source-action="contract" title="كليك يمين لفتح بيانات العقد"><div class="employee-profile-fields">${contractFields.map(x=>kv(x[0],x[1])).join('')}${kv('تاريخ المباشرة',cm?.startDate?fmtDMY(cm.startDate):'لا توجد مباشرة')}${kv('المشروع في المباشرة',cm?.project||'—')}</div></section><section class="employee-profile-section employee-source-section" data-source-action="personal" title="كليك يمين لفتح شاشة إدخال الموظف"><div class="employee-profile-fields">${bankFields.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section"><h3>الحضور والانصراف <span class="employee-section-count">${monthNames.length} شهر</span></h3><div class="employee-attendance-summary">${Object.entries(attendanceCounts).map(([code,count])=>`<span><b>${count}</b> ${escapeHtml(attCodeLabel(code)||code)}</span>`).join('')||'لا توجد سجلات ضمن الفترة'}</div>${table(['الشهر','عدد الأيام المسجلة','التفصيل'],attendanceRows,'لا توجد سجلات حضور من تاريخ المباشرة حتى اليوم')}</section><section class="employee-profile-section"><h3>مسيرات الرواتب <span class="employee-section-count">${months.length} شهر</span></h3><p class="employee-history-hint">اضغط على الشهر لعرض المسير، أو كليك يمين لفتح مسير الإدخال للعرض فقط.</p>${table(['الشهر','إجمالي المستحقات','إجمالي الخصومات','صافي الراتب'],payrollRows,'لا توجد أشهر رواتب ضمن الفترة')}</section><section class="employee-profile-section"><h3>سجل التغطيات <span class="employee-section-count">${empCov.length} سجل</span></h3>${table(['التاريخ','المغطّي','الغائب','الموقع / المشروع','الحالة','المستحق','ملاحظات'],covRows,'لا توجد تغطيات مرتبطة بهذا الموظف')}</section><section class="employee-profile-section"><h3>إجراءات الموظف <span class="employee-section-count">${empActs.length} إجراء</span></h3>${table(['التاريخ','الرمز','الإجراء','الأيام','ملاحظات'],actRows,'لا توجد إجراءات مسجلة')}</section><section class="employee-profile-section"><h3>التنبيهات والملاحظات</h3><div class="employee-alert-list">${alertHtml}</div>${e.notes?`<p class="employee-profile-notes">${escapeHtml(e.notes)}</p>`:''}</section></div></article>`;
     document.body.appendChild(modal); document.body.classList.add('employee-profile-open');
+    renderEmployeeStatusSection(modal,e);
     modal.querySelectorAll('.employee-source-section').forEach(sec=>sec.addEventListener('contextmenu',ev=>{
       const action=sec.dataset.sourceAction;
       employeeReportSourceMenu(ev,()=>{ if(action==='contract' && c?.id){ openContractForEdit(e.id,c.id); } else { openEmployeeInputFromReport(e.id); } },action==='contract'?'فتح شاشة العقد':'فتح شاشة بيانات الموظف');
@@ -3219,6 +3281,7 @@
         const auto = autoAttendanceCode(ym,empId,d);
         if(auto) rec[d]=auto;
       }
+      { const so=attStatusOverride(empId,`${ym}-${String(d).padStart(2,'0')}`,rec[d]); if(so) rec[d]=so; }
     }
     return rec;
   }
@@ -3258,6 +3321,7 @@
     let raw = (attendance[ym] && attendance[ym][empId]) ? attendance[ym][empId][day] : undefined;
     if(raw==='ح' && attIsFutureDay(ym,day)) raw = undefined;
     if(raw!==undefined && raw!=='' && raw!=='ط'){ const st=attStartDateFor(empId); if(!st || `${ym}-${String(day).padStart(2,'0')}`<st) raw=undefined; }
+    { const so=attStatusOverride(empId,`${ym}-${String(day).padStart(2,'0')}`,raw); if(so) return so; }
     if(raw!==undefined && raw!=='') return raw;
     return autoAttendanceCode(ym, empId, day);
   }
