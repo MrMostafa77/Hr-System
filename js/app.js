@@ -5520,6 +5520,7 @@
         <p>أفوّضكم أنا الموظف الموضحة بياناتي أدناه بإيداع جميع مستحقاتي المالية (الرواتب والبدلات والمستحقات الأخرى) في الحساب البنكي المبيّن في هذه المذكرة، وأقر بأن بيانات الحساب صحيحة ومسؤوليتها عليّ، وأن الشركة غير مسؤولة عن أي تأخير أو خطأ ناتج عن عدم صحة بيانات الآيبان.</p>
         ${docEmpTable(e)}
         <table class="doc-mini-table"><tbody>
+          <tr><th>اسم صاحب الحساب</th><td colspan="3" style="font-weight:700">${blank(e.bankAccountType==='تفويض بنكي' ? (e.delegate_name||'') : (e.fullname||''))}</td></tr>
           <tr><th>اسم البنك</th><td>${blank(e.bankname)}</td><th>رقم الحساب</th><td>${blank(e.accountno)}</td></tr>
           <tr><th>رقم الآيبان (IBAN)</th><td colspan="3" dir="ltr" style="text-align:center;font-weight:700;letter-spacing:1px">${e.iban?escapeHtml(e.iban):'<span class="blank">SA..............................</span>'}</td></tr>
         </tbody></table>
