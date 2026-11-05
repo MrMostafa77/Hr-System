@@ -1015,6 +1015,7 @@
       const view = target.dataset.view;
       if(!view) return;
       ev.preventDefault();
+      if(view==='reports') window.currentReport = target.dataset.report || 'payroll';   // حدّد نوع التقرير قبل فتح التبويب (وإلا يُفتح تبويب الرواتب بالغلط)
       try{
         if(view==='add' && document.getElementById('f_id')?.value==='' && !pjTabOpen('add')) resetForm();
         expandParentGroup(view);
