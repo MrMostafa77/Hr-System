@@ -3287,8 +3287,8 @@
     const base=bankSheetFiles([],'');
     const esc=t=>String(t==null?'':t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
     const colName=n=>{ let s=''; n++; while(n>0){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); } return s; };
-    const H=[['Employee IBAN','أيبان الموظف'],['Employee Name','إسم الموظف'],['Employee Number','الرقم الوظيفي'],['ID Number','رقم الهوية'],['Total Salary','الراتب الإجمالي'],['Basic Salary','الراتب الأساسي'],['Housing Allowance','بدل السكن'],['Other Earnings','بدلات أخرى'],['Deductions','الخصومات'],['Employee Remarks','ملاحظات الموظف'],['Employee Department','قسم الموظف']];
-    const N=H.length, widths=[30,30,18,16,20,20,22,18,16,20,24];
+    const H=[['Employee IBAN','أيبان الموظف'],['Employee Name','إسم الموظف'],['Employee Number','الرقم الوظيفي'],['ID Number','رقم الهوية'],['Total Salary','الراتب الإجمالي'],['Basic Salary','الراتب الأساسي'],['Housing Allowance','بدل السكن'],['Other Earnings','بدلات أخرى'],['Deductions','الخصومات'],['Employee Remarks','ملاحظات الموظف'],['Employee Job Title','الوظيفة'],['Project','المشروع']];
+    const N=H.length, widths=[30,30,18,16,20,20,22,18,16,20,22,30];
     const sc=(r,c,t,st)=>`<c r="${colName(c)}${r}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${esc(t)}</t></is></c>`;
     const nc=(r,c,v,st)=>`<c r="${colName(c)}${r}" s="${st}"><v>${Number(v)||0}</v></c>`;
     const blank=(r,c,st)=>`<c r="${colName(c)}${r}" s="${st}"/>`;
@@ -3298,7 +3298,7 @@
     let r=3;
     rows.forEach((x,i)=>{
       const no=String(x.empno||'').trim()||String(i+1);
-      xr.push(`<row r="${r}" ht="18" customHeight="1">${sc(r,0,x.iban||'',3)}${sc(r,1,x.name||'',4)}${/^\d+$/.test(no)?nc(r,2,no,8):sc(r,2,no,8)}${sc(r,3,x.idnum||'',8)}${nc(r,4,x.total,6)}${nc(r,5,x.basic,5)}${nc(r,6,x.housing,5)}${nc(r,7,x.other,5)}${nc(r,8,x.ded,5)}${sc(r,9,x.remarks||'إيداع راتب',4)}${sc(r,10,x.dept||'',4)}</row>`);
+      xr.push(`<row r="${r}" ht="18" customHeight="1">${sc(r,0,x.iban||'',3)}${sc(r,1,x.name||'',4)}${/^\d+$/.test(no)?nc(r,2,no,8):sc(r,2,no,8)}${sc(r,3,x.idnum||'',8)}${nc(r,4,x.total,6)}${nc(r,5,x.basic,5)}${nc(r,6,x.housing,5)}${nc(r,7,x.other,5)}${nc(r,8,x.ded,5)}${sc(r,9,x.remarks||'إيداع راتب',4)}${sc(r,10,x.job||'',4)}${sc(r,11,x.project||'',4)}</row>`);
       r++;
     });
     const cols=widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('');
@@ -3351,7 +3351,7 @@
     Object.keys(m).forEach(id=>{
       const b=m[id]&&m[id].bank; if(!b) return;
       const e=employees.find(x=>String(x.id)===String(id))||{};
-      out.push({id,name:e.fullname||b.name||'',iban:String(e.iban||'').replace(/\s+/g,'').toUpperCase(),empno:e.empcode||'',idnum:e.idnum||'',dept:e.dept||'',project:e.project||'',region:e.region||'',total:b.total,basic:b.basic,housing:b.housing,other:b.other,ded:b.ded,at:b.at||'',remarks:'إيداع راتب'});
+      out.push({id,name:e.fullname||b.name||'',iban:String(e.iban||'').replace(/\s+/g,'').toUpperCase(),empno:e.empcode||'',idnum:e.idnum||'',dept:e.dept||'',job:e.jobtitle||'',project:e.project||'',region:e.region||'',total:b.total,basic:b.basic,housing:b.housing,other:b.other,ded:b.ded,at:b.at||'',remarks:'إيداع راتب'});
     });
     return out.sort((a,b)=>String(a.empno).localeCompare(String(b.empno),'ar',{numeric:true})||String(a.name).localeCompare(String(b.name),'ar'));
   }
@@ -3362,8 +3362,8 @@
   function bankTotals(rows){ const t={total:0,basic:0,housing:0,other:0,ded:0}; rows.forEach(x=>{ Object.keys(t).forEach(k=>{ t[k]+=Number(x[k])||0; }); }); Object.keys(t).forEach(k=>{ t[k]=r2(t[k]); }); return t; }
   function bankSheetHtml(rows,forPrint){
     const t=bankTotals(rows), act=!forPrint&&pdrCanFinance();
-    const heads=[['Employee IBAN','أيبان الموظف'],['Employee Name','إسم الموظف'],['Employee Number','الرقم الوظيفي'],['ID Number','رقم الهوية'],['Total Salary','الراتب الإجمالي'],['Basic Salary','الراتب الأساسي'],['Housing Allowance','بدل السكن'],['Other Earnings','بدلات أخرى'],['Deductions','الخصومات'],['Employee Remarks','ملاحظات الموظف'],['Employee Department','قسم الموظف']];
-    const body=rows.map((x,i)=>`<tr><td class="bk-ltr">${x.iban?escapeHtml(x.iban):'<span class="bk-warn">بدون آيبان</span>'}</td><td class="bk-name">${escapeHtml(x.name||'—')}</td><td class="bk-num">${escapeHtml(x.empno||String(i+1))}</td><td class="bk-num">${escapeHtml(x.idnum||'')}</td><td class="bk-num bk-total">${bankNum(x.total)}</td><td class="bk-num">${bankNum(x.basic)}</td><td class="bk-num">${bankNum(x.housing)}</td><td class="bk-num">${bankNum(x.other)}</td><td class="bk-num">${bankNum(x.ded)}</td><td>${escapeHtml(x.remarks)}</td><td>${escapeHtml(x.dept||'')}</td><td>${escapeHtml(x.project||'—')}</td><td class="bk-small">${x.at?escapeHtml(fmtDMY(String(x.at).slice(0,10))):''}</td>${act?`<td class="no-print"><button type="button" class="btn btn-sm" data-bank-unpost="${escapeAttr(x.id)}" title="يرجع الموظف لقائمة غير المرحّلين">إلغاء الترحيل</button></td>`:''}</tr>`).join('');
+    const heads=[['Employee IBAN','أيبان الموظف'],['Employee Name','إسم الموظف'],['Employee Number','الرقم الوظيفي'],['ID Number','رقم الهوية'],['Total Salary','الراتب الإجمالي'],['Basic Salary','الراتب الأساسي'],['Housing Allowance','بدل السكن'],['Other Earnings','بدلات أخرى'],['Deductions','الخصومات'],['Employee Remarks','ملاحظات الموظف'],['Employee Job Title','الوظيفة']];
+    const body=rows.map((x,i)=>`<tr><td class="bk-ltr">${x.iban?escapeHtml(x.iban):'<span class="bk-warn">بدون آيبان</span>'}</td><td class="bk-name">${escapeHtml(x.name||'—')}</td><td class="bk-num">${escapeHtml(x.empno||String(i+1))}</td><td class="bk-num">${escapeHtml(x.idnum||'')}</td><td class="bk-num bk-total">${bankNum(x.total)}</td><td class="bk-num">${bankNum(x.basic)}</td><td class="bk-num">${bankNum(x.housing)}</td><td class="bk-num">${bankNum(x.other)}</td><td class="bk-num">${bankNum(x.ded)}</td><td>${escapeHtml(x.remarks)}</td><td>${escapeHtml(x.job||'')}</td><td>${escapeHtml(x.project||'—')}</td><td class="bk-small">${x.at?escapeHtml(fmtDMY(String(x.at).slice(0,10))):''}</td>${act?`<td class="no-print"><button type="button" class="btn btn-sm" data-bank-unpost="${escapeAttr(x.id)}" title="يرجع الموظف لقائمة غير المرحّلين">إلغاء الترحيل</button></td>`:''}</tr>`).join('');
     return `<div class="bank-sheet"><div class="bank-banner"><b>ARB WPS Payroll Payments File</b><span>ملف دفع الرواتب لمصرف الراجحي</span></div>
       <div class="table-wrap"><table class="bank-table"><thead><tr>${heads.map(h=>`<th><b>${h[0]}</b><span>${h[1]}</span></th>`).join('')}<th><b>Project</b><span>المشروع</span></th><th><b>Posted</b><span>تاريخ الترحيل</span></th>${act?'<th class="no-print"></th>':''}</tr></thead>
       <tbody>${body||`<tr><td colspan="${act?14:13}" class="empty-note">لا يوجد موظفون مرحّلون مطابقون للفلاتر.</td></tr>`}</tbody>
