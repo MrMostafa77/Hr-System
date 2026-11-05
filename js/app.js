@@ -2906,6 +2906,13 @@
     let draft=empStatusPeriods(e).map(p=>({...p}));
     const msgs={};   // رسالة آخر حفظ لكل حالة
     const sig=arr=>JSON.stringify(arr.map(p=>[p.from||'',p.to||'']).sort());
+    const statusHtml=k=>{
+      const mine=draft.filter(p=>p.k===k), saved=empStatusPeriods(cur()).filter(p=>p.k===k), m=msgs[k];
+      const dirty=sig(mine)!==sig(saved);
+      return dirty?`<span class="emp-status-msg dirty">● تعديلات غير محفوظة</span>`:(m?`<span class="emp-status-msg ${m.bad?'bad':'ok'}">${escapeHtml(m.text)}</span>`:(saved.length?`<span class="emp-status-msg ok">محفوظة</span>`:''));
+    };
+    // تحديث سطر الحالة فقط (بدون إعادة رسم الخانات) حتى لا يضيع المؤشر أثناء كتابة التاريخ
+    const refreshLine=k=>{ const el=host.querySelector(`[data-st-line="${k}"]`); if(el) el.innerHTML=statusHtml(k); };
     const draw=()=>{
       host.innerHTML=`<h3>حالة الموظف <span class="employee-section-count">تؤثر تلقائيًا على المسير والحضور وسعة المشروع</span></h3>
         <div class="emp-status-vlist">${EMP_STATUS_LIST.map(s=>{
@@ -2913,7 +2920,7 @@
           const saved=empStatusPeriods(cur()).filter(p=>p.k===s.k);
           const dirty=sig(mine.map(x=>x.p))!==sig(saved);
           const m=msgs[s.k];
-          const status=dirty?`<span class="emp-status-msg dirty">● تعديلات غير محفوظة</span>`:(m?`<span class="emp-status-msg ${m.bad?'bad':'ok'}">${escapeHtml(m.text)}</span>`:(saved.length?`<span class="emp-status-msg ok">محفوظة</span>`:''));
+          const status=statusHtml(s.k);
           const rows=mine.map(x=>s.single
             ? `<div class="emp-status-period"><label>${escapeHtml(s.dateLabel||'التاريخ')} <input type="date" data-st-from="${x.i}" value="${escapeAttr(x.p.from)}" ${canEdit?'':'disabled'}></label></div>`
             : `<div class="emp-status-period"><label>من <input type="date" data-st-from="${x.i}" value="${escapeAttr(x.p.from)}" ${canEdit?'':'disabled'}></label><label>إلى <input type="date" data-st-to="${x.i}" value="${escapeAttr(x.p.to)}" ${canEdit?'':'disabled'}></label>${canEdit?`<button type="button" class="btn btn-sm" data-st-del="${x.i}" title="حذف الفترة">✕</button>`:''}</div>`).join('');
@@ -2921,7 +2928,7 @@
             <label class="emp-status-check"><input type="checkbox" data-st-toggle="${s.k}" ${mine.length?'checked':''} ${canEdit?'':'disabled'}> <span>${escapeHtml(s.label)}</span></label>
             ${s.desc?`<small class="emp-status-desc">${escapeHtml(s.desc)}</small>`:''}
             ${mine.length?`<div class="emp-status-periods">${rows}${(!s.single&&canEdit)?`<button type="button" class="btn btn-sm emp-status-add" data-st-add="${s.k}">+ فترة أخرى</button>`:''}</div>`:''}
-            ${canEdit?`<div class="emp-status-actions"><button type="button" class="btn btn-sm btn-primary" data-st-save="${s.k}">حفظ «${escapeHtml(s.label)}»</button>${status}</div>`:status}
+            ${canEdit?`<div class="emp-status-actions"><button type="button" class="btn btn-sm btn-primary" data-st-save="${s.k}">حفظ «${escapeHtml(s.label)}»</button><span data-st-line="${s.k}">${status}</span></div>`:`<span data-st-line="${s.k}">${status}</span>`}
           </div>`;
         }).join('')}</div>
         <small class="emp-status-hint">لإلغاء حالة (مثل إيقاف الإدارة): شيل علامة الاختيار ثم اضغط «حفظ» الخاص بها.</small>`;
@@ -2930,8 +2937,8 @@
         if(cb.checked) draft.push({k,from:todayISO(),to:''}); else draft=draft.filter(p=>p.k!==k);
         delete msgs[k]; draw();
       }));
-      host.querySelectorAll('[data-st-from]').forEach(el=>el.addEventListener('change',()=>{ const p=draft[Number(el.dataset.stFrom)]; p.from=el.value; delete msgs[p.k]; draw(); }));
-      host.querySelectorAll('[data-st-to]').forEach(el=>el.addEventListener('change',()=>{ const p=draft[Number(el.dataset.stTo)]; p.to=el.value; delete msgs[p.k]; draw(); }));
+      host.querySelectorAll('[data-st-from]').forEach(el=>el.addEventListener('input',()=>{ const p=draft[Number(el.dataset.stFrom)]; p.from=el.value; delete msgs[p.k]; refreshLine(p.k); }));
+      host.querySelectorAll('[data-st-to]').forEach(el=>el.addEventListener('input',()=>{ const p=draft[Number(el.dataset.stTo)]; p.to=el.value; delete msgs[p.k]; refreshLine(p.k); }));
       host.querySelectorAll('[data-st-add]').forEach(b=>b.addEventListener('click',()=>{ draft.push({k:b.dataset.stAdd,from:todayISO(),to:''}); delete msgs[b.dataset.stAdd]; draw(); }));
       host.querySelectorAll('[data-st-del]').forEach(b=>b.addEventListener('click',()=>{ const p=draft[Number(b.dataset.stDel)]; draft.splice(Number(b.dataset.stDel),1); delete msgs[p.k]; draw(); }));
       host.querySelectorAll('[data-st-save]').forEach(b=>b.addEventListener('click',()=>{
