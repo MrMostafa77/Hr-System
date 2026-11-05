@@ -3162,7 +3162,7 @@
     const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel'), bankMode=window.currentReport==='bank', bankPanel=document.getElementById('bankReportsPanel');
     if(covPanel)covPanel.style.display=coverageMode?'':'none';
     // أزرار الشريط العلوي خاصة بمسير الرواتب فقط
-    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':''; });
+    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','payrollUnpostAllBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':''; });
     if(card)card.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':'';
     { const sb=document.getElementById('paySelBar'); if(sb&&(projectMode||employeeMode||coverageMode||bankMode)) sb.style.display='none'; }
     if(panel)panel.style.display=projectMode?'':'none';
@@ -3312,7 +3312,9 @@
   async function payrollBankExport(list,ym,opts){
     opts=opts||{};
     if(!pdrCanFinance()){ showToast('ترحيل الرواتب يحتاج صلاحية المالية'); return; }
-    if(!window.JSZip){ showToast('مكتبة Excel غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
+    // من يملك صلاحية تقرير «كشف البنك» يُعرض له الكشف بعد الترحيل؛ غيره يبقى التنزيل المباشر كما كان
+    const canOpenBank=!(window.HRAuth&&window.HRAuth.profile)||!!window.HRAuth.canReport('bank');
+    if(!canOpenBank && !window.JSZip){ showToast('مكتبة Excel غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
     const cols=monthCols(ym); let held=0, zero=0, noIban=0; const posted=[];
     list.forEach(e=>{
       const p=payrollStatementForCols(e,cols);
@@ -3328,12 +3330,19 @@
     if(!payrollRecords[ym]) payrollRecords[ym]={};
     posted.forEach(x=>{ payrollRecords[ym][x.id]={...payrollAdjustmentFor(ym,x.id),bank:{at,name:x.name,total:x.total,basic:x.basic,housing:x.housing,other:x.other,ded:x.ded}}; });
     persistCloud('');
-    const ids=new Set(posted.map(x=>String(x.id)));
-    const rows=bankPostedRows(ym).filter(x=>ids.has(String(x.id)));
-    await bankDownloadRows(rows,`ملف_دفع_الرواتب_الراجحي_${monthLabel(ym).replace(/\s+/g,'_')}${opts.selected?'_موظفين_محددين':''}.xlsx`);
     const notes=[]; if(held) notes.push(`${held} راتب موقوف لم يُرحّل`); if(zero) notes.push(`${zero} بصافي صفر لم يُرحّل`); if(noIban) notes.push(`${noIban} بدون آيبان`);
     showToast(`تم ترحيل ${posted.length} موظف — تجدهم في «كشف البنك»`+(notes.length?` — (${notes.join('، ')})`:''));
-    try{ renderReports(); }catch(_){}
+    if(canOpenBank){
+      // بدل تنزيل Excel مباشرة: افتح «كشف البنك» على شهر الترحيل (المرحَّلون فقط) ومنه الطباعة أو التنزيل
+      if(opts.selected){ paySelMode=false; paySelected.clear(); try{ paySelRefresh(); }catch(_){} }
+      bankState.month=ym; bankState.q=''; bankState.project=''; bankState.region='';
+      window.currentReport='bank'; expandParentGroup('reports'); switchView('reports');
+    }else{
+      const ids=new Set(posted.map(x=>String(x.id)));
+      const rows=bankPostedRows(ym).filter(x=>ids.has(String(x.id)));
+      await bankDownloadRows(rows,`ملف_دفع_الرواتب_الراجحي_${monthLabel(ym).replace(/\s+/g,'_')}${opts.selected?'_موظفين_محددين':''}.xlsx`);
+      try{ renderReports(); }catch(_){}
+    }
   }
   /* ===== صفحة كشف البنك: المرحَّلون فقط + فلاتر + إجمالي متغير ===== */
   const bankState={month:'',q:'',project:'',region:''};
@@ -3366,6 +3375,7 @@
     const out=document.getElementById('bankOutput'); if(!out) return;
     const msel=document.getElementById('bankMonth'), psel=document.getElementById('bankProject'), rsel=document.getElementById('bankRegion'), qin=document.getElementById('bankSearch');
     const months=bankMonths();
+    { const ub=document.getElementById('bankUnpostAllBtn'); if(ub) ub.style.display=(pdrCanFinance()&&months.length)?'':'none'; }
     if(!months.includes(bankState.month)) bankState.month=months[0]||'';
     msel.innerHTML=months.length?months.map(m=>`<option value="${escapeAttr(m)}">${escapeHtml(monthLabel(m))}</option>`).join(''):'<option value="">لا يوجد ترحيل</option>';
     msel.value=bankState.month;
@@ -3405,6 +3415,18 @@
     if(!confirm(`إلغاء ترحيل ${nm} من كشف البنك لشهر ${monthLabel(bankState.month)}؟`)) return;
     delete rec.bank; persistCloud(`تم إلغاء ترحيل ${nm}`); renderBankReport();
   });
+  // إلغاء ترحيل كل موظفي شهر معيّن: يحذف علامة الترحيل فقط (bank) ولا يلمس الرواتب أو التعديلات المسجّلة
+  function bankUnpostAll(ym){
+    if(!pdrCanFinance()){ showToast('إلغاء الترحيل يحتاج صلاحية المالية'); return; }
+    const m=ym&&payrollRecords&&payrollRecords[ym]; const ids=m?Object.keys(m).filter(id=>m[id]&&m[id].bank):[];
+    if(!ids.length){ showToast('لا يوجد موظفون مرحّلون في هذا الشهر'); return; }
+    if(!confirm(`إلغاء ترحيل كل الموظفين (${ids.length}) من كشف البنك لشهر ${monthLabel(ym)}؟\n\nسيرجعون لقائمة غير المرحّلين، ولن تتأثر الرواتب أو التعديلات المسجّلة.`)) return;
+    ids.forEach(id=>{ delete m[id].bank; });
+    persistCloud(`تم إلغاء ترحيل ${ids.length} موظف من كشف البنك`);
+    try{ renderReports(); }catch(_){}
+  }
+  document.getElementById('bankUnpostAllBtn')?.addEventListener('click',()=>bankUnpostAll(bankState.month));
+  document.getElementById('payrollUnpostAllBtn')?.addEventListener('click',()=>bankUnpostAll(document.getElementById('payrollMonth')?.value));
   document.getElementById('payrollBankAllBtn')?.addEventListener('click',()=>{
     const ym=document.getElementById('payrollMonth')?.value; if(!ym){ showToast('لا يوجد شهر مسير متاح'); return; }
     const list=payrollFilteredList(ym); if(!list.length){ showToast('لا يوجد موظفون مطابقون للترحيل'); return; }
