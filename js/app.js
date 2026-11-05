@@ -14,15 +14,18 @@
   const PROJECT_ACCOUNT_KEY = 'hr_project_accounts_v1';
   const PAYROLL_KEY = 'hr_payroll_v1';
   const INVOICE_KEY = 'hr_invoices_v1';
-  const ATT_CODES = ['','ح','-','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق'];   // (-) = لم يحضر: لا حضور ولا غياب، يُخصم يومه من الراتب بدون جزاء
+  const ATT_CODES = ['','ح','-','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق','إجازة','مرضية'];   // (-) = لم يحضر: لا حضور ولا غياب، يُخصم يومه من الراتب بدون جزاء
   let paySelMode=false; const paySelected=new Set();   // وضع اختيار موظفين لترحيل كشف البنك
+  // hold = الراتب الإجمالي لا يدخل إجمالي المسير ولا يُرحَّل على كشف البنك حتى تُلغى الحالة
+  // code = رمز الحضور الذي تفرضه الحالة على أيام الفترة (فارغ = الحضور يبقى طبيعيًا)
+  // cap  = لا يُحسب الموظف من سعة المشروع طوال الفترة
   const EMP_STATUS_LIST=[
-    {k:'stop',label:'إيقاف عن العمل',hold:true,code:'-'},
-    {k:'annual',label:'إجازة سنوية',hold:true,code:'ق'},
-    {k:'sick',label:'إجازة مرضية',hold:false,code:'ق'},
-    {k:'mgmt',label:'إيقاف الإدارة',hold:true,code:'-'},
-    {k:'resign',label:'استقالة',hold:true,code:'-'},
-    {k:'absent',label:'تغيب عن العمل',hold:true,code:'غ'}
+    {k:'stop',label:'إيقاف عن العمل',hold:false,code:'-',cap:true,desc:'تتوقف كل مستحقاته تلقائيًا من تاريخ الإيقاف (يظهر في الحضور بـ «-») ولا يُحسب من سعة المشروع.'},
+    {k:'annual',label:'إجازة سنوية',hold:false,code:'إجازة',desc:'من تاريخ إلى تاريخ: لا حضور ولا راتب عن أيامها، ويُكتب «إجازة» في الحضور والانصراف.'},
+    {k:'sick',label:'إجازة مرضية',hold:false,code:'مرضية',desc:'يُحتسب الحضور والراتب كاملًا، ويُكتب «مرضية» في الحضور والانصراف.'},
+    {k:'mgmt',label:'إيقاف الإدارة',hold:true,code:'',desc:'يُحتسب الحضور والانصراف عادي، لكن راتبه الإجمالي لا يدخل المسير ولا يمكن ترحيله إلا بعد إلغاء الإيقاف.'},
+    {k:'resign',label:'استقالة',hold:false,code:'-',desc:'لا يُحتسب له حضور وانصراف من تاريخ الاستقالة (يظهر «-») ولا يُحسب له راتب عن الأيام بعدها.'},
+    {k:'absent',label:'تغيب عن العمل',hold:true,code:'غ',cap:true,desc:'يُكتب «غ» في الحضور من تاريخ التغيب، ولا يُحسب من سعة المشروع، ولا ينزل له راتب إجمالي.'}
   ];
   const EMP_STATUS_PRIORITY=['resign','stop','mgmt','absent','annual','sick'];
   let employees = [];
@@ -729,7 +732,7 @@
     saveProjects();refreshEmployeeProjectSelect();refreshDepartmentJobSelects();renderProjects();resetProjectForm();showToast(idx>=0?'تم تعديل المشروع':'تم إضافة المشروع');
   });
   function projectEmployeeTotal(projectName){
-    return employees.filter(e=>sameProjectName(e.project,projectName)).length;
+    return employees.filter(e=>sameProjectName(e.project,projectName) && empCountsInCapacity(e)).length;
   }
   function projectCapacityTotal(p){
     return Object.keys(roleCapacityLabels).reduce((sum,k)=>sum+projectRoleCapacity(p,k),0);
@@ -2332,11 +2335,17 @@
   function sameProjectName(a,b){
     return normalizeCapacityText(a)===normalizeCapacityText(b);
   }
+  // الموظف الذي عليه (إيقاف عن العمل) أو (تغيب عن العمل) ساري اليوم لا يُحسب من سعة المشروع
+  function empCountsInCapacity(e){
+    const td=todayISO();
+    return !empStatusPeriods(e).some(p=>EMP_STATUS_LIST.find(s=>s.k===p.k).cap && (!p.from||p.from<=td) && (!p.to||p.to>=td));
+  }
   function projectEmployeeCounts(projectName, excludeId){
     const counts={guards:0,guardsFemale:0,supervisors:0,managers:0,patrols:0};
     employees.forEach(e=>{
       if(excludeId && e.id===excludeId) return;
       if(!sameProjectName(e.project,projectName)) return;
+      if(!empCountsInCapacity(e)) return;
       const k=roleCapacityKey(e.jobtitle);
       if(k) counts[k]++;
     });
@@ -2620,7 +2629,7 @@
   // الدوام = كل الأيام المسجلة بأي حرف (ح + أي إجراء) على أساس أيام الشهر الفعلية
   function attWorkDays(cols, empId){
     if(!cols.length) return 0;
-    let coded=0; cols.forEach(c=>{ const k=attCodeAt(c.ym, empId, c.d); if(k && k!=='-') coded++; });
+    let coded=0; cols.forEach(c=>{ const k=attCodeAt(c.ym, empId, c.d); if(k && k!=='-' && k!=='إجازة') coded++; });
     return Math.min(payMonthDaysFor(cols), coded);
   }
   function payrollAdjustmentFor(ym, empId){
@@ -2669,7 +2678,7 @@
      حتى لو تغيّر راتب الموظف أو لائحة المشروع، إلا إذا تغيّر حضور الموظف في ذلك الشهر
      أو إجراءاته أو تعديلات المسير (مكافأة/خصومات...) — وعندها يُعاد الحساب بنفس الراتب المثبّت. */
   const PAY_SNAP_KEYS=['day','basic','housing','transport','otherAllow','monthlyGross','overtime','bonus','totalEarned','nonWorkDays','nonWorkDed','absenceDays','absence','penalty','withdrawal','gosi','uniform','newspaper','advance','other','deduction','net','insuranceBase','workDays'];
-  const PAY_SUM_ZERO={'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
+  const PAY_SUM_ZERO={'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0,'إجازة':0,'مرضية':0};
   function payCanFreeze(){ return !(window.HRAuth&&typeof window.HRAuth.canFinance==='function') || !!window.HRAuth.canFinance(); }
   // الموظف يدخل مسير الشهر فقط إذا باشر في هذا الشهر أو قبله (أول حضور له لا يقع بعد نهاية الشهر)
   function employeeInPayrollMonth(e,ym){ return employeeEligibleForHR(e) && !employeeNotStartedFor(e,monthCols(ym)); }
@@ -2740,7 +2749,7 @@
   // رمز الحضور الذي تفرضه الحالة في يوم معيّن (للفترات المؤرّخة فقط): استقالة/إيقاف ← (-) ، تغيب ← (غ) ، إجازة ← (ق)
   function attStatusCodeAt(empId,iso){
     const e=employees.find(x=>String(x.id)===String(empId)); if(!e) return '';
-    const hit=empStatusPeriods(e).filter(p=>p.from && iso>=p.from && (!p.to||iso<=p.to)); if(!hit.length) return '';
+    const hit=empStatusPeriods(e).filter(p=>p.from && iso>=p.from && (!p.to||iso<=p.to) && EMP_STATUS_LIST.find(s=>s.k===p.k).code); if(!hit.length) return '';
     hit.sort((x,y)=>EMP_STATUS_PRIORITY.indexOf(x.k)-EMP_STATUS_PRIORITY.indexOf(y.k));
     return EMP_STATUS_LIST.find(s=>s.k===hit[0].k).code;
   }
@@ -2760,8 +2769,8 @@
     const periodOpen=cols.length>0 && cols[cols.length-1].iso>todayISO();
     let nonWorkDays;
     if(notStarted) nonWorkDays=MD;
-    else if(periodOpen){ const st=attStartDateFor(e.id)||'', td=todayISO(); let el=0, dash=0; cols.forEach(c=>{ if(c.iso<=td && (!st||c.iso>=st)){ el++; if(attCodeAt(c.ym,e.id,c.d)==='-') dash++; } }); nonWorkDays=Math.min(MD, MD-Math.min(MD,el)+dash); }
-    else nonWorkDays=Math.min(MD, nonAttendanceDaysForCols(e,cols)+(sum['-']||0));   // (-) يُخصم يومه كأنه لم يحضر، ولا يدخل في الغياب
+    else if(periodOpen){ const st=attStartDateFor(e.id)||'', td=todayISO(); let el=0, dash=0; cols.forEach(c=>{ if(c.iso<=td && (!st||c.iso>=st)){ el++; { const k0=attCodeAt(c.ym,e.id,c.d); if(k0==='-'||k0==='إجازة') dash++; } } }); nonWorkDays=Math.min(MD, MD-Math.min(MD,el)+dash); }
+    else nonWorkDays=Math.min(MD, nonAttendanceDaysForCols(e,cols)+(sum['-']||0)+(sum['إجازة']||0));   // (-) والإجازة السنوية: يُخصم يومها كأنه لم يحضر، ولا يدخل في الغياب
     const paidDays=MD-nonWorkDays, nonWorkDed=notStarted?r2(monthlyGross):r2(nonWorkDays*day);
     const ded=attDeductionsFor(e,cols,day), penalty=ded.penalty, withdrawal=ded.withdrawal;
     // الغياب (غ) حسب لائحة المشروع، والانكشاف (ش) يوم بأجر اليوم الإجمالي
@@ -2886,10 +2895,10 @@
       host.innerHTML=`<h3>حالة الموظف <span class="employee-section-count">تؤثر تلقائيًا على المسير والحضور والانصراف</span></h3>
         <div class="emp-status-vlist">${EMP_STATUS_LIST.map(s=>{
           const mine=draft.map((p,i)=>({p,i})).filter(x=>x.p.k===s.k);
-          return `<div class="emp-status-item${mine.length?' is-on':''}"><label class="emp-status-check"><input type="checkbox" data-st-toggle="${s.k}" ${mine.length?'checked':''} ${canEdit?'':'disabled'}> <span>${escapeHtml(s.label)}</span></label>${mine.length?`<div class="emp-status-periods">${mine.map(x=>`<div class="emp-status-period"><label>من <input type="date" data-st-from="${x.i}" value="${escapeAttr(x.p.from)}" ${canEdit?'':'disabled'}></label><label>إلى <input type="date" data-st-to="${x.i}" value="${escapeAttr(x.p.to)}" ${canEdit?'':'disabled'}></label>${canEdit?`<button type="button" class="btn btn-sm" data-st-del="${x.i}" title="حذف الفترة">✕</button>`:''}</div>`).join('')}${canEdit?`<button type="button" class="btn btn-sm emp-status-add" data-st-add="${s.k}">+ فترة أخرى</button>`:''}</div>`:''}</div>`;
+          return `<div class="emp-status-item${mine.length?' is-on':''}"><label class="emp-status-check"><input type="checkbox" data-st-toggle="${s.k}" ${mine.length?'checked':''} ${canEdit?'':'disabled'}> <span>${escapeHtml(s.label)}</span></label>${mine.length&&s.desc?`<small class="emp-status-desc">${escapeHtml(s.desc)}</small>`:''}${mine.length?`<div class="emp-status-periods">${mine.map(x=>`<div class="emp-status-period"><label>من <input type="date" data-st-from="${x.i}" value="${escapeAttr(x.p.from)}" ${canEdit?'':'disabled'}></label><label>إلى <input type="date" data-st-to="${x.i}" value="${escapeAttr(x.p.to)}" ${canEdit?'':'disabled'}></label>${canEdit?`<button type="button" class="btn btn-sm" data-st-del="${x.i}" title="حذف الفترة">✕</button>`:''}</div>`).join('')}${canEdit?`<button type="button" class="btn btn-sm emp-status-add" data-st-add="${s.k}">+ فترة أخرى</button>`:''}</div>`:''}</div>`;
         }).join('')}</div>
         ${canEdit?`<div class="emp-status-actions"><button type="button" class="btn btn-sm btn-primary" data-st-save>حفظ الحالة</button><span class="emp-status-msg${bad?' bad':''}">${escapeHtml(msg||'')}</span></div>`:''}
-        <small class="emp-status-hint">«إلى» اختياري (يُترك فارغًا إذا الحالة مستمرة). أيام الفترة تظهر في الحضور: استقالة/إيقاف ← (-) ، تغيب ← (غ) ، إجازة ← (ق). أي حالة عدا «إجازة مرضية» لا يدخل راتب الشهر المتأثر في إجمالي المسير، و«إجازة مرضية» تظهر في الملاحظات فقط.</small>`;
+        <small class="emp-status-hint">«إلى» اختياري (يُترك فارغًا إذا الحالة مستمرة) ما عدا الإجازة السنوية. لإلغاء حالة (مثل إيقاف الإدارة) ألغِ علامة الاختيار أو احذف فترتها ثم اضغط «حفظ الحالة».</small>`;
       host.querySelectorAll('[data-st-toggle]').forEach(cb=>cb.addEventListener('change',()=>{
         const k=cb.dataset.stToggle;
         if(cb.checked) draft.push({k,from:todayISO(),to:''}); else draft=draft.filter(p=>p.k!==k);
@@ -2903,6 +2912,7 @@
         for(const p of draft){
           const lbl=EMP_STATUS_LIST.find(s=>s.k===p.k).label;
           if(!p.from){ draw(`حدد تاريخ البداية (من) لحالة «${lbl}».`,true); return; }
+          if(p.k==='annual' && !p.to){ draw(`الإجازة السنوية تحتاج تاريخ النهاية (إلى).`,true); return; }
           if(p.to && p.to<p.from){ draw(`تاريخ النهاية قبل البداية في حالة «${lbl}».`,true); return; }
         }
         const target=employees.find(x=>String(x.id)===String(e.id)); if(!target) return;
@@ -2971,7 +2981,7 @@
     modal.querySelectorAll('[data-profile-close]').forEach(el=>el.addEventListener('click',()=>{modal.remove();document.body.classList.remove('employee-profile-open');}));
     const escClose=ev=>{if(ev.key==='Escape'){modal.remove();document.body.classList.remove('employee-profile-open');document.removeEventListener('keydown',escClose);}};document.addEventListener('keydown',escClose);
   }
-  function attCodeLabel(code){const map={'ح':'حضور','غ':'غياب','ش':'انكشاف','ج':'جزاء','راحة':'راحة','ط':'تغطية','ض':'إضافي','س':'انسحاب','جمع':'إجازة جمع','عيد':'إجازة عيد','ق':'إجازة'};return map[String(code||'')]||String(code||'—');}
+  function attCodeLabel(code){const map={'ح':'حضور','غ':'غياب','ش':'انكشاف','ج':'جزاء','راحة':'راحة','ط':'تغطية','ض':'إضافي','س':'انسحاب','جمع':'إجازة جمع','عيد':'إجازة عيد','ق':'إجازة','إجازة':'إجازة سنوية','مرضية':'إجازة مرضية'};return map[String(code||'')]||String(code||'—');}
   function renderEmployeeReports(){
     const body=document.getElementById('employeeReportBody'); if(!body)return;
     const q=(document.getElementById('employeeReportSearch')?.value||'').trim().toLocaleLowerCase('ar');
@@ -3230,12 +3240,12 @@
     const cols=monthCols(ym); let held=0, zero=0, noIban=0; const rows=[];
     list.forEach(e=>{
       const p=payrollStatementForCols(e,cols);
-      if(opts.skipHeld && p.held){ held++; return; }          // الراتب الموقوف لا يُرحّل في «الكل» (مثل إجمالي المسير)
+      if(p.held){ held++; return; }          // الراتب الموقوف (إيقاف الإدارة / تغيب) لا يُرحّل أبدًا — لا في «الكل» ولا في «موظفين معينين» — إلا بعد إلغاء الحالة
       if(!(p.net>0)){ zero++; return; }                       // لا يُرحّل صافي صفر أو سالب
       const iban=String(e.iban||'').replace(/\s+/g,'').toUpperCase(); if(!iban) noIban++;
       rows.push({name:e.fullname||'',project:e.project||'',iban,bankcode:e.bankcode||'',bankname:e.bankname||'',idnum:e.idnum||'',basic:p.basic,allow:r2((Number(p.housing)||0)+(Number(p.transport)||0)+(Number(p.otherAllow)||0)),net:p.net});
     });
-    if(!rows.length){ showToast('لا يوجد موظفون لهم صافي راتب لترحيلهم'); return; }
+    if(!rows.length){ showToast(held?`لا يمكن ترحيل راتب ${held} موظف لأن عليه حالة موقوفة (إيقاف الإدارة / تغيب) — ألغِ الحالة من ملف الموظف أولًا`:'لا يوجد موظفون لهم صافي راتب لترحيلهم'); return; }
     const files=bankSheetFiles(rows,`كشف البنك — ${monthLabel(ym)}`), zip=new JSZip();
     Object.keys(files).forEach(k=>zip.file(k,files[k]));
     const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
@@ -3305,7 +3315,7 @@
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
   }
   const ATT_MONTHS = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
-  const ATT_CODE_LABELS = {'':'—','ح':'حضور','غ':'غياب','ش':'انكشاف','ج':'جزاء','راحة':'راحة','ط':'تغطية','ض':'إضافي','س':'انسحاب','جمع':'جمع','عيد':'عيد','ق':'تطبيق','-':'لم يحضر (بدون غياب)'};
+  const ATT_CODE_LABELS = {'':'—','ح':'حضور','غ':'غياب','ش':'انكشاف','ج':'جزاء','راحة':'راحة','ط':'تغطية','ض':'إضافي','س':'انسحاب','جمع':'جمع','عيد':'عيد','ق':'تطبيق','-':'لم يحضر (بدون غياب)','إجازة':'إجازة سنوية','مرضية':'إجازة مرضية'};
   function monthLabel(ym){
     if(!ym) return '';
     const [y,m] = ym.split('-').map(Number);
@@ -3369,7 +3379,7 @@
   }
   function attSummaryFor(ym, empId){
     const rec = effectiveAttendanceRecord(ym, empId);
-    const counts = {'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
+    const counts = {'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0,'إجازة':0,'مرضية':0};
     Object.values(rec).forEach(code=>{ if(Object.prototype.hasOwnProperty.call(counts,code)) counts[code]++; });
     return counts;
   }
@@ -3408,7 +3418,7 @@
     return autoAttendanceCode(ym, empId, day);
   }
   function attSummaryForCols(cols, empId){
-    const counts = {'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0};
+    const counts = {'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0,'إجازة':0,'مرضية':0};
     cols.forEach(c=>{ const code=attCodeAt(c.ym, empId, c.d); if(Object.prototype.hasOwnProperty.call(counts,code)) counts[code]++; });
     return counts;
   }
