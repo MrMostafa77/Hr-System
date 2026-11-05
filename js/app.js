@@ -20,12 +20,12 @@
   // code = رمز الحضور الذي تفرضه الحالة على أيام الفترة (فارغ = الحضور يبقى طبيعيًا)
   // cap  = لا يُحسب الموظف من سعة المشروع طوال الفترة
   const EMP_STATUS_LIST=[
-    {k:'stop',label:'إيقاف عن العمل',hold:false,code:'-',cap:true,single:true,force:true,dateLabel:'تاريخ الإيقاف',desc:'تاريخ واحد: من هذا التاريخ لا يُحسب له حضور وانصراف (يظهر «-») ولا يدخل في مسير الرواتب ولا يُحسب من سعة المشروع.'},
+    {k:'stop',label:'إيقاف عن العمل',hold:true,code:'-',cap:true,single:true,force:true,dateLabel:'تاريخ الإيقاف',desc:'تاريخ واحد: قبل التاريخ يُحسب حضوره وراتبه عادي، ومن التاريخ لا حضور ولا راتب (يظهر «-»). لا يظهر في الشهور التالية (حضور/مسير)، ولا يُحسب من سعة المشروع، ولا يُرحَّل راتب شهر الإيقاف للبنك إلا بعد إلغاء الإيقاف.'},
     {k:'annual',label:'إجازة سنوية',hold:false,code:'إجازة',force:true,desc:'من تاريخ إلى تاريخ: لا حضور ولا راتب عن أيامها، ويُكتب «إجازة» في الحضور والانصراف.'},
     {k:'sick',label:'إجازة مرضية',hold:false,code:'مرضية',desc:'يُحتسب الحضور والراتب كاملًا في المسير، ويُكتب «مرضية» في الحضور والانصراف.'},
     {k:'mgmt',label:'إيقاف الإدارة',hold:true,code:'',desc:'يُحتسب الحضور والانصراف عادي، لكن راتبه الإجمالي لا يدخل المسير ولا يمكن ترحيله إلا بعد إلغاء الإيقاف.'},
-    {k:'resign',label:'استقالة',hold:false,code:'-',cap:true,single:true,force:true,dateLabel:'تاريخ الاستقالة',desc:'تاريخ واحد: من هذا التاريخ لا يُحتسب له حضور وانصراف (يظهر «-») ولا يُحسب من سعة المشروع.'},
-    {k:'absent',label:'تغيب عن العمل',hold:true,code:'غ',cap:true,single:true,dateLabel:'تاريخ التغيب',desc:'تاريخ واحد: من هذا التاريخ يُكتب «غ» في الحضور، ولا يُحسب من سعة المشروع، ولا ينزل له راتب إجمالي.'}
+    {k:'resign',label:'استقالة',hold:false,code:'-',cap:true,single:true,force:true,dateLabel:'تاريخ الاستقالة',desc:'تاريخ واحد: قبل التاريخ حضوره وراتبه عادي، ومن التاريخ لا حضور ولا راتب (يظهر «-»). لا يظهر في الشهور التالية (حضور/مسير)، ولا يُحسب من سعة المشروع.'},
+    {k:'absent',label:'تغيب عن العمل',hold:true,code:'غ',cap:true,single:true,dateLabel:'تاريخ التغيب',desc:'تاريخ واحد: من التاريخ يُكتب «غ» حتى نهاية الشهر ولا ينزل له راتب إجمالي (ولا يُرحَّل)، ولا يظهر في الشهور التالية، ولا يُحسب من سعة المشروع.'}
   ];
   const EMP_STATUS_PRIORITY=['resign','stop','mgmt','absent','annual','sick'];
   let employees = [];
@@ -2766,10 +2766,10 @@
     if(!d.force && !(raw===undefined||raw===''||raw==='ح')) return '';
     return d.code;
   }
-  // الموظف الموقوف عن العمل: لا يدخل مسير أي فترة تبدأ من تاريخ الإيقاف أو بعده
+  // الموظف المنتهي (إيقاف/استقالة/تغيب): لا يظهر في حضور ولا مسير أي فترة تبدأ من تاريخ الحالة أو بعده
   function empStoppedForCols(e,cols){
     if(!cols||!cols.length) return false;
-    return empStatusPeriods(e).some(p=>p.k==='stop' && p.from && cols[0].iso>=p.from);
+    return empStatusPeriods(e).some(p=>(p.k==='stop'||p.k==='resign'||p.k==='absent') && p.from && cols[0].iso>=p.from);
   }
   function payrollComputeStatement(e,cols,sumIn){
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
@@ -2835,11 +2835,14 @@
     const start=attStartDateFor(emp.id)||String(emp.startdate||'').slice(0,10), end=todayISO();
     if(!start)return [];
     const out=[]; let cursor=start.slice(0,7), last=end.slice(0,7);
+    const fr=k=>empStatusPeriods(emp).filter(p=>p.k===k&&p.from).map(p=>p.from).sort()[0]||'', endStop=[fr('stop'),fr('resign')].filter(Boolean).sort()[0]||'', endAbs=fr('absent');
     while(cursor<=last){
       const rec=effectiveAttendanceRecord(cursor,emp.id), max=Math.min(daysInMonth(cursor),Number(cursor===last?end.slice(8,10):daysInMonth(cursor)));
       for(let d=1;d<=max;d++){
         const date=`${cursor}-${String(d).padStart(2,'0')}`; if(date<start||date>end)continue;
         const code=rec[d]||''; if(!code)continue;
+        if(endStop && date>=endStop) continue;                                  // بعد الإيقاف/الاستقالة لا حضور
+        if(endAbs && date.slice(0,7)>endAbs.slice(0,7)) continue;               // بعد شهر التغيب لا يظهر
         out.push({date,code});
       }
       const [y,m]=cursor.split('-').map(Number); cursor=m===12?`${y+1}-01`:`${y}-${String(m+1).padStart(2,'0')}`;
@@ -3641,8 +3644,9 @@
     const regionQ=document.getElementById('attRegionFilter')?.value||'';
     const projectQ=document.getElementById('attProjectFilter')?.value||'';
     const statusQ=document.getElementById('attStatusFilter')?.value||'';
-    const statusCols=statusQ?attColumns():null;
+    const statusCols=statusQ?attColumns():null, endCols=attColumns();
     return attBaseList().filter(e=>{
+      if(empStoppedForCols(e,endCols)) return false;   // انتهى عمله قبل هذه الفترة (إيقاف/استقالة/تغيب)
       const name=String(e.fullname||'').toLowerCase(), code=String(e.empcode||'').toLowerCase();
       if(!((!searchQ || name.includes(searchQ) || code.includes(searchQ)) &&
              (!regionQ || String(e.region||'')===regionQ) &&
