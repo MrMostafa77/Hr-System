@@ -1020,6 +1020,7 @@
         if(view==='add' && document.getElementById('f_id')?.value==='' && !pjTabOpen('add')) resetForm();
         expandParentGroup(view);
         switchView(view);
+        ev.__hrNavDone=true;   // منع المعالجة المزدوجة من المستمع الثاني
       }catch(err){
         console.error('Navigation error:', err);
         // Minimal fallback: always make the requested section visible.
@@ -1050,8 +1051,7 @@
       if(view==='add' && !document.getElementById('f_id').value && !pjTabOpen('add')){
         resetForm();
       }
-      expandParentGroup(view);
-      switchView(view);
+      if(!ev.__hrNavDone){ expandParentGroup(view); switchView(view); }
       const scrollTarget=el.dataset.scroll;
       if(scrollTarget){
         setTimeout(()=>document.getElementById(scrollTarget)?.scrollIntoView({behavior:'smooth',block:'start'}),120);
