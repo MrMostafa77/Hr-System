@@ -3167,6 +3167,7 @@
   function renderReports(){
     const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel'), bankMode=window.currentReport==='bank', bankPanel=document.getElementById('bankReportsPanel');
     if(covPanel)covPanel.style.display=coverageMode?'':'none';
+    if(bankPanel)bankPanel.style.display=bankMode?'':'none';   // كل تقرير في تبويبه فقط: لا يبقى كشف البنك ظاهرًا في تقارير الموظفين/المشاريع
     // أزرار الشريط العلوي خاصة بمسير الرواتب فقط
     ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':''; });
     if(card)card.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':'';
