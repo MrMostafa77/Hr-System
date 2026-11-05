@@ -923,7 +923,7 @@
     if(view==='users') window.HRUsers?.render();
     if(view==='reports'){
       const activeReport=document.querySelector('.nav-child[data-view="reports"].active');
-      const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
+      const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك'};
       const title=titleMap[activeReport?.dataset.report||'payroll']||'تقارير الرواتب';
       const h=document.querySelector('#view-reports .pagetitle h1');
       if(h) h.textContent=title;
@@ -934,7 +934,7 @@
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
   const PJ_TITLES={users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',reports:'التقارير'};
-  const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات'};
+  const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك'};
   const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn'],sales:['btn','saveInvoiceBtn'],salesorder:['btn','saveOrderBtn']};
   const pjTabs={open:[],dirty:new Set()};
   // عند فتح سجل تاريخي من التقارير، نعرض شاشة الإدخال نفسها لكن للقراءة فقط.
@@ -3155,17 +3155,19 @@
   });
 
   function renderReports(){
-    const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel');
+    const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel'), bankMode=window.currentReport==='bank', bankPanel=document.getElementById('bankReportsPanel');
     if(covPanel)covPanel.style.display=coverageMode?'':'none';
     // أزرار الشريط العلوي خاصة بمسير الرواتب فقط
-    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode)?'none':''; });
-    if(card)card.style.display=(projectMode||employeeMode||coverageMode)?'none':'';
-    { const sb=document.getElementById('paySelBar'); if(sb&&(projectMode||employeeMode||coverageMode)) sb.style.display='none'; }
+    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':''; });
+    if(card)card.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':'';
+    { const sb=document.getElementById('paySelBar'); if(sb&&(projectMode||employeeMode||coverageMode||bankMode)) sb.style.display='none'; }
     if(panel)panel.style.display=projectMode?'':'none';
     if(employeePanel)employeePanel.style.display=employeeMode?'':'none';
     if(projectMode){renderProjects();renderProjectCapacity();try{renderProjectDetailReport();}catch(err){console.error(err);}return;}
     if(employeeMode){renderEmployeeReports();return;}
+    if(bankPanel)bankPanel.style.display=bankMode?'':'none';
     if(coverageMode){renderCoverageReport();return;}
+    if(bankMode){renderBankReport();return;}
     refreshPayrollMonthOptions();refreshPayrollFilters();
     try{
       const dg=document.getElementById('payrollDiag');
@@ -3194,7 +3196,7 @@
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="advance" data-emp="${escapeAttr(e.id)}" value="${Number(a.advance)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="other" data-emp="${escapeAttr(e.id)}" value="${Number(a.other)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="mono g3 tot" ${red(p.deduction)}>${fmt(p.deduction)}</td><td class="mono g4 tot" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
-      <td class="g5">${p.statusText?`<small class="pay-status-note${p.held?' held':''}">${escapeHtml(p.statusText)}</small>`:''}<select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
+      <td class="g5">${payrollRecords[p.ym]?.[e.id]?.bank?'<small class="pay-status-note posted">✓ مرحّل للبنك</small>':''}${p.statusText?`<small class="pay-status-note${p.held?' held':''}">${escapeHtml(p.statusText)}</small>`:''}<select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
       </tr>`;
     }).join('')||'<tr><td colspan="25" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
@@ -3269,26 +3271,136 @@
       'xl/styles.xml':styles,'xl/worksheets/sheet1.xml':sheet
     };
   }
+  /* ===== ملف دفع الرواتب لمصرف الراجحي (ARB WPS Payroll Payments File) ===== */
+  function rajhiSheetFiles(rows){
+    const base=bankSheetFiles([],'');
+    const esc=t=>String(t==null?'':t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+    const colName=n=>{ let s=''; n++; while(n>0){ const r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); } return s; };
+    const H=[['Employee IBAN','أيبان الموظف'],['Employee Name','إسم الموظف'],['Employee Number','الرقم الوظيفي'],['ID Number','رقم الهوية'],['Total Salary','الراتب الإجمالي'],['Basic Salary','الراتب الأساسي'],['Housing Allowance','بدل السكن'],['Other Earnings','بدلات أخرى'],['Deductions','الخصومات'],['Employee Remarks','ملاحظات الموظف'],['Employee Department','قسم الموظف']];
+    const N=H.length, widths=[30,30,18,16,20,20,22,18,16,20,24];
+    const sc=(r,c,t,st)=>`<c r="${colName(c)}${r}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${esc(t)}</t></is></c>`;
+    const nc=(r,c,v,st)=>`<c r="${colName(c)}${r}" s="${st}"><v>${Number(v)||0}</v></c>`;
+    const blank=(r,c,st)=>`<c r="${colName(c)}${r}" s="${st}"/>`;
+    const xr=[];
+    xr.push(`<row r="1" ht="64" customHeight="1">${sc(1,0,'ARB WPS Payroll Payments File\nملف دفع الرواتب لمصرف الراجحي',1)}${Array.from({length:N-1},(_,i)=>blank(1,i+1,1)).join('')}</row>`);
+    xr.push(`<row r="2" ht="46" customHeight="1">${H.map((h,i)=>sc(2,i,h[0]+'\n'+h[1],2)).join('')}</row>`);
+    let r=3;
+    rows.forEach((x,i)=>{
+      const no=String(x.empno||'').trim()||String(i+1);
+      xr.push(`<row r="${r}" ht="18" customHeight="1">${sc(r,0,x.iban||'',3)}${sc(r,1,x.name||'',4)}${/^\d+$/.test(no)?nc(r,2,no,8):sc(r,2,no,8)}${sc(r,3,x.idnum||'',8)}${nc(r,4,x.total,6)}${nc(r,5,x.basic,5)}${nc(r,6,x.housing,5)}${nc(r,7,x.other,5)}${nc(r,8,x.ded,5)}${sc(r,9,x.remarks||'إيداع راتب',4)}${sc(r,10,x.dept||'',4)}</row>`);
+      r++;
+    });
+    const cols=widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('');
+    const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0"><pane ySplit="2" topLeftCell="A3" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${cols}</cols><sheetData>${xr.join('')}</sheetData><mergeCells count="1"><mergeCell ref="A1:${colName(N-1)}1"/></mergeCells><pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+    const bd='<border><left style="thin"><color rgb="FFBFBFBF"/></left><right style="thin"><color rgb="FFBFBFBF"/></right><top style="thin"><color rgb="FFBFBFBF"/></top><bottom style="thin"><color rgb="FFBFBFBF"/></bottom><diagonal/></border>';
+    const xf=(num,font,fill,border,h,wrap)=>`<xf numFmtId="${num}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="${h}" vertical="center"${wrap?' wrapText="1"':''}/></xf>`;
+    const fill=c=>`<fill><patternFill patternType="solid"><fgColor rgb="${c}"/><bgColor indexed="64"/></patternFill></fill>`;
+    const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;SAR &quot;#,##0.00"/></numFmts><fonts count="3"><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font><font><b/><sz val="14"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts><fills count="5"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fill('FF0A3FCC')}${fill('FFDCE6F5')}${fill('FFD9D9D9')}</fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border>${bd}</borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="9">${xf(0,0,0,0,'general')}${xf(0,2,2,0,'center',1)}${xf(0,1,3,1,'left',1)}${xf(0,0,0,1,'left')}${xf(0,0,0,1,'right')}${xf(164,0,0,1,'right')}${xf(164,1,4,1,'right')}${xf(0,0,0,0,'center')}${xf(0,0,0,1,'right')}</cellXfs></styleSheet>`;
+    return {...base,'xl/styles.xml':styles,'xl/worksheets/sheet1.xml':sheet};
+  }
+  async function bankDownloadRows(rows,fileName){
+    if(!window.JSZip){ showToast('مكتبة Excel غير محمّلة — تحقق من الاتصال بالإنترنت'); return false; }
+    const files=rajhiSheetFiles(rows), zip=new JSZip();
+    Object.keys(files).forEach(k=>zip.file(k,files[k]));
+    const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    ppDownloadBlob(blob,fileName); return true;
+  }
   async function payrollBankExport(list,ym,opts){
     opts=opts||{};
     if(!pdrCanFinance()){ showToast('ترحيل الرواتب يحتاج صلاحية المالية'); return; }
     if(!window.JSZip){ showToast('مكتبة Excel غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
-    const cols=monthCols(ym); let held=0, zero=0, noIban=0; const rows=[];
+    const cols=monthCols(ym); let held=0, zero=0, noIban=0; const posted=[];
     list.forEach(e=>{
       const p=payrollStatementForCols(e,cols);
-      if(p.held){ held++; return; }          // الراتب الموقوف (إيقاف الإدارة / تغيب) لا يُرحّل أبدًا — لا في «الكل» ولا في «موظفين معينين» — إلا بعد إلغاء الحالة
-      if(!(p.net>0)){ zero++; return; }                       // لا يُرحّل صافي صفر أو سالب
-      const iban=String(e.iban||'').replace(/\s+/g,'').toUpperCase(); if(!iban) noIban++;
-      rows.push({name:e.fullname||'',project:e.project||'',iban,bankcode:e.bankcode||'',bankname:e.bankname||'',idnum:e.idnum||'',basic:p.basic,allow:r2((Number(p.housing)||0)+(Number(p.transport)||0)+(Number(p.otherAllow)||0)),net:p.net});
+      if(p.held){ held++; return; }          // الراتب الموقوف (إيقاف الإدارة / تغيب) لا يُرحّل أبدًا — إلا بعد إلغاء الحالة
+      if(!(p.net>0)){ zero++; return; }      // لا يُرحّل صافي صفر أو سالب
+      if(!String(e.iban||'').replace(/\s+/g,'')) noIban++;
+      const basic=Number(p.basic)||0, housing=Number(p.housing)||0;
+      posted.push({id:e.id,name:e.fullname||'',total:p.net,basic,housing,other:r2((Number(p.totalEarned)||0)-basic-housing),ded:Number(p.deduction)||0});
     });
-    if(!rows.length){ showToast(held?`لا يمكن ترحيل راتب ${held} موظف لأن عليه حالة موقوفة (إيقاف الإدارة / تغيب) — ألغِ الحالة من ملف الموظف أولًا`:'لا يوجد موظفون لهم صافي راتب لترحيلهم'); return; }
-    const files=bankSheetFiles(rows,`كشف البنك — ${monthLabel(ym)}`), zip=new JSZip();
-    Object.keys(files).forEach(k=>zip.file(k,files[k]));
-    const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    ppDownloadBlob(blob,`كشف_البنك_${monthLabel(ym).replace(/\s+/g,'_')}${opts.selected?'_موظفين_محددين':''}.xlsx`);
+    if(!posted.length){ showToast(held?`لا يمكن ترحيل راتب ${held} موظف لأن عليه حالة موقوفة (إيقاف الإدارة / تغيب) — ألغِ الحالة من ملف الموظف أولًا`:'لا يوجد موظفون لهم صافي راتب لترحيلهم'); return; }
+    // تسجيل الترحيل في النظام: يظهر هؤلاء فقط في صفحة «كشف البنك»
+    const at=new Date().toISOString();
+    if(!payrollRecords[ym]) payrollRecords[ym]={};
+    posted.forEach(x=>{ payrollRecords[ym][x.id]={...payrollAdjustmentFor(ym,x.id),bank:{at,name:x.name,total:x.total,basic:x.basic,housing:x.housing,other:x.other,ded:x.ded}}; });
+    persistCloud('');
+    const ids=new Set(posted.map(x=>String(x.id)));
+    const rows=bankPostedRows(ym).filter(x=>ids.has(String(x.id)));
+    await bankDownloadRows(rows,`ملف_دفع_الرواتب_الراجحي_${monthLabel(ym).replace(/\s+/g,'_')}${opts.selected?'_موظفين_محددين':''}.xlsx`);
     const notes=[]; if(held) notes.push(`${held} راتب موقوف لم يُرحّل`); if(zero) notes.push(`${zero} بصافي صفر لم يُرحّل`); if(noIban) notes.push(`${noIban} بدون آيبان`);
-    showToast(`تم ترحيل ${rows.length} موظف على كشف البنك`+(notes.length?` — (${notes.join('، ')})`:''));
+    showToast(`تم ترحيل ${posted.length} موظف — تجدهم في «كشف البنك»`+(notes.length?` — (${notes.join('، ')})`:''));
+    try{ renderReports(); }catch(_){}
   }
+  /* ===== صفحة كشف البنك: المرحَّلون فقط + فلاتر + إجمالي متغير ===== */
+  const bankState={month:'',q:'',project:'',region:''};
+  const bankNum=n=>'SAR '+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  function bankMonths(){ return Object.keys(payrollRecords||{}).filter(ym=>/^\d{4}-\d{2}$/.test(ym)&&Object.values(payrollRecords[ym]||{}).some(r=>r&&r.bank)).sort().reverse(); }
+  function bankPostedRows(ym){
+    const m=(payrollRecords&&payrollRecords[ym])||{}, out=[];
+    Object.keys(m).forEach(id=>{
+      const b=m[id]&&m[id].bank; if(!b) return;
+      const e=employees.find(x=>String(x.id)===String(id))||{};
+      out.push({id,name:e.fullname||b.name||'',iban:String(e.iban||'').replace(/\s+/g,'').toUpperCase(),empno:e.empcode||'',idnum:e.idnum||'',dept:e.dept||'',project:e.project||'',region:e.region||'',total:b.total,basic:b.basic,housing:b.housing,other:b.other,ded:b.ded,at:b.at||'',remarks:'إيداع راتب'});
+    });
+    return out.sort((a,b)=>String(a.empno).localeCompare(String(b.empno),'ar',{numeric:true})||String(a.name).localeCompare(String(b.name),'ar'));
+  }
+  function bankFilteredRows(){
+    const q=bankState.q.trim().toLowerCase();
+    return bankPostedRows(bankState.month).filter(x=>(!bankState.project||x.project===bankState.project)&&(!bankState.region||x.region===bankState.region)&&(!q||[x.name,x.iban,x.idnum,x.empno].some(v=>String(v||'').toLowerCase().includes(q))));
+  }
+  function bankTotals(rows){ const t={total:0,basic:0,housing:0,other:0,ded:0}; rows.forEach(x=>{ Object.keys(t).forEach(k=>{ t[k]+=Number(x[k])||0; }); }); Object.keys(t).forEach(k=>{ t[k]=r2(t[k]); }); return t; }
+  function bankSheetHtml(rows,forPrint){
+    const t=bankTotals(rows), act=!forPrint&&pdrCanFinance();
+    const heads=[['Employee IBAN','أيبان الموظف'],['Employee Name','إسم الموظف'],['Employee Number','الرقم الوظيفي'],['ID Number','رقم الهوية'],['Total Salary','الراتب الإجمالي'],['Basic Salary','الراتب الأساسي'],['Housing Allowance','بدل السكن'],['Other Earnings','بدلات أخرى'],['Deductions','الخصومات'],['Employee Remarks','ملاحظات الموظف'],['Employee Department','قسم الموظف']];
+    const body=rows.map((x,i)=>`<tr><td class="bk-ltr">${x.iban?escapeHtml(x.iban):'<span class="bk-warn">بدون آيبان</span>'}</td><td class="bk-name">${escapeHtml(x.name||'—')}</td><td class="bk-num">${escapeHtml(x.empno||String(i+1))}</td><td class="bk-num">${escapeHtml(x.idnum||'')}</td><td class="bk-num bk-total">${bankNum(x.total)}</td><td class="bk-num">${bankNum(x.basic)}</td><td class="bk-num">${bankNum(x.housing)}</td><td class="bk-num">${bankNum(x.other)}</td><td class="bk-num">${bankNum(x.ded)}</td><td>${escapeHtml(x.remarks)}</td><td>${escapeHtml(x.dept||'')}</td><td>${escapeHtml(x.project||'—')}</td><td class="bk-small">${x.at?escapeHtml(fmtDMY(String(x.at).slice(0,10))):''}</td>${act?`<td class="no-print"><button type="button" class="btn btn-sm" data-bank-unpost="${escapeAttr(x.id)}" title="يرجع الموظف لقائمة غير المرحّلين">إلغاء الترحيل</button></td>`:''}</tr>`).join('');
+    return `<div class="bank-sheet"><div class="bank-banner"><b>ARB WPS Payroll Payments File</b><span>ملف دفع الرواتب لمصرف الراجحي</span></div>
+      <div class="table-wrap"><table class="bank-table"><thead><tr>${heads.map(h=>`<th><b>${h[0]}</b><span>${h[1]}</span></th>`).join('')}<th><b>Project</b><span>المشروع</span></th><th><b>Posted</b><span>تاريخ الترحيل</span></th>${act?'<th class="no-print"></th>':''}</tr></thead>
+      <tbody>${body||`<tr><td colspan="${act?14:13}" class="empty-note">لا يوجد موظفون مرحّلون مطابقون للفلاتر.</td></tr>`}</tbody>
+      <tfoot><tr class="bank-foot"><td colspan="4">الإجمالي — ${rows.length} موظف</td><td class="bk-num bk-total">${bankNum(t.total)}</td><td class="bk-num">${bankNum(t.basic)}</td><td class="bk-num">${bankNum(t.housing)}</td><td class="bk-num">${bankNum(t.other)}</td><td class="bk-num">${bankNum(t.ded)}</td><td colspan="${act?5:4}"></td></tr></tfoot></table></div></div>`;
+  }
+  function renderBankReport(){
+    const out=document.getElementById('bankOutput'); if(!out) return;
+    const msel=document.getElementById('bankMonth'), psel=document.getElementById('bankProject'), rsel=document.getElementById('bankRegion'), qin=document.getElementById('bankSearch');
+    const months=bankMonths();
+    if(!months.includes(bankState.month)) bankState.month=months[0]||'';
+    msel.innerHTML=months.length?months.map(m=>`<option value="${escapeAttr(m)}">${escapeHtml(monthLabel(m))}</option>`).join(''):'<option value="">لا يوجد ترحيل</option>';
+    msel.value=bankState.month;
+    const all=bankPostedRows(bankState.month);
+    const projs=[...new Set(all.map(x=>x.project).filter(Boolean))].sort(), regs=[...new Set(all.map(x=>x.region).filter(Boolean))].sort();
+    if(!projs.includes(bankState.project)) bankState.project=''; if(!regs.includes(bankState.region)) bankState.region='';
+    psel.innerHTML='<option value="">كل المشاريع</option>'+projs.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join(''); psel.value=bankState.project;
+    rsel.innerHTML='<option value="">كل المناطق</option>'+regs.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join(''); rsel.value=bankState.region;
+    if(qin&&qin.value!==bankState.q) qin.value=bankState.q;
+    const rows=bankFilteredRows(), t=bankTotals(rows);
+    const cnt=document.getElementById('bankCount'); if(cnt) cnt.textContent=`${rows.length} من ${all.length} موظف`;
+    if(!months.length){ out.innerHTML='<div class="empty-note">لا توجد رواتب مرحّلة بعد. من «تقارير الرواتب» اضغط «ترحيل الرواتب كلها» أو «ترحيل موظفين معينين» وستظهر هنا.</div>'; return; }
+    out.innerHTML=`<div class="bank-summary"><div><small>عدد الموظفين</small><b>${rows.length}</b></div><div class="main"><small>إجمالي الرواتب (Total Salary)</small><b>${bankNum(t.total)}</b></div><div><small>الأساسي</small><b>${bankNum(t.basic)}</b></div><div><small>بدل السكن</small><b>${bankNum(t.housing)}</b></div><div><small>بدلات أخرى</small><b>${bankNum(t.other)}</b></div><div><small>الخصومات</small><b>${bankNum(t.ded)}</b></div></div>`+bankSheetHtml(rows,false);
+  }
+  document.getElementById('bankMonth')?.addEventListener('change',e=>{ bankState.month=e.target.value; renderBankReport(); });
+  document.getElementById('bankProject')?.addEventListener('change',e=>{ bankState.project=e.target.value; renderBankReport(); });
+  document.getElementById('bankRegion')?.addEventListener('change',e=>{ bankState.region=e.target.value; renderBankReport(); });
+  document.getElementById('bankSearch')?.addEventListener('input',e=>{ bankState.q=e.target.value; const pos=e.target.selectionStart; renderBankReport(); const el=document.getElementById('bankSearch'); if(el){ el.focus(); try{el.setSelectionRange(pos,pos);}catch(_){} } });
+  document.getElementById('bankDownloadBtn')?.addEventListener('click',async()=>{
+    if(!pdrCanFinance()){ showToast('تنزيل كشف البنك يحتاج صلاحية المالية'); return; }
+    const rows=bankFilteredRows(); if(!rows.length){ showToast('لا توجد بيانات لتنزيلها'); return; }
+    const filtered=bankState.project||bankState.region||bankState.q.trim();
+    await bankDownloadRows(rows,`ملف_دفع_الرواتب_الراجحي_${monthLabel(bankState.month).replace(/\s+/g,'_')}${filtered?'_مفلتر':''}.xlsx`);
+    showToast(`تم تنزيل ${rows.length} موظف`);
+  });
+  document.getElementById('bankPrintBtn')?.addEventListener('click',()=>{
+    const rows=bankFilteredRows(); if(!rows.length){ showToast('لا توجد بيانات للطباعة'); return; }
+    const w=window.open('','_blank'); if(!w){ showToast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>كشف البنك — ${escapeHtml(monthLabel(bankState.month))}</title><style>body{font-family:Arial,Tahoma,sans-serif;margin:14px;color:#111}.bank-banner{background:#0a3fcc;color:#fff;text-align:center;padding:12px;font-size:16px}.bank-banner b,.bank-banner span{display:block}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:0}th,td{border:1px solid #bbb;padding:5px 6px;text-align:center}th{background:#dce6f5}th b,th span{display:block}.bk-total{background:#e6e6e6;font-weight:700}.bank-foot td{font-weight:700;background:#f2f4f8}.no-print{display:none}@page{size:A4 landscape;margin:8mm}</style></head><body>${bankSheetHtml(rows,true)}</body></html>`);
+    w.document.close(); w.focus(); setTimeout(()=>{ try{w.print();}catch(_){} },300);
+  });
+  document.getElementById('bankOutput')?.addEventListener('click',e=>{
+    const b=e.target.closest('[data-bank-unpost]'); if(!b) return;
+    if(!pdrCanFinance()){ showToast('إلغاء الترحيل يحتاج صلاحية المالية'); return; }
+    const id=b.dataset.bankUnpost, rec=payrollRecords[bankState.month]&&payrollRecords[bankState.month][id]; if(!rec||!rec.bank) return;
+    const nm=rec.bank.name||'الموظف';
+    if(!confirm(`إلغاء ترحيل ${nm} من كشف البنك لشهر ${monthLabel(bankState.month)}؟`)) return;
+    delete rec.bank; persistCloud(`تم إلغاء ترحيل ${nm}`); renderBankReport();
+  });
   document.getElementById('payrollBankAllBtn')?.addEventListener('click',()=>{
     const ym=document.getElementById('payrollMonth')?.value; if(!ym){ showToast('لا يوجد شهر مسير متاح'); return; }
     const list=payrollFilteredList(ym); if(!list.length){ showToast('لا يوجد موظفون مطابقون للترحيل'); return; }
