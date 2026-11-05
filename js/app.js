@@ -20,12 +20,12 @@
   // code = رمز الحضور الذي تفرضه الحالة على أيام الفترة (فارغ = الحضور يبقى طبيعيًا)
   // cap  = لا يُحسب الموظف من سعة المشروع طوال الفترة
   const EMP_STATUS_LIST=[
-    {k:'stop',label:'إيقاف عن العمل',hold:false,code:'-',cap:true,desc:'تتوقف كل مستحقاته تلقائيًا من تاريخ الإيقاف (يظهر في الحضور بـ «-») ولا يُحسب من سعة المشروع.'},
-    {k:'annual',label:'إجازة سنوية',hold:false,code:'إجازة',desc:'من تاريخ إلى تاريخ: لا حضور ولا راتب عن أيامها، ويُكتب «إجازة» في الحضور والانصراف.'},
-    {k:'sick',label:'إجازة مرضية',hold:false,code:'مرضية',desc:'يُحتسب الحضور والراتب كاملًا، ويُكتب «مرضية» في الحضور والانصراف.'},
+    {k:'stop',label:'إيقاف عن العمل',hold:false,code:'-',cap:true,single:true,force:true,dateLabel:'تاريخ الإيقاف',desc:'تاريخ واحد: من هذا التاريخ لا يُحسب له حضور وانصراف (يظهر «-») ولا يدخل في مسير الرواتب ولا يُحسب من سعة المشروع.'},
+    {k:'annual',label:'إجازة سنوية',hold:false,code:'إجازة',force:true,desc:'من تاريخ إلى تاريخ: لا حضور ولا راتب عن أيامها، ويُكتب «إجازة» في الحضور والانصراف.'},
+    {k:'sick',label:'إجازة مرضية',hold:false,code:'مرضية',desc:'يُحتسب الحضور والراتب كاملًا في المسير، ويُكتب «مرضية» في الحضور والانصراف.'},
     {k:'mgmt',label:'إيقاف الإدارة',hold:true,code:'',desc:'يُحتسب الحضور والانصراف عادي، لكن راتبه الإجمالي لا يدخل المسير ولا يمكن ترحيله إلا بعد إلغاء الإيقاف.'},
-    {k:'resign',label:'استقالة',hold:false,code:'-',desc:'لا يُحتسب له حضور وانصراف من تاريخ الاستقالة (يظهر «-») ولا يُحسب له راتب عن الأيام بعدها.'},
-    {k:'absent',label:'تغيب عن العمل',hold:true,code:'غ',cap:true,desc:'يُكتب «غ» في الحضور من تاريخ التغيب، ولا يُحسب من سعة المشروع، ولا ينزل له راتب إجمالي.'}
+    {k:'resign',label:'استقالة',hold:false,code:'-',cap:true,single:true,force:true,dateLabel:'تاريخ الاستقالة',desc:'تاريخ واحد: من هذا التاريخ لا يُحتسب له حضور وانصراف (يظهر «-») ولا يُحسب من سعة المشروع.'},
+    {k:'absent',label:'تغيب عن العمل',hold:true,code:'غ',cap:true,single:true,dateLabel:'تاريخ التغيب',desc:'تاريخ واحد: من هذا التاريخ يُكتب «غ» في الحضور، ولا يُحسب من سعة المشروع، ولا ينزل له راتب إجمالي.'}
   ];
   const EMP_STATUS_PRIORITY=['resign','stop','mgmt','absent','annual','sick'];
   let employees = [];
@@ -942,10 +942,14 @@
   let hrSourceEmployeeId='';
   let hrSourceMonth='';
   function pjTabOpen(v){return pjTabs.open.includes(v);}
-  function pjTitle(v){return v==='reports'?(PJ_REPORTS[window.currentReport||'payroll']||PJ_TITLES.reports):(PJ_TITLES[v]||v);}
-  function pjTabsSync(view){ if(!pjTabs.open.includes(view)) pjTabs.open.push(view); pjTabsRender(view); }
+  // كل تقرير (رواتب/موظفين/مشاريع/تغطيات) له تبويب مستقل: المفتاح reports:payroll ... إلخ
+  function pjKey(view){ return view==='reports' ? 'reports:'+(window.currentReport||'payroll') : view; }
+  function pjViewOf(key){ return String(key).split(':')[0]; }
+  function pjGo(key){ const v=pjViewOf(key); if(v==='reports') window.currentReport=String(key).split(':')[1]||'payroll'; expandParentGroup(v); switchView(v); }
+  function pjTitle(v){ const b=pjViewOf(v), sub=String(v).split(':')[1]; return b==='reports'?(PJ_REPORTS[sub||window.currentReport||'payroll']||PJ_TITLES.reports):(PJ_TITLES[b]||b); }
+  function pjTabsSync(view){ const k=pjKey(view); if(!pjTabs.open.includes(k)) pjTabs.open.push(k); pjTabsRender(k); }
   function pjTabsRender(active){
-    const bar=document.getElementById('pjTabs'); if(!bar)return; active=active||currentView;
+    const bar=document.getElementById('pjTabs'); if(!bar)return; active=active||pjKey(currentView);
     bar.innerHTML=pjTabs.open.map(v=>`<div class="pj-tab${v===active?' active':''}" data-tab="${v}" role="tab" aria-selected="${v===active}"><span class="pj-tab-title">${pjTitle(v)}${pjTabs.dirty.has(v)?' <i class="pj-dot" title="بيانات غير محفوظة">●</i>':''}</span>${PJ_SAVE[v]?`<button type="button" class="pj-tab-btn" data-tab-save="${v}" title="حفظ" aria-label="حفظ">💾</button>`:''}<button type="button" class="pj-tab-btn pj-tab-x" data-tab-close="${v}" title="إغلاق التبويب" aria-label="إغلاق">✕</button></div>`).join('');
     bar.querySelector('.pj-tab.active')?.scrollIntoView({block:'nearest',inline:'nearest'});
   }
@@ -967,8 +971,8 @@
     if(pjTabs.dirty.has(v) && !confirm('هذا التبويب به بيانات لم تُحفظ بعد. هل تريد إغلاقه وتجاهلها؟')) return;
     const i=pjTabs.open.indexOf(v); if(i<0)return;
     pjTabs.open.splice(i,1); pjTabs.dirty.delete(v);
-    try{ pjResetView(v); }catch(e){ console.error(e); }
-    if(currentView===v){ const next=pjTabs.open[i]||pjTabs.open[i-1]||'dashboard'; expandParentGroup(next); switchView(next); }
+    try{ if(pjViewOf(v)!=='reports') pjResetView(v); }catch(e){ console.error(e); }
+    if(pjKey(currentView)===v){ const next=pjTabs.open[i]||pjTabs.open[i-1]||'dashboard'; pjGo(next); }
     else pjTabsRender();
   }
   function pjCloseAll(){
@@ -978,7 +982,7 @@
       if(!confirm(`هناك تبويبات بها بيانات غير محفوظة: ${names}.\n\nهل تريد إغلاق كل التبويبات وتجاهل هذه البيانات؟`)) return;
     }
     const opened=[...pjTabs.open];
-    opened.forEach(v=>{ try{ pjResetView(v); }catch(e){} });
+    opened.forEach(v=>{ try{ if(pjViewOf(v)!=='reports') pjResetView(v); }catch(e){} });
     pjTabs.open=[]; pjTabs.dirty.clear();
     hrSourceReadOnly=false; hrSourceEmployeeId=''; hrSourceMonth='';
     pjTabs.open=['dashboard'];
@@ -991,7 +995,7 @@
     const sv=e.target.closest('[data-tab-save]'), cl=e.target.closest('[data-tab-close]'), tab=e.target.closest('.pj-tab');
     if(sv){ pjSave(sv.dataset.tabSave); return; }
     if(cl){ pjClose(cl.dataset.tabClose); return; }
-    if(tab && tab.dataset.tab!==currentView){ expandParentGroup(tab.dataset.tab); switchView(tab.dataset.tab); }
+    if(tab && tab.dataset.tab!==pjKey(currentView)){ pjGo(tab.dataset.tab); }
   });
   document.querySelector('main')?.addEventListener('input',e=>{
     const sec=e.target.closest('section[id^="view-"]'); if(!sec)return; const v=sec.id.slice(5);
@@ -2681,7 +2685,7 @@
   const PAY_SUM_ZERO={'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0,'إجازة':0,'مرضية':0};
   function payCanFreeze(){ return !(window.HRAuth&&typeof window.HRAuth.canFinance==='function') || !!window.HRAuth.canFinance(); }
   // الموظف يدخل مسير الشهر فقط إذا باشر في هذا الشهر أو قبله (أول حضور له لا يقع بعد نهاية الشهر)
-  function employeeInPayrollMonth(e,ym){ return employeeEligibleForHR(e) && !employeeNotStartedFor(e,monthCols(ym)); }
+  function employeeInPayrollMonth(e,ym){ return employeeEligibleForHR(e) && !employeeNotStartedFor(e,monthCols(ym)) && !empStoppedForCols(e,monthCols(ym)); }
   function payFreezeApplies(ym,cols){
     return !!ym && ym<currentMonthStr() && cols.length===daysInMonth(ym) && cols[0].d===1 && cols.every(c=>c.ym===ym);
   }
@@ -2734,7 +2738,7 @@
   // فترات الحالة: [{k, from, to}] — to فارغ = مفتوحة. الحالات القديمة بلا تواريخ (statuses) تُعامل كفترة بلا تاريخ (تؤثر على المسير فقط كما كانت)
   function empStatusPeriods(e){
     const out=[]; if(!e) return out;
-    (Array.isArray(e.statusPeriods)?e.statusPeriods:[]).forEach(x=>{ if(x && EMP_STATUS_LIST.some(s=>s.k===x.k)) out.push({k:x.k,from:String(x.from||'').slice(0,10),to:String(x.to||'').slice(0,10)}); });
+    (Array.isArray(e.statusPeriods)?e.statusPeriods:[]).forEach(x=>{ if(x && EMP_STATUS_LIST.some(s=>s.k===x.k)) out.push({k:x.k,from:String(x.from||'').slice(0,10),to:EMP_STATUS_LIST.find(z=>z.k===x.k).single?'':String(x.to||'').slice(0,10)}); });
     (Array.isArray(e.statuses)?e.statuses:[]).forEach(k=>{ if(EMP_STATUS_LIST.some(s=>s.k===k) && !out.some(x=>x.k===k)) out.push({k,from:'',to:''}); });
     return out;
   }
@@ -2747,17 +2751,25 @@
     return {held, text:hit.length?((held?'راتب موقوف: ':'')+hit.map(p=>EMP_STATUS_LIST.find(s=>s.k===p.k).label+empStatusRangeText(p)).join('، ')):''};
   }
   // رمز الحضور الذي تفرضه الحالة في يوم معيّن (للفترات المؤرّخة فقط): استقالة/إيقاف ← (-) ، تغيب ← (غ) ، إجازة ← (ق)
-  function attStatusCodeAt(empId,iso){
-    const e=employees.find(x=>String(x.id)===String(empId)); if(!e) return '';
-    const hit=empStatusPeriods(e).filter(p=>p.from && iso>=p.from && (!p.to||iso<=p.to) && EMP_STATUS_LIST.find(s=>s.k===p.k).code); if(!hit.length) return '';
+  function attStatusDefAt(empId,iso){
+    const e=employees.find(x=>String(x.id)===String(empId)); if(!e) return null;
+    const hit=empStatusPeriods(e).filter(p=>p.from && iso>=p.from && (!p.to||iso<=p.to) && EMP_STATUS_LIST.find(s=>s.k===p.k).code); if(!hit.length) return null;
     hit.sort((x,y)=>EMP_STATUS_PRIORITY.indexOf(x.k)-EMP_STATUS_PRIORITY.indexOf(y.k));
-    return EMP_STATUS_LIST.find(s=>s.k===hit[0].k).code;
+    return EMP_STATUS_LIST.find(s=>s.k===hit[0].k);
   }
+  function attStatusCodeAt(empId,iso){ const d=attStatusDefAt(empId,iso); return d?d.code:''; }
   function attStatusOverride(empId,iso,raw){
-    if(!(raw===undefined||raw===''||raw==='ح')) return '';      // أي رمز آخر مُدخل يدويًا (غياب/جزاء/تغطية...) يبقى كما هو
     if(iso>todayISO()) return '';
     const st=attStartDateFor(empId); if(!st||iso<st) return '';
-    return attStatusCodeAt(empId,iso);
+    const d=attStatusDefAt(empId,iso); if(!d) return '';
+    // الإيقاف/الاستقالة/الإجازة السنوية تفرض رمزها على كل الأيام؛ باقي الحالات تحترم ما أُدخل يدويًا (غياب/جزاء/تغطية...)
+    if(!d.force && !(raw===undefined||raw===''||raw==='ح')) return '';
+    return d.code;
+  }
+  // الموظف الموقوف عن العمل: لا يدخل مسير أي فترة تبدأ من تاريخ الإيقاف أو بعده
+  function empStoppedForCols(e,cols){
+    if(!cols||!cols.length) return false;
+    return empStatusPeriods(e).some(p=>p.k==='stop' && p.from && cols[0].iso>=p.from);
   }
   function payrollComputeStatement(e,cols,sumIn){
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
@@ -2886,41 +2898,58 @@
     setTimeout(()=>document.addEventListener('click',()=>menu.remove(),{once:true}),0);
   }
 
-  /* ===== حالة الموظف داخل ملفه: خانات عمودية، كل حالة لها فترة (من - إلى) تؤثر على المسير والحضور ===== */
+  /* ===== حالة الموظف داخل ملفه: لكل حالة خانة وتواريخها وزر «حفظ» مستقل ===== */
   function renderEmployeeStatusSection(modal,e){
     const host=modal.querySelector('[data-status-host]'); if(!host) return;
     const canEdit=!window.HRAuth || typeof window.HRAuth.canView!=='function' || window.HRAuth.canView('add');
+    const cur=()=>employees.find(x=>String(x.id)===String(e.id))||e;
     let draft=empStatusPeriods(e).map(p=>({...p}));
-    const draw=(msg,bad)=>{
-      host.innerHTML=`<h3>حالة الموظف <span class="employee-section-count">تؤثر تلقائيًا على المسير والحضور والانصراف</span></h3>
+    const msgs={};   // رسالة آخر حفظ لكل حالة
+    const sig=arr=>JSON.stringify(arr.map(p=>[p.from||'',p.to||'']).sort());
+    const draw=()=>{
+      host.innerHTML=`<h3>حالة الموظف <span class="employee-section-count">تؤثر تلقائيًا على المسير والحضور وسعة المشروع</span></h3>
         <div class="emp-status-vlist">${EMP_STATUS_LIST.map(s=>{
           const mine=draft.map((p,i)=>({p,i})).filter(x=>x.p.k===s.k);
-          return `<div class="emp-status-item${mine.length?' is-on':''}"><label class="emp-status-check"><input type="checkbox" data-st-toggle="${s.k}" ${mine.length?'checked':''} ${canEdit?'':'disabled'}> <span>${escapeHtml(s.label)}</span></label>${mine.length&&s.desc?`<small class="emp-status-desc">${escapeHtml(s.desc)}</small>`:''}${mine.length?`<div class="emp-status-periods">${mine.map(x=>`<div class="emp-status-period"><label>من <input type="date" data-st-from="${x.i}" value="${escapeAttr(x.p.from)}" ${canEdit?'':'disabled'}></label><label>إلى <input type="date" data-st-to="${x.i}" value="${escapeAttr(x.p.to)}" ${canEdit?'':'disabled'}></label>${canEdit?`<button type="button" class="btn btn-sm" data-st-del="${x.i}" title="حذف الفترة">✕</button>`:''}</div>`).join('')}${canEdit?`<button type="button" class="btn btn-sm emp-status-add" data-st-add="${s.k}">+ فترة أخرى</button>`:''}</div>`:''}</div>`;
+          const saved=empStatusPeriods(cur()).filter(p=>p.k===s.k);
+          const dirty=sig(mine.map(x=>x.p))!==sig(saved);
+          const m=msgs[s.k];
+          const status=dirty?`<span class="emp-status-msg dirty">● تعديلات غير محفوظة</span>`:(m?`<span class="emp-status-msg ${m.bad?'bad':'ok'}">${escapeHtml(m.text)}</span>`:(saved.length?`<span class="emp-status-msg ok">محفوظة</span>`:''));
+          const rows=mine.map(x=>s.single
+            ? `<div class="emp-status-period"><label>${escapeHtml(s.dateLabel||'التاريخ')} <input type="date" data-st-from="${x.i}" value="${escapeAttr(x.p.from)}" ${canEdit?'':'disabled'}></label></div>`
+            : `<div class="emp-status-period"><label>من <input type="date" data-st-from="${x.i}" value="${escapeAttr(x.p.from)}" ${canEdit?'':'disabled'}></label><label>إلى <input type="date" data-st-to="${x.i}" value="${escapeAttr(x.p.to)}" ${canEdit?'':'disabled'}></label>${canEdit?`<button type="button" class="btn btn-sm" data-st-del="${x.i}" title="حذف الفترة">✕</button>`:''}</div>`).join('');
+          return `<div class="emp-status-item${mine.length?' is-on':''}">
+            <label class="emp-status-check"><input type="checkbox" data-st-toggle="${s.k}" ${mine.length?'checked':''} ${canEdit?'':'disabled'}> <span>${escapeHtml(s.label)}</span></label>
+            ${s.desc?`<small class="emp-status-desc">${escapeHtml(s.desc)}</small>`:''}
+            ${mine.length?`<div class="emp-status-periods">${rows}${(!s.single&&canEdit)?`<button type="button" class="btn btn-sm emp-status-add" data-st-add="${s.k}">+ فترة أخرى</button>`:''}</div>`:''}
+            ${canEdit?`<div class="emp-status-actions"><button type="button" class="btn btn-sm btn-primary" data-st-save="${s.k}">حفظ «${escapeHtml(s.label)}»</button>${status}</div>`:status}
+          </div>`;
         }).join('')}</div>
-        ${canEdit?`<div class="emp-status-actions"><button type="button" class="btn btn-sm btn-primary" data-st-save>حفظ الحالة</button><span class="emp-status-msg${bad?' bad':''}">${escapeHtml(msg||'')}</span></div>`:''}
-        <small class="emp-status-hint">«إلى» اختياري (يُترك فارغًا إذا الحالة مستمرة) ما عدا الإجازة السنوية. لإلغاء حالة (مثل إيقاف الإدارة) ألغِ علامة الاختيار أو احذف فترتها ثم اضغط «حفظ الحالة».</small>`;
+        <small class="emp-status-hint">لإلغاء حالة (مثل إيقاف الإدارة): شيل علامة الاختيار ثم اضغط «حفظ» الخاص بها.</small>`;
       host.querySelectorAll('[data-st-toggle]').forEach(cb=>cb.addEventListener('change',()=>{
         const k=cb.dataset.stToggle;
         if(cb.checked) draft.push({k,from:todayISO(),to:''}); else draft=draft.filter(p=>p.k!==k);
-        draw('تم التعديل — اضغط «حفظ الحالة» لتطبيقه.');
+        delete msgs[k]; draw();
       }));
-      host.querySelectorAll('[data-st-from]').forEach(el=>el.addEventListener('change',()=>{ draft[Number(el.dataset.stFrom)].from=el.value; }));
-      host.querySelectorAll('[data-st-to]').forEach(el=>el.addEventListener('change',()=>{ draft[Number(el.dataset.stTo)].to=el.value; }));
-      host.querySelectorAll('[data-st-add]').forEach(b=>b.addEventListener('click',()=>{ draft.push({k:b.dataset.stAdd,from:todayISO(),to:''}); draw(); }));
-      host.querySelectorAll('[data-st-del]').forEach(b=>b.addEventListener('click',()=>{ draft.splice(Number(b.dataset.stDel),1); draw('تم التعديل — اضغط «حفظ الحالة» لتطبيقه.'); }));
-      host.querySelector('[data-st-save]')?.addEventListener('click',()=>{
-        for(const p of draft){
-          const lbl=EMP_STATUS_LIST.find(s=>s.k===p.k).label;
-          if(!p.from){ draw(`حدد تاريخ البداية (من) لحالة «${lbl}».`,true); return; }
-          if(p.k==='annual' && !p.to){ draw(`الإجازة السنوية تحتاج تاريخ النهاية (إلى).`,true); return; }
-          if(p.to && p.to<p.from){ draw(`تاريخ النهاية قبل البداية في حالة «${lbl}».`,true); return; }
+      host.querySelectorAll('[data-st-from]').forEach(el=>el.addEventListener('change',()=>{ const p=draft[Number(el.dataset.stFrom)]; p.from=el.value; delete msgs[p.k]; draw(); }));
+      host.querySelectorAll('[data-st-to]').forEach(el=>el.addEventListener('change',()=>{ const p=draft[Number(el.dataset.stTo)]; p.to=el.value; delete msgs[p.k]; draw(); }));
+      host.querySelectorAll('[data-st-add]').forEach(b=>b.addEventListener('click',()=>{ draft.push({k:b.dataset.stAdd,from:todayISO(),to:''}); delete msgs[b.dataset.stAdd]; draw(); }));
+      host.querySelectorAll('[data-st-del]').forEach(b=>b.addEventListener('click',()=>{ const p=draft[Number(b.dataset.stDel)]; draft.splice(Number(b.dataset.stDel),1); delete msgs[p.k]; draw(); }));
+      host.querySelectorAll('[data-st-save]').forEach(b=>b.addEventListener('click',()=>{
+        const k=b.dataset.stSave, s=EMP_STATUS_LIST.find(x=>x.k===k), mine=draft.filter(p=>p.k===k);
+        for(const p of mine){
+          if(!p.from){ msgs[k]={text:`حدد ${s.single?s.dateLabel:'تاريخ البداية (من)'} أولًا.`,bad:true}; draw(); return; }
+          if(!s.single && p.to && p.to<p.from){ msgs[k]={text:'تاريخ النهاية قبل البداية.',bad:true}; draw(); return; }
+          if(k==='annual' && !p.to){ msgs[k]={text:'الإجازة السنوية تحتاج تاريخ النهاية (إلى).',bad:true}; draw(); return; }
         }
-        const target=employees.find(x=>String(x.id)===String(e.id)); if(!target) return;
-        target.statusPeriods=draft.map(p=>({k:p.k,from:p.from,to:p.to||''})); target.statuses=[];
+        const target=cur(); if(!target) return;
+        const others=empStatusPeriods(target).filter(p=>p.k!==k);
+        target.statusPeriods=[...others,...mine.map(p=>({k,from:p.from,to:s.single?'':(p.to||'')}))]; target.statuses=[];
         saveEmployees();
         try{renderAttendance();}catch(_){} try{renderReports();}catch(_){} try{renderEmployeeReports();}catch(_){}
-        draw('تم حفظ الحالة وتحديث المسير والحضور.');
-      });
+        const t=new Date(); msgs[k]={text:`✓ تم الحفظ ${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`};
+        draw();
+        try{showToast(`تم حفظ حالة «${s.label}»`);}catch(_){}
+      }));
     };
     draw();
   }
