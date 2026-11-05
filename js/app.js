@@ -802,11 +802,17 @@
   }
   function printCurrentForExport(){
     if(currentView==='contracts'){ downloadContractPdf(); return; }
-    const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(currentView);
     const id='exportPrintStyle'; document.getElementById(id)?.remove();
     const st=document.createElement('style'); st.id=id;
-    st.textContent=`@media print{ @page{size:A4 ${isLandscape?'landscape':'portrait'} !important;margin:${isLandscape?'8mm':'10mm'} !important;} body *{visibility:hidden!important} #view-${currentView},#view-${currentView} *{visibility:visible!important} #view-${currentView}{display:block!important;position:static!important;width:100%!important;max-width:none!important} .no-print,.export-toolbar,.sidebar,.topbar-actions{display:none!important} .table-wrap{overflow:visible!important} }`;
+    // الأسماء والأرقام كاملة على سطر واحد: نقيس عرض أعرض جدول ثم نختار الاتجاه ونصغّر ليناسب الصفحة
+    const nowrapCss=`#view-${currentView} table th,#view-${currentView} table td{white-space:nowrap!important;overflow-wrap:normal!important;word-break:keep-all!important;overflow:visible!important}`;
+    st.textContent=`@media screen{${nowrapCss}}`;
     document.head.appendChild(st);
+    let maxW=0; document.querySelectorAll(`#view-${currentView} table`).forEach(t=>{ maxW=Math.max(maxW,t.scrollWidth||0); });
+    const isLandscape=['projects','allprojects','allcontracts','coverage','attendance','reports','actions','employees'].includes(currentView)||maxW>700;
+    const target=Math.floor(((isLandscape?297-16:210-20))/25.4*96);
+    const zoom=maxW>target?Math.max(.3,target/maxW):1;
+    st.textContent=`@media print{ @page{size:A4 ${isLandscape?'landscape':'portrait'} !important;margin:${isLandscape?'8mm':'10mm'} !important;} body *{visibility:hidden!important} #view-${currentView},#view-${currentView} *{visibility:visible!important} #view-${currentView}{display:block!important;position:static!important;width:100%!important;max-width:none!important;zoom:${zoom.toFixed(4)}} .no-print,.export-toolbar,.sidebar,.topbar-actions{display:none!important} .table-wrap{overflow:visible!important} ${nowrapCss} #view-${currentView} table{width:auto!important;min-width:100%!important;table-layout:auto!important} }`;
     const cleanup=()=>{document.getElementById(id)?.remove();window.removeEventListener('afterprint',cleanup)};
     window.addEventListener('afterprint',cleanup);
     window.print();
@@ -1020,7 +1026,6 @@
         if(view==='add' && document.getElementById('f_id')?.value==='' && !pjTabOpen('add')) resetForm();
         expandParentGroup(view);
         switchView(view);
-        ev.__hrNavDone=true;   // منع المعالجة المزدوجة من المستمع الثاني
       }catch(err){
         console.error('Navigation error:', err);
         // Minimal fallback: always make the requested section visible.
@@ -1051,7 +1056,8 @@
       if(view==='add' && !document.getElementById('f_id').value && !pjTabOpen('add')){
         resetForm();
       }
-      if(!ev.__hrNavDone){ expandParentGroup(view); switchView(view); }
+      expandParentGroup(view);
+      switchView(view);
       const scrollTarget=el.dataset.scroll;
       if(scrollTarget){
         setTimeout(()=>document.getElementById(scrollTarget)?.scrollIntoView({behavior:'smooth',block:'start'}),120);
@@ -3162,7 +3168,7 @@
     const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel'), bankMode=window.currentReport==='bank', bankPanel=document.getElementById('bankReportsPanel');
     if(covPanel)covPanel.style.display=coverageMode?'':'none';
     // أزرار الشريط العلوي خاصة بمسير الرواتب فقط
-    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','payrollUnpostAllBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':''; });
+    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':''; });
     if(card)card.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':'';
     { const sb=document.getElementById('paySelBar'); if(sb&&(projectMode||employeeMode||coverageMode||bankMode)) sb.style.display='none'; }
     if(panel)panel.style.display=projectMode?'':'none';
@@ -3312,9 +3318,7 @@
   async function payrollBankExport(list,ym,opts){
     opts=opts||{};
     if(!pdrCanFinance()){ showToast('ترحيل الرواتب يحتاج صلاحية المالية'); return; }
-    // من يملك صلاحية تقرير «كشف البنك» يُعرض له الكشف بعد الترحيل؛ غيره يبقى التنزيل المباشر كما كان
-    const canOpenBank=!(window.HRAuth&&window.HRAuth.profile)||!!window.HRAuth.canReport('bank');
-    if(!canOpenBank && !window.JSZip){ showToast('مكتبة Excel غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
+    if(!window.JSZip){ showToast('مكتبة Excel غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
     const cols=monthCols(ym); let held=0, zero=0, noIban=0; const posted=[];
     list.forEach(e=>{
       const p=payrollStatementForCols(e,cols);
@@ -3330,19 +3334,12 @@
     if(!payrollRecords[ym]) payrollRecords[ym]={};
     posted.forEach(x=>{ payrollRecords[ym][x.id]={...payrollAdjustmentFor(ym,x.id),bank:{at,name:x.name,total:x.total,basic:x.basic,housing:x.housing,other:x.other,ded:x.ded}}; });
     persistCloud('');
+    const ids=new Set(posted.map(x=>String(x.id)));
+    const rows=bankPostedRows(ym).filter(x=>ids.has(String(x.id)));
+    await bankDownloadRows(rows,`ملف_دفع_الرواتب_الراجحي_${monthLabel(ym).replace(/\s+/g,'_')}${opts.selected?'_موظفين_محددين':''}.xlsx`);
     const notes=[]; if(held) notes.push(`${held} راتب موقوف لم يُرحّل`); if(zero) notes.push(`${zero} بصافي صفر لم يُرحّل`); if(noIban) notes.push(`${noIban} بدون آيبان`);
     showToast(`تم ترحيل ${posted.length} موظف — تجدهم في «كشف البنك»`+(notes.length?` — (${notes.join('، ')})`:''));
-    if(canOpenBank){
-      // بدل تنزيل Excel مباشرة: افتح «كشف البنك» على شهر الترحيل (المرحَّلون فقط) ومنه الطباعة أو التنزيل
-      if(opts.selected){ paySelMode=false; paySelected.clear(); try{ paySelRefresh(); }catch(_){} }
-      bankState.month=ym; bankState.q=''; bankState.project=''; bankState.region='';
-      window.currentReport='bank'; expandParentGroup('reports'); switchView('reports');
-    }else{
-      const ids=new Set(posted.map(x=>String(x.id)));
-      const rows=bankPostedRows(ym).filter(x=>ids.has(String(x.id)));
-      await bankDownloadRows(rows,`ملف_دفع_الرواتب_الراجحي_${monthLabel(ym).replace(/\s+/g,'_')}${opts.selected?'_موظفين_محددين':''}.xlsx`);
-      try{ renderReports(); }catch(_){}
-    }
+    try{ renderReports(); }catch(_){}
   }
   /* ===== صفحة كشف البنك: المرحَّلون فقط + فلاتر + إجمالي متغير ===== */
   const bankState={month:'',q:'',project:'',region:''};
@@ -3375,7 +3372,6 @@
     const out=document.getElementById('bankOutput'); if(!out) return;
     const msel=document.getElementById('bankMonth'), psel=document.getElementById('bankProject'), rsel=document.getElementById('bankRegion'), qin=document.getElementById('bankSearch');
     const months=bankMonths();
-    { const ub=document.getElementById('bankUnpostAllBtn'); if(ub) ub.style.display=(pdrCanFinance()&&months.length)?'':'none'; }
     if(!months.includes(bankState.month)) bankState.month=months[0]||'';
     msel.innerHTML=months.length?months.map(m=>`<option value="${escapeAttr(m)}">${escapeHtml(monthLabel(m))}</option>`).join(''):'<option value="">لا يوجد ترحيل</option>';
     msel.value=bankState.month;
@@ -3415,18 +3411,6 @@
     if(!confirm(`إلغاء ترحيل ${nm} من كشف البنك لشهر ${monthLabel(bankState.month)}؟`)) return;
     delete rec.bank; persistCloud(`تم إلغاء ترحيل ${nm}`); renderBankReport();
   });
-  // إلغاء ترحيل كل موظفي شهر معيّن: يحذف علامة الترحيل فقط (bank) ولا يلمس الرواتب أو التعديلات المسجّلة
-  function bankUnpostAll(ym){
-    if(!pdrCanFinance()){ showToast('إلغاء الترحيل يحتاج صلاحية المالية'); return; }
-    const m=ym&&payrollRecords&&payrollRecords[ym]; const ids=m?Object.keys(m).filter(id=>m[id]&&m[id].bank):[];
-    if(!ids.length){ showToast('لا يوجد موظفون مرحّلون في هذا الشهر'); return; }
-    if(!confirm(`إلغاء ترحيل كل الموظفين (${ids.length}) من كشف البنك لشهر ${monthLabel(ym)}؟\n\nسيرجعون لقائمة غير المرحّلين، ولن تتأثر الرواتب أو التعديلات المسجّلة.`)) return;
-    ids.forEach(id=>{ delete m[id].bank; });
-    persistCloud(`تم إلغاء ترحيل ${ids.length} موظف من كشف البنك`);
-    try{ renderReports(); }catch(_){}
-  }
-  document.getElementById('bankUnpostAllBtn')?.addEventListener('click',()=>bankUnpostAll(bankState.month));
-  document.getElementById('payrollUnpostAllBtn')?.addEventListener('click',()=>bankUnpostAll(document.getElementById('payrollMonth')?.value));
   document.getElementById('payrollBankAllBtn')?.addEventListener('click',()=>{
     const ym=document.getElementById('payrollMonth')?.value; if(!ym){ showToast('لا يوجد شهر مسير متاح'); return; }
     const list=payrollFilteredList(ym); if(!list.length){ showToast('لا يوجد موظفون مطابقون للترحيل'); return; }
@@ -3801,14 +3785,14 @@
   .pay-paper .pay-title{font-size:23px;font-weight:800;color:#1f4e5a;white-space:nowrap;line-height:1.35}
   .pay-paper .pay-meta{display:flex;flex-wrap:wrap;gap:4px 18px;justify-content:flex-start;align-items:center;font-size:11.5px;color:#222;line-height:1.6}
   .pay-paper .pay-meta span{white-space:nowrap}
-  .pay-paper .pay-table{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:9px}
-  .pay-paper .pay-table th,.pay-paper .pay-table td{border:1px solid #6b7780;padding:4px 2px;text-align:center;white-space:normal;overflow-wrap:anywhere;font-family:inherit;line-height:1.25;color:#111;background:#fff}
+  .pay-paper .pay-table{width:100%;min-width:0;table-layout:auto;border-collapse:collapse;font-size:9px}
+  .pay-paper .pay-table th,.pay-paper .pay-table td{border:1px solid #6b7780;padding:4px 5px;text-align:center;white-space:nowrap;overflow:visible;overflow-wrap:normal;word-break:keep-all;font-family:inherit;line-height:1.25;color:#111;background:#fff}
   .pay-paper .pay-table thead{display:table-header-group}
   .pay-paper .pay-table tr{page-break-inside:avoid}
   .pay-paper .pay-table thead tr.g th{background:#dfe9ed;color:#111;font-size:9px;font-weight:800;padding:5px 2px}
   .pay-paper .pay-table thead tr:not(.g) th{background:#dfe9ed;color:#111;font-size:8.5px;font-weight:800;line-height:1.25;padding:5px 2px}
   .pay-paper .pay-table tbody td{font-size:9px;height:24px}
-  .pay-paper .pay-table tbody td.s{text-align:right;padding:4px 5px;font-weight:700;font-size:9.5px;overflow-wrap:break-word;word-break:normal;line-height:1.35}
+  .pay-paper .pay-table tbody td.s{text-align:right;padding:4px 6px;font-weight:700;font-size:9.5px;white-space:nowrap;overflow-wrap:normal;word-break:keep-all;line-height:1.35}
   .pay-paper .pay-table tbody td.ptot,.pay-paper .pay-table tfoot td{background:#f1f5f6;font-weight:800}
   .pay-paper .pay-table tbody td.net{font-weight:800}
   .pay-paper .pay-table tfoot td{font-size:9px;padding:5px 2px}
@@ -3819,7 +3803,7 @@
   .pp-title{font-size:17px;font-weight:800;text-align:center;margin:0;color:#0b2444}
   .pp-sub{font-size:10px;text-align:center;color:#333;margin:3px 0 8px}
   .pp-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:7.2px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .pp-table th,.pp-table td{border:1px solid #3d6aa3;padding:3px 1px;text-align:center;white-space:normal;overflow-wrap:anywhere;color:#fff;line-height:1.25;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pp-table th,.pp-table td{border:1px solid #3d6aa3;padding:3px 3px;text-align:center;white-space:nowrap;overflow-wrap:normal;color:#fff;line-height:1.25;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .pp-table thead{display:table-header-group}
   .pp-table tr{page-break-inside:avoid}
   .pp-table .pg1{--g:#2c6db8;--h:#1f5596;--hl:#2b68b0;--b:#12335e;--t:#1c4a80}
@@ -3844,13 +3828,13 @@
   .as-paper .as-title{font-size:23px;font-weight:800;color:#1f4e5a;white-space:nowrap}
   .as-paper .as-meta{display:flex;flex-wrap:wrap;gap:4px 20px;font-size:11.5px;color:#222;justify-content:flex-end}
   .as-paper .as-meta b{color:#1f4e5a}
-  .as-paper .as-table{width:100%;min-width:0;border-collapse:collapse;table-layout:fixed;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-  .as-paper .as-table th,.as-paper .as-table td{border:1px solid #6b7780;padding:4px 1px !important;text-align:center;overflow:hidden;white-space:nowrap;font-size:9px !important;color:#111 !important;background:#fff;background-image:none !important;font-family:inherit}
+  .as-paper .as-table{width:100%;min-width:0;border-collapse:collapse;table-layout:auto;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .as-paper .as-table th,.as-paper .as-table td{border:1px solid #6b7780;padding:4px 2px !important;text-align:center;overflow:visible;white-space:nowrap;font-size:9px !important;color:#111 !important;background:#fff;background-image:none !important;font-family:inherit}
   .as-paper .as-table thead{display:table-header-group}
   .as-paper .as-table tr{page-break-inside:avoid}
   .as-paper .as-table thead th{background:#dfe9ed !important;font-weight:800;font-size:8.5px !important;white-space:normal;line-height:1.25;padding:5px 1px !important}
   .as-paper .as-table tbody td{height:24px}
-  .as-paper .as-table td.s{text-align:right;padding:4px 5px !important;font-weight:700;font-size:10px !important}
+  .as-paper .as-table td.s{text-align:right;padding:4px 6px !important;font-weight:700;font-size:10px !important;white-space:nowrap}
   .as-paper .as-table td.j{font-weight:400;font-size:8px !important;color:#333 !important}
   .as-paper .as-table td.d{font-size:9px !important;font-weight:700}
   .as-paper .as-table td.sum{background:#f1f5f6 !important;font-weight:800;font-size:10.5px !important}
@@ -3917,7 +3901,7 @@
   function ppPaperHTML(m){
     const cg=ppColGroups();
     const meta=String(m.sub||'').split(' — ').map(x=>`<span>${escapeHtml(x)}</span>`).join('');
-    let h=`<div class="pay-head"><div class="pay-title">${escapeHtml(m.title)}</div><div class="pay-meta">${meta}</div></div><table class="pp-table pay-table">${ppColgroup()}<thead><tr class="g">`;
+    let h=`<div class="pay-head"><div class="pay-title">${escapeHtml(m.title)}</div><div class="pay-meta">${meta}</div></div><table class="pp-table pay-table"><thead><tr class="g">`;
     PP_GROUPS.forEach(([t,n],gi)=>{ h+=`<th class="pg${gi+1}" colspan="${n}">${escapeHtml(t)}</th>`; });
     h+='</tr><tr>'+PP_COLS.map((c,i)=>`<th class="pg${cg[i]}${c.tot?' ptot':''}">${escapeHtml(c.h)}</th>`).join('')+'</tr></thead><tbody>';
     m.rows.forEach(r=>{ h+='<tr>'+PP_COLS.map((c,i)=>`<td class="pg${cg[i]} ${c.t==='s'?'s ':''}${c.b?'b ':''}${c.tot?'ptot ':''}${c.net?'net':''}">${escapeHtml(ppFmt(c,c.k(r)))}</td>`).join('')+'</tr>'; });
@@ -3928,23 +3912,43 @@
     return h;
   }
   function ppHTML(m){ return m.html ? m.html() : ppPaperHTML(m); }
+  /* يقيس العرض الطبيعي للجدول (أسماء كاملة وأرقام كاملة على سطر واحد) ويضبط عرض الورقة عليه؛ إن زاد عن الصفحة يُصغَّر ليناسبها */
+  function ppNaturalWidth(paper){
+    paper.style.zoom=''; paper.style.width='max-content';
+    return Math.ceil(Math.max(paper.scrollWidth,paper.getBoundingClientRect().width));
+  }
+  function ppSizePaper(paper,baseW){
+    if(!paper||!paper.querySelector('table')) return baseW;
+    const W=Math.max(baseW,ppNaturalWidth(paper));
+    paper.style.width=W+'px'; paper.dataset.w=W; return W;
+  }
   function ppDownloadBlob(blob,name){
     const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click();
     setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },1500);
   }
   function ppPrint(m){
-    const f=document.createElement('iframe'); f.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    const f=document.createElement('iframe'); f.style.cssText='position:fixed;left:-10000px;top:0;width:1200px;height:800px;border:0;';
     document.body.appendChild(f);
     const d=f.contentDocument; d.open();
     d.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>${escapeHtml(m.title)}</title><style>${PP_CSS}${m.css||''} @page{size:${m.page||'A4 landscape'};margin:6mm} html,body{margin:0;background:#fff}</style></head><body><div class="pp-paper ${m.cls||''}">${ppHTML(m)}</div></body></html>`);
     d.close();
-    setTimeout(()=>{ try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>f.remove(),3000); },350);
+    setTimeout(()=>{
+      try{
+        const paper=d.querySelector('.pp-paper');
+        if(paper&&paper.querySelector('table')){
+          const land=!/portrait/i.test(m.page||'A4 landscape'), target=Math.floor(((land?297:210)-12)/25.4*96);
+          const w=ppNaturalWidth(paper);
+          if(w>target){ paper.style.width=w+'px'; paper.style.zoom=(target/w).toFixed(4); } else paper.style.width=target+'px';
+        }
+      }catch(e){}
+      try{ f.contentWindow.focus(); f.contentWindow.print(); }catch(e){} setTimeout(()=>f.remove(),3000); },450);
   }
   async function ppDownloadPdf(m){
     if(!window.html2canvas || !(window.jspdf&&window.jspdf.jsPDF)){ showToast('مكتبة PDF غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
-    const PAGE_W=1123, PAGE_H=794, M=14, SC=2;
+    let PAGE_W=1123, PAGE_H=794, M=14; const SC=2;
     const host=document.createElement('div'); host.className='pp-paper '+(m.cls||'');
     host.style.cssText=`position:fixed;left:-20000px;top:0;width:${PAGE_W}px;`; host.innerHTML=ppHTML(m); document.body.appendChild(host);
+    PAGE_W=ppSizePaper(host,PAGE_W); PAGE_H=Math.round(PAGE_W*794/1123); M=14*PAGE_W/1123;
     try{
       const canvas=await html2canvas(host,{scale:SC,backgroundColor:'#ffffff',useCORS:true});
       const top0=host.getBoundingClientRect().top, rel=el=>{const r=el.getBoundingClientRect(); return {t:r.top-top0,b:r.bottom-top0};};
@@ -4035,7 +4039,7 @@
     const nd=m.cols.length, span=4+nd+AS_SUMS.length;
     const cross=m.cols.some(c=>c.ym!==m.cols[0].ym);
     let h=`<div class="as-head"><div class="as-title">${escapeHtml(m.title)}</div><div class="as-meta">${m.meta.map(([k,v])=>`<span><b>${escapeHtml(k)}:</b> ${escapeHtml(v)}</span>`).join('')}</div></div>`;
-    h+=`<table class="as-table"><colgroup><col style="width:22px"><col style="width:112px"><col style="width:44px"><col style="width:52px">${m.cols.map(()=>'<col style="width:18px">').join('')}${AS_SUMS.map(()=>'<col style="width:34px">').join('')}</colgroup>`;
+    h+=`<table class="as-table"><colgroup><col style="width:22px"><col><col><col>${m.cols.map(()=>'<col style="width:18px">').join('')}${AS_SUMS.map(()=>'<col style="width:34px">').join('')}</colgroup>`;
     h+='<thead><tr><th>م</th><th>اسم الحارس</th><th>الكود</th><th>الوظيفة</th>'
       + m.cols.map(c=>`<th>${c.d}${cross?`<br><span style="font-weight:400;font-size:7px">${c.ym.slice(5)}</span>`:''}</th>`).join('')
       + AS_SUMS.map(([t])=>`<th>${t}</th>`).join('')+'</tr></thead><tbody>';
@@ -4067,7 +4071,7 @@
   function ppFit(ov){
     const body=ov.querySelector('.pp-body'), paper=ov.querySelector('.pp-paper'); if(!body||!paper) return;
     const W=Number(paper.dataset.w)||1123;
-    paper.style.zoom=Math.min(2.4,Math.max(.45,(body.clientWidth-16)/W));
+    paper.style.zoom=Math.min(2.4,Math.max(.2,(body.clientWidth-16)/W));
   }
   function openAttendanceSheet({list, cols, single}){
     if(!list||!list.length){ showToast('لا يوجد موظفون لعرض الكشف'); return; }
@@ -4082,6 +4086,7 @@
       <button class="btn btn-sm" data-pp="close">إغلاق</button></div>
       <div class="pp-body"><div class="pp-paper as-paper">${m.html()}</div></div>`;
     document.body.appendChild(ov);
+    ppSizePaper(ov.querySelector('.pp-paper'),1123);
     ov.querySelector('[data-pp="print"]').onclick=()=>ppPrint(m);
     ov.querySelector('[data-pp="pdf"]').onclick=()=>ppDownloadPdf(m);
     ov.querySelector('[data-pp="close"]').onclick=closePayrollPreview;
@@ -4108,6 +4113,7 @@
       <button class="btn btn-sm" data-pp="close">إغلاق</button></div>
       <div class="pp-body"><div class="pp-paper ${m.cls||''}">${ppPaperHTML(m)}</div></div>`;
     document.body.appendChild(ov);
+    ppSizePaper(ov.querySelector('.pp-paper'),1123);
     ov.querySelector('[data-pp="print"]').onclick=()=>ppPrint(m);
     ov.querySelector('[data-pp="pdf"]').onclick=()=>ppDownloadPdf(m);
     ov.querySelector('[data-pp="xlsx"]').onclick=()=>ppDownloadXlsx(m);

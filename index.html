@@ -1118,9 +1118,8 @@
           </button>
           <button class="btn" id="payrollRecalcBtn" title="للشهور المنتهية فقط: يعيد الحساب بالرواتب الحالية ويثبّته من جديد">إعادة احتساب الشهر</button>
           <button class="btn" id="payrollPreviewAllBtn">معاينة المسير</button>
-          <button class="btn" id="payrollBankAllBtn" title="ترحيل كل موظفي الشهر المعروضين إلى كشف البنك (ومنه الطباعة أو تنزيل Excel)">ترحيل الرواتب كلها</button>
+          <button class="btn" id="payrollBankAllBtn" title="تصدير كشف البنك (Excel) لكل موظفي الشهر المعروضين">ترحيل الرواتب كلها</button>
           <button class="btn" id="payrollBankSelBtn" title="اختيار موظفين بعينهم وترحيلهم على كشف البنك">ترحيل موظفين معينين</button>
-          <button class="btn btn-danger" id="payrollUnpostAllBtn" title="إلغاء ترحيل كل موظفي الشهر المعروض من كشف البنك">إلغاء ترحيل الكل</button>
           <button class="btn" id="printReportBtn">
             <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18H4a1 1 0 01-1-1v-5a1 1 0 011-1h16a1 1 0 011 1v5a1 1 0 01-1 1h-2M6 14h12v7H6z"/></svg>
             طباعة الكشف
@@ -1153,7 +1152,6 @@
           <span class="pill pill-gray" id="bankCount">0 موظف</span>
           <button class="btn btn-primary" id="bankDownloadBtn" title="تنزيل الكشف المعروض بصيغة ملف دفع الرواتب لمصرف الراجحي">تنزيل Excel (الراجحي)</button>
           <button class="btn" id="bankPrintBtn">طباعة</button>
-          <button class="btn btn-danger" id="bankUnpostAllBtn" title="إلغاء ترحيل كل موظفي الشهر المعروض من كشف البنك">إلغاء ترحيل الكل</button>
         </div>
         <div id="bankOutput"></div>
       </div>
@@ -1266,7 +1264,7 @@
 <script src="js/access.js?v=20261026a" type="module"></script>
 <script src="js/data.js?v=20261011f" defer></script>
 <script src="js/sales.js?v=20261102a" defer></script>
-<script src="js/app.js?v=20261105c" defer></script>
+<script src="js/app.js?v=20261105a" defer></script>
 <script>
 (function(){
   function fallbackEmployeeCancel(e){
