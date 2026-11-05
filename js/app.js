@@ -26,8 +26,9 @@
     {k:'mgmt',label:'إيقاف الإدارة',hold:true,code:'',desc:'يُحتسب الحضور والانصراف عادي، لكن راتبه الإجمالي لا يدخل المسير ولا يمكن ترحيله إلا بعد إلغاء الإيقاف.'},
     {k:'resign',label:'استقالة',hold:false,code:'-',cap:true,single:true,force:true,dateLabel:'تاريخ الاستقالة',desc:'تاريخ واحد: قبل التاريخ حضوره وراتبه عادي، ومن التاريخ لا حضور ولا راتب (يظهر «-»). لا يظهر في الشهور التالية (حضور/مسير)، ولا يُحسب من سعة المشروع.'},
     {k:'absent',label:'تغيب عن العمل',hold:true,code:'غ',cap:true,single:true,dateLabel:'تاريخ التغيب',desc:'تاريخ واحد: من التاريخ يُكتب «غ» حتى نهاية الشهر ولا ينزل له راتب إجمالي (ولا يُرحَّل)، ولا يظهر في الشهور التالية، ولا يُحسب من سعة المشروع.'}
+    ,{k:'settle',label:'مخالصة',hold:false,code:'-',cap:true,single:true,force:true,dateLabel:'تاريخ المخالصة',desc:'تاريخ واحد: من التاريخ يتوقف كل شيء للحارس (لا حضور ولا راتب، يظهر «-»)، ولا يظهر في سجلات الشهور التالية (حضور/مسير)، ولا يُحسب من سعة المشروع. ينزل له راتبه المستحق وحضوره لشهر المخالصة فقط.'}
   ];
-  const EMP_STATUS_PRIORITY=['resign','stop','mgmt','absent','annual','sick'];
+  const EMP_STATUS_PRIORITY=['settle','resign','stop','mgmt','absent','annual','sick'];
   let employees = [];
   let attendance = {};   // { "YYYY-MM": { empId: { day: code } } }
   let penalties = [];    // [{id, empId, date, type, days, notes}]
@@ -2776,7 +2777,7 @@
   // الموظف المنتهي (إيقاف/استقالة/تغيب): لا يظهر في حضور ولا مسير أي فترة تبدأ من تاريخ الحالة أو بعده
   function empStoppedForCols(e,cols){
     if(!cols||!cols.length) return false;
-    return empStatusPeriods(e).some(p=>(p.k==='stop'||p.k==='resign'||p.k==='absent') && p.from && cols[0].iso>=p.from);
+    return empStatusPeriods(e).some(p=>(p.k==='stop'||p.k==='resign'||p.k==='settle'||p.k==='absent') && p.from && cols[0].iso>=p.from);
   }
   function payrollComputeStatement(e,cols,sumIn){
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
@@ -2842,7 +2843,7 @@
     const start=attStartDateFor(emp.id)||String(emp.startdate||'').slice(0,10), end=todayISO();
     if(!start)return [];
     const out=[]; let cursor=start.slice(0,7), last=end.slice(0,7);
-    const fr=k=>empStatusPeriods(emp).filter(p=>p.k===k&&p.from).map(p=>p.from).sort()[0]||'', endStop=[fr('stop'),fr('resign')].filter(Boolean).sort()[0]||'', endAbs=fr('absent');
+    const fr=k=>empStatusPeriods(emp).filter(p=>p.k===k&&p.from).map(p=>p.from).sort()[0]||'', endStop=[fr('stop'),fr('resign'),fr('settle')].filter(Boolean).sort()[0]||'', endAbs=fr('absent');
     while(cursor<=last){
       const rec=effectiveAttendanceRecord(cursor,emp.id), max=Math.min(daysInMonth(cursor),Number(cursor===last?end.slice(8,10):daysInMonth(cursor)));
       for(let d=1;d<=max;d++){
