@@ -810,7 +810,7 @@
     st.textContent=`@media screen{${nowrapCss}}`;
     document.head.appendChild(st);
     let maxW=0; document.querySelectorAll(`#view-${currentView} table`).forEach(t=>{ maxW=Math.max(maxW,t.scrollWidth||0); });
-    const isLandscape=['projects','allprojects','allcontracts','coverage','attendance','reports','actions','employees'].includes(currentView)||maxW>700;
+    const isLandscape=['projects','allprojects','allcontracts','coverage','attendance','reports','actions','employees','all-employees'].includes(currentView)||maxW>700;
     const target=Math.floor(((isLandscape?297-16:210-20))/25.4*96);
     const zoom=maxW>target?Math.max(.3,target/maxW):1;
     st.textContent=`@media print{ @page{size:A4 ${isLandscape?'landscape':'portrait'} !important;margin:${isLandscape?'8mm':'10mm'} !important;} body *{visibility:hidden!important} #view-${currentView},#view-${currentView} *{visibility:visible!important} #view-${currentView}{display:block!important;position:static!important;width:100%!important;max-width:none!important;zoom:${zoom.toFixed(4)}} .no-print,.export-toolbar,.sidebar,.topbar-actions{display:none!important} .table-wrap{overflow:visible!important} ${nowrapCss} #view-${currentView} table{width:auto!important;min-width:100%!important;table-layout:auto!important} }`;
@@ -871,7 +871,7 @@
     }
     currentView = view;
     try{ pjTabsSync(view); }catch(e){ console.error('tabs',e); }
-    document.querySelector('main')?.classList.toggle('wide-data-view', view==='attendance' || view==='reports' || view==='projectaccounts');
+    document.querySelector('main')?.classList.toggle('wide-data-view', view==='attendance' || view==='reports' || view==='projectaccounts' || view==='all-employees');
     document.body.classList.toggle('hr-source-readonly', !!hrSourceReadOnly);
     // Printing orientation for wide data screens. Projects, All Contracts and Coverage
     // are intentionally landscape so their full tables/columns fit on the printed page.
@@ -1477,7 +1477,7 @@
         <td>${since?`<span class="pill pill-gray">${escapeHtml(since)}</span>`:''}</td>
         <td><button type="button" class="btn btn-sm btn-danger iban-del" data-emp="${escapeAttr(e.id)}" data-iban="${escapeAttr(x.iban)}">حذف</button></td></tr>`;
     }).join('')||'<tr><td colspan="7" class="empty-note">لا توجد آيبانات مضافة.</td></tr>';
-    return `<tr class="iban-sub-row" data-sub="${escapeAttr(e.id)}"><td colspan="8"><div class="iban-sub-box"><div class="iban-sub-title">آيبانات ${escapeHtml(e.fullname||'')} — علّم على الآيبان المفعّل ليصبح الافتراضي من تاريخ اليوم، وما قبله يبقى على الآيبان السابق</div>
+    return `<tr class="iban-sub-row" data-sub="${escapeAttr(e.id)}"><td colspan="19"><div class="iban-sub-box"><div class="iban-sub-title">آيبانات ${escapeHtml(e.fullname||'')} — علّم على الآيبان المفعّل ليصبح الافتراضي من تاريخ اليوم، وما قبله يبقى على الآيبان السابق</div>
       <table class="iban-sub-table"><thead><tr><th>مفعّل</th><th>اسم البنك</th><th>رقم الآيبان</th><th>رقم الحساب</th><th>رمز البنك</th><th>الحالة</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></td></tr>`;
   }
   function setActiveIban(empId, iban){
@@ -1525,15 +1525,27 @@
       const cs=employeeContractStatus(e), comm=employeeCommencementStatus(e);
       const contractBtn=cs==='ساري'?' <span class="status-badge status-ساري">ساري</span>':'<button class="btn btn-sm btn-primary all-employee-add-contract" data-id="'+escapeAttr(e.id)+'">إضافة عقد</button>';
       const commBtn=comm==='مباشر'?' <span class="status-badge status-ساري">مباشر</span>':'<button class="btn btn-sm btn-primary all-employee-add-comm" data-id="'+escapeAttr(e.id)+'">إضافة مباشرة</button>';
+      const startD=commencementForEmployee(e.id)?.startDate, stTxt=empStatusInfo(e).text||'على رأس العمل';
       return `<tr data-id="${escapeAttr(e.id)}" class="all-employee-row">
         <td><b>${escapeHtml(e.fullname||'—')}</b>${e.linkedEmpId?' <span class="pill pill-amber">تعيين إضافي</span>':''}</td>
         <td class="mono">${escapeHtml(e.empcode||'—')}</td>
-        <td>${escapeHtml(e.jobtitle||'—')}</td>
+        <td class="mono">${escapeHtml(e.idnum||'—')}</td>
+        <td>${escapeHtml(e.nationality||'—')}</td>
+        <td class="mono" dir="ltr">${escapeHtml(e.phone||'—')}</td>
+        <td>${escapeHtml(e.region||'—')}</td>
         <td>${escapeHtml(e.project||'—')}</td>
+        <td>${escapeHtml(e.jobtitle||'—')}</td>
+        <td class="mono">${startD?fmtDMY(startD):'—'}</td>
         <td>${contractBtn}</td>
         <td>${commBtn}</td>
-        <td class="mono">${fmt(lastWageTotal(e))} ﷼</td>
+        <td>${escapeHtml(stTxt)}</td>
+        <td class="mono">${fmt(Number(e.basicsalary)||0)}</td>
+        <td class="mono">${fmt(Number(e.housing)||0)}</td>
+        <td class="mono">${fmt(Number(e.transport)||0)}</td>
+        <td class="mono">${fmt(Number(e.otherallow)||0)}</td>
+        <td class="mono"><b>${fmt(lastWageTotal(e))} ﷼</b></td>
         <td><div class="row-actions"><button class="btn btn-sm btn-ghost all-employee-view" data-id="${escapeAttr(e.id)}">معاينة</button><button class="btn btn-sm btn-ghost all-employee-edit" data-id="${escapeAttr(e.id)}">تعديل</button><button class="btn btn-sm btn-ghost iban-toggle${allEmpIbanOpen.has(e.id)?' on':''}" data-id="${escapeAttr(e.id)}" title="عرض الآيبانات">الآيبانات (${employeeIbanList(e).length})</button></div></td>
+        <td><button class="btn btn-sm btn-primary all-employee-add-project" data-id="${escapeAttr(e.id)}" title="إضافة الموظف على مشروع آخر براتب وحضور ومسير مستقلين">تعيين جديد</button></td>
       </tr>${allEmpIbanOpen.has(e.id)?allEmpIbanSubRow(e):''}`;
     }).join('') || '';
   }
@@ -1541,6 +1553,7 @@
   document.getElementById('allEmployeesProjectFilter')?.addEventListener('change',renderAllEmployees);
   document.getElementById('allEmployeesTableBody')?.addEventListener('click',e=>{
     const row=e.target.closest('tr[data-id]'); if(!row)return; const id=row.dataset.id;
+    if(e.target.closest('.all-employee-add-project')){ const emp=employees.find(x=>String(x.id)===String(id)); if(emp) openAddProjectDialog(emp); return; }
     if(e.target.closest('.all-employee-add-contract')){
       expandParentGroup('contracts'); switchView('contracts');
       setTimeout(()=>{const sel=document.getElementById('contract_emp');if(sel){sel.value=id;sel.dispatchEvent(new Event('change'));}},80);return;

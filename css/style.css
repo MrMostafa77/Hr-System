@@ -2865,3 +2865,12 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 .bank-table .bk-small{font-size:11px;color:var(--ink-soft)}
 .bank-table tfoot .bank-foot td{background:#0a3fcc;color:#fff;font-weight:800}
 .pay-status-note.posted{color:#146B54;font-weight:700}
+
+/* كل الموظفين: عرض عريض (landscape) يظهر كل البيانات بدون شريط تمرير أفقي */
+#view-all-employees .table-wrap{overflow-x:visible!important;max-width:none!important;width:100%}
+#view-all-employees .all-employees-table{width:100%;table-layout:auto;font-size:11.5px}
+#view-all-employees .all-employees-table th,#view-all-employees .all-employees-table td{white-space:normal!important;word-break:break-word;padding:7px 5px;text-align:center;line-height:1.5}
+#view-all-employees .all-employees-table td .mono{word-break:break-all}
+#view-all-employees .all-employees-table td.mono{word-break:break-all}
+#view-all-employees .all-employees-table .row-actions{flex-wrap:wrap;gap:4px;justify-content:center}
+#view-all-employees .all-employees-table .btn-sm{padding:4px 7px;font-size:11px}
