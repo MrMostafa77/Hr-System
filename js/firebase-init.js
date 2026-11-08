@@ -122,12 +122,15 @@ window.FB = {
     if(isSingle()) return setDoc(stateRef, { ...state, updatedAt: new Date().toISOString() });
     const { general, finance } = S.split(state);
     const gs = stable(general);
-    if(gs !== sig.general){ await setDoc(stateRef, stamp(general)); sig.general = gs; }
+    // الوثيقتان العامة والمالية تُكتبان بالتوازي (بدل الانتظار لواحدة بعد الأخرى) لتقليل زمن الحفظ إلى النصف تقريباً
+    const jobs = [];
+    if(gs !== sig.general) jobs.push(setDoc(stateRef, stamp(general)).then(() => { sig.general = gs; }));
     // من لا يملك صلاحية المالية لا يكتب وثيقة المالية أبداً (وبياناته أصلاً لا تحتوي الحقول المالية)
     if(canFin()){
       const fs = stable(finance);
-      if(fs !== sig.finance){ await setDoc(financeRef, stamp(finance)); sig.finance = fs; }
+      if(fs !== sig.finance) jobs.push(setDoc(financeRef, stamp(finance)).then(() => { sig.finance = fs; }));
     }
+    await Promise.all(jobs);
   },
   startRealtimeSync: (callback) => {
     const S = window.HRSplit;

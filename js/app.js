@@ -2052,7 +2052,6 @@
       document.querySelector(`.tabpanel[data-panel="${tab.dataset.tab}"]`).classList.add('active');
     });
   });
-  document.getElementById('employeeFilesRefreshBtn')?.addEventListener('click',renderEmployeeFiles);
 
   function currentFormEmployeeId(){ return document.getElementById('f_id')?.value || ''; }
   function employeeFileMap(e){ return (e && e.files && typeof e.files==='object') ? e.files : {}; }
@@ -2063,33 +2062,8 @@
     const id=currentFormEmployeeId();
     const e=employees.find(x=>x.id===id);
     const saved=employeeFileMap(e);
-    list.innerHTML=EMPLOYEE_FILE_TYPES.map(item=>{
-      const pending=pendingEmployeeFiles[item.key];
-      const entry=pending || saved[item.key];
-      const has=!!entry;
-      const name=entry?.name || '';
-      return `<div class="employee-file-row" data-file-key="${item.key}">
-        <div class="employee-file-title"><span class="employee-file-dot ${has?'has-file':''}"></span><div><strong>${escapeHtml(item.label)}</strong><small>${has?escapeHtml(name):'لم يتم تحميل ملف بعد'}</small></div></div>
-        <div class="employee-file-actions">
-          <input type="file" class="employee-file-input" data-file-key="${item.key}" accept=".pdf,.jpg,.jpeg,.png" hidden>
-          <button type="button" class="btn btn-sm employee-upload-btn" data-file-key="${item.key}">تحميل من الجهاز</button>
-          <button type="button" class="btn btn-sm employee-download-btn" data-file-key="${item.key}">تنزيل الملف PDF</button>
-          <button type="button" class="btn btn-sm btn-danger employee-remove-file-btn" data-file-key="${item.key}">إزالة الملف</button>
-        </div>
-      </div>`;
-    }).join('') + `<div class="employee-file-row employee-files-all-row"><div class="employee-file-title"><span class="employee-file-dot ${(pendingEmployeeFiles.__all || EMPLOYEE_FILE_TYPES.some(x=>pendingEmployeeFiles[x.key]||saved[x.key]))?'has-file':''}"></span><div><strong>تحميل الكل</strong><small>الملف الكامل للموظف مرة واحدة</small></div></div><div class="employee-file-actions"><input type="file" class="employee-file-all-input" id="employeeFileAllInput" accept="*/*" hidden><button type="button" class="btn btn-sm employee-file-all-upload-btn" id="employeeUploadAllBtn">تحميل من الجهاز</button><button type="button" class="btn btn-sm employee-file-all-download-btn" id="employeeDownloadAllBtn">تنزيل الملف PDF</button><button type="button" class="btn btn-sm btn-danger employee-file-all-remove-btn" id="employeeRemoveAllBtn">إزالة الملف</button></div></div>`;
+    list.innerHTML=`<div class="employee-file-row employee-files-all-row"><div class="employee-file-title"><span class="employee-file-dot ${(pendingEmployeeFiles.__all || EMPLOYEE_FILE_TYPES.some(x=>pendingEmployeeFiles[x.key]||saved[x.key]))?'has-file':''}"></span><div><strong>تحميل الكل</strong><small>الملف الكامل للموظف مرة واحدة</small></div></div><div class="employee-file-actions"><input type="file" class="employee-file-all-input" id="employeeFileAllInput" accept="*/*" hidden><button type="button" class="btn btn-sm employee-file-all-upload-btn" id="employeeUploadAllBtn">تحميل من الجهاز</button><button type="button" class="btn btn-sm employee-file-all-download-btn" id="employeeDownloadAllBtn">تنزيل الملف PDF</button><button type="button" class="btn btn-sm btn-danger employee-file-all-remove-btn" id="employeeRemoveAllBtn">إزالة الملف</button></div></div>`;
 
-    list.querySelectorAll('.employee-upload-btn').forEach(btn=>btn.addEventListener('click',()=>list.querySelector(`.employee-file-input[data-file-key="${btn.dataset.fileKey}"]`)?.click()));
-    list.querySelectorAll('.employee-file-input').forEach(input=>input.addEventListener('change',()=>{
-      const file=input.files?.[0]; if(!file) return;
-      if(!/^(application\/pdf|image\/(jpeg|png))$/i.test(file.type) && !/\.(pdf|jpe?g|png)$/i.test(file.name)){ showToast('يرجى اختيار ملف PDF أو صورة JPG/PNG.'); input.value=''; return; }
-      if(file.size>MAX_EMPLOYEE_FILE_BYTES){ showToast(`حجم الملف يجب ألا يتجاوز ${Math.round(MAX_EMPLOYEE_FILE_BYTES/1024)} كيلوبايت تقريباً (${(MAX_EMPLOYEE_FILE_BYTES/1024/1024).toFixed(2)} ميجا). جرّب ضغط الملف أو تصغير الصورة.`); input.value=''; return; }
-      pendingEmployeeFiles[input.dataset.fileKey]=file;
-      renderEmployeeFiles();
-      showToast(`تم اختيار ملف «${file.name}» وسيتم حفظه مع الموظف.`);
-    }));
-    list.querySelectorAll('.employee-download-btn').forEach(btn=>btn.addEventListener('click',()=>downloadEmployeeFile(btn.dataset.fileKey)));
-    list.querySelectorAll('.employee-remove-file-btn').forEach(btn=>btn.addEventListener('click',()=>removeEmployeeFile(btn.dataset.fileKey)));
     document.getElementById('employeeDownloadAllBtn')?.addEventListener('click',downloadAllEmployeeFiles);
     document.getElementById('employeeUploadAllBtn')?.addEventListener('click',()=>document.getElementById('employeeFileAllInput')?.click());
     document.getElementById('employeeFileAllInput')?.addEventListener('change',handleUploadAllEmployeeFiles);
@@ -2561,11 +2535,18 @@
     // احفظ محلياً فوراً، ثم انتظر حفظ Firestore قبل إغلاق النموذج حتى لا يعيد
     // الـ realtime snapshot القديم البيانات مرة أخرى.
     persistLocal();
+    let slowSync=false;
     if(window.FB?.saveState){
-      await withTimeout(window.FB.saveState(currentState()), 20000, 'saveState');
+      // الحفظ المحلي تم فعلاً. لو تأخّرت الكتابة السحابية (مستند كبير/اتصال بطيء) لا نعرض «تعذر الحفظ»؛
+      // الكتابة تكمل في الخلفية، ونعرض رسالة أن المزامنة جارية.
+      try{ await withTimeout(window.FB.saveState(currentState()), 45000, 'saveState'); }
+      catch(err){
+        if(String(err?.message||'').startsWith('TIMEOUT:')){ console.warn('Cloud save is slow, continuing in background:',err); slowSync=true; }
+        else throw err;
+      }
     }
     try{ renderProjectCapacity(); renderProjects(); }catch(e){}
-    showToast('تم حفظ بيانات الموظف بنجاح');
+    showToast(slowSync?'تم حفظ بيانات الموظف — المزامنة مع قاعدة البيانات ما زالت جارية في الخلفية':'تم حفظ بيانات الموظف بنجاح');
     resetForm();
     switchView('employees');
     }catch(err){
