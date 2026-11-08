@@ -1969,7 +1969,18 @@
   document.getElementById('f_region')?.addEventListener('change',()=>{ refreshEmployeeProjectSelect(document.getElementById('f_region').value); updateEmployeeCode(true); });
 
   /* ===== تعبئة الراتب تلقائياً من راتب المشروع حسب فئة الوظيفة ===== */
-  const AUTO_HOUSING_PCT=25, AUTO_TRANSPORT_PCT=38.5, AUTO_OTHER_PCT=0;   // نسب التوزيع على الراتب الأساسي
+  const AUTO_HOUSING_PCT=0, AUTO_TRANSPORT_PCT=0, AUTO_OTHER_PCT=0;   // الافتراضي: بدون بدلات (0%) إلا إذا كان للمشروع توزيع بدلات محفوظ في حسابات المشاريع
+  // توزيع البدلات المحفوظ للمشروع (آخر حساب مشروع بنفس الاسم) لفئة الوظيفة: {hp,tp,op} بنسب من الأساسي، أو null إن لم يوجد توزيع
+  function projectAllowanceSplit(project,key){
+    if(!project||!key) return null;
+    const recs=(projectAccounts||[]).filter(r=>sameProjectName(r?.name,project.name));
+    for(let i=recs.length-1;i>=0;i--){
+      const d=(recs[i].roles||[]).find(x=>x?.def?.key===key)?.data; if(!d) continue;
+      const basic=Number(d.basic)||0, hp=Number(d.housingPct)||0, tp=Number(d.transportPct)||0, op=basic>0?(Number(d.other)||0)/basic*100:0;
+      return (hp>0||tp>0||op>0) ? {hp,tp,op:Math.round(op*100)/100} : null;
+    }
+    return null;
+  }
   function projectRoleSalary(project,key){
     if(!project||!key) return 0;
     const costRows=Array.isArray(project.costItems?.[key])?project.costItems[key]:[];
@@ -2004,11 +2015,12 @@
     const editing=!!document.getElementById('f_id')?.value;
     const currentTotal=Number(document.getElementById('f_lastwage')?.value)||0;
     if(editing && currentTotal>0 && Math.abs(currentTotal-total)>=0.01 && !confirm(`تحديث راتب الموظف إلى راتب فئة «${job}» في المشروع (${money(total)}) بدل الراتب الحالي (${money(currentTotal)})؟`)) return;
-    document.getElementById('f_housing_pct').value=AUTO_HOUSING_PCT;
-    document.getElementById('f_transport_pct').value=AUTO_TRANSPORT_PCT;
-    document.getElementById('f_otherallow_pct').value=AUTO_OTHER_PCT;
-    const b0=solveBasicForTotal(total,AUTO_HOUSING_PCT,AUTO_TRANSPORT_PCT,AUTO_OTHER_PCT);
-    const hAmt=allowanceAmount(b0,AUTO_HOUSING_PCT), tAmt=allowanceAmount(b0,AUTO_TRANSPORT_PCT), oAmt=allowanceAmount(b0,AUTO_OTHER_PCT);
+    const sp=projectAllowanceSplit(project,key)||{hp:AUTO_HOUSING_PCT,tp:AUTO_TRANSPORT_PCT,op:AUTO_OTHER_PCT};
+    document.getElementById('f_housing_pct').value=sp.hp;
+    document.getElementById('f_transport_pct').value=sp.tp;
+    document.getElementById('f_otherallow_pct').value=sp.op;
+    const b0=solveBasicForTotal(total,sp.hp,sp.tp,sp.op);
+    const hAmt=allowanceAmount(b0,sp.hp), tAmt=allowanceAmount(b0,sp.tp), oAmt=allowanceAmount(b0,sp.op);
     const residual=Math.round(total*100)-Math.round((b0+hAmt+tAmt+oAmt)*100);      // فرق هللات نادر بسبب التقريب يُضاف على الأساسي
     document.getElementById('f_basicsalary').value=(b0+residual/100).toFixed(2);
     syncAllAllowances();
@@ -2236,7 +2248,7 @@
     syncStartDateAction();
     const statusEl=document.getElementById('f_contractstatus_display'); if(statusEl) statusEl.value='بدون عقد';
     const housingPct=document.getElementById('f_housing_pct'), transportPct=document.getElementById('f_transport_pct'), otherPct=document.getElementById('f_otherallow_pct');
-    if(housingPct) housingPct.value='25'; if(transportPct) transportPct.value='38.5'; if(otherPct) otherPct.value='0'; const payHint=document.getElementById('payAutoHint'); if(payHint) payHint.hidden=true;
+    if(housingPct) housingPct.value='0'; if(transportPct) transportPct.value='0'; if(otherPct) otherPct.value='0'; const payHint=document.getElementById('payAutoHint'); if(payHint) payHint.hidden=true;
     const delMemo=document.getElementById('f_delegate_memo'); if(delMemo){delMemo.value=''; delete delMemo.dataset.value;} const delName=document.getElementById('f_delegate_name'); if(delName) delName.value=''; const delMemoName=document.getElementById('delegateMemoName'); if(delMemoName) delMemoName.textContent=''; syncBankAccountType(); const photoEl=document.getElementById('f_idphoto'); if(photoEl){ photoEl.value=''; delete photoEl.dataset.value; } const photoName=document.getElementById('idPhotoName'); if(photoName) photoName.textContent=''; const personalRadio=document.querySelector('input[name=bankAccountType][value="حساب شخصي"]'); if(personalRadio) personalRadio.checked=true;
     document.getElementById('formTitle').textContent = 'إضافة موظف جديد';
     syncStartDateAction();
@@ -2596,10 +2608,11 @@
     n.empcode=nextEmployeeCode(n.region,'');
     n.jobtitle=job; n.startdate=o.startDate;
     n.statuses=[]; n.statusPeriods=[]; n.otherded=''; delete n.projectSince; delete n.projectHistory;
-    const b0=solveBasicForTotal(total,AUTO_HOUSING_PCT,AUTO_TRANSPORT_PCT,AUTO_OTHER_PCT);
-    const h=allowanceAmount(b0,AUTO_HOUSING_PCT), t=allowanceAmount(b0,AUTO_TRANSPORT_PCT), x=allowanceAmount(b0,AUTO_OTHER_PCT);
+    const sp=projectAllowanceSplit(pObj,roleCapacityKey(job))||{hp:AUTO_HOUSING_PCT,tp:AUTO_TRANSPORT_PCT,op:AUTO_OTHER_PCT};
+    const b0=solveBasicForTotal(total,sp.hp,sp.tp,sp.op);
+    const h=allowanceAmount(b0,sp.hp), t=allowanceAmount(b0,sp.tp), x=allowanceAmount(b0,sp.op);
     const residual=Math.round(total*100)-Math.round((b0+h+t+x)*100);
-    n.basicsalary=Math.round((b0+residual/100)*100)/100; n.housingPct=AUTO_HOUSING_PCT; n.transportPct=AUTO_TRANSPORT_PCT; n.otherallowPct=AUTO_OTHER_PCT;
+    n.basicsalary=Math.round((b0+residual/100)*100)/100; n.housingPct=sp.hp; n.transportPct=sp.tp; n.otherallowPct=sp.op;
     n.housing=h; n.transport=t; n.otherallow=x; n.lastwage=Math.round(total*100)/100;
     const nowIso=new Date().toISOString();
     employees.push(n);
