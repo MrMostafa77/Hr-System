@@ -1526,7 +1526,7 @@
       const contractBtn=cs==='ساري'?' <span class="status-badge status-ساري">ساري</span>':'<button class="btn btn-sm btn-primary all-employee-add-contract" data-id="'+escapeAttr(e.id)+'">إضافة عقد</button>';
       const commBtn=comm==='مباشر'?' <span class="status-badge status-ساري">مباشر</span>':'<button class="btn btn-sm btn-primary all-employee-add-comm" data-id="'+escapeAttr(e.id)+'">إضافة مباشرة</button>';
       return `<tr data-id="${escapeAttr(e.id)}" class="all-employee-row">
-        <td><b>${escapeHtml(e.fullname||'—')}</b></td>
+        <td><b>${escapeHtml(e.fullname||'—')}</b>${e.linkedEmpId?' <span class="pill pill-amber">تعيين إضافي</span>':''}</td>
         <td class="mono">${escapeHtml(e.empcode||'—')}</td>
         <td>${escapeHtml(e.jobtitle||'—')}</td>
         <td>${escapeHtml(e.project||'—')}</td>
@@ -1738,9 +1738,14 @@
     const parts=['firstname','fathername','grandname','familyname'].map(k=>document.getElementById('f_'+k)?.value.trim()).filter(Boolean);
     const el=document.getElementById('f_fullname'); if(el) el.value=parts.join(' ');
   }
-  function employeeContractInfo(empId){
+  function employeeContractInfo(empId,_depth=0){
     const list=contracts.filter(c=>c && c.empId===empId);
-    if(!list.length) return {status:'بدون عقد', contract:null};
+    if(!list.length){
+      // سجل تعيين إضافي على مشروع آخر: العقد عقد الموظف نفسه (لا يُنشأ عقد/رقم عقد جديد)
+      const me=employees.find(x=>x && x.id===empId);
+      if(me?.linkedEmpId && me.linkedEmpId!==empId && _depth<10) return employeeContractInfo(me.linkedEmpId,_depth+1);
+      return {status:'بدون عقد', contract:null};
+    }
     const contract=[...list].sort((a,b)=>String(b.createdAt||b.id||'').localeCompare(String(a.createdAt||a.id||'')))[0];
     return {status:'ساري', contract};
   }
@@ -2470,7 +2475,7 @@
     data.delegate_name=document.getElementById('f_delegate_name')?.value||'';
     const dm=document.getElementById('f_delegate_memo'); data.delegate_memo=dm?.dataset.value||data.delegate_memo||''; data.delegate_memo_name=dm?.files?.[0]?.name || data.delegate_memo_name || '';
     data.lastwage=Number(data.basicsalary||0)+Number(data.housing||0)+Number(data.transport||0)+Number(data.otherallow||0);
-    { const oldE=employees.find(x=>String(x.id)===String(id)); data.statuses=Array.isArray(oldE?.statuses)?oldE.statuses:[]; if(Array.isArray(oldE?.statusPeriods)) data.statusPeriods=oldE.statusPeriods; }   // الحالة تُدار من ملف الموظف فقط
+    { const oldE=employees.find(x=>String(x.id)===String(id)); if(oldE?.linkedEmpId) data.linkedEmpId=oldE.linkedEmpId; data.statuses=Array.isArray(oldE?.statuses)?oldE.statuses:[]; if(Array.isArray(oldE?.statusPeriods)) data.statusPeriods=oldE.statusPeriods; }   // الحالة تُدار من ملف الموظف فقط
     delete data.contracttype; delete data.contractstatus; delete data.contractduration; delete data.contractend; delete data.gosi;
     const errors={};
     if(!data.firstname) errors.firstname='الاسم مطلوب.';
@@ -2571,6 +2576,81 @@
   function empDayRateOn(e,iso){
     const ym=/^\d{4}-\d{2}/.test(String(iso||''))?String(iso).slice(0,7):currentMonthStr();
     return empDayRate(e,daysInMonth(ym));
+  }
+  /* ===== إضافة الموظف على مشروع آخر (سجل مستقل لكل مشروع) =====
+     كل تعيين على مشروع = سجل موظف مستقل: راتبه وحضوره ومسيره وحالاته (إيقاف/إجازة/...) وسعته ولائحة جزاءاته
+     خاصة بمشروعه، ويشترك مع السجل الأصلي في البيانات الشخصية والعقد فقط (linkedEmpId). */
+  function empLinkRoot(e){ let cur=e, n=0; while(cur?.linkedEmpId && n++<10){ const nx=employees.find(x=>x.id===cur.linkedEmpId); if(!nx) break; cur=nx; } return cur; }
+  function empGroupMembers(e){ const root=empLinkRoot(e); return employees.filter(x=>empLinkRoot(x)===root); }
+  function addEmployeeToProject(src, o){
+    const np=String(o.project||'').trim(), job=String(o.jobtitle||'').trim(), total=Number(o.total)||0;
+    if(!np) return 'اختر المشروع';
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(o.startDate||''))) return 'اختر تاريخ بداية العمل على المشروع';
+    if(!job) return 'اختر الوظيفة';
+    if(!(total>0)) return 'اكتب إجمالي الراتب على هذا المشروع';
+    const contract=employeeContractInfo(src.id).contract;
+    if(!contract) return 'لا يمكن الإضافة: الموظف بدون عقد';
+    const pObj=projects.find(x=>sameProjectName(x.name,np)); if(!pObj) return 'المشروع غير موجود';
+    if(empGroupMembers(src).some(m=>sameProjectName(m.project,pObj.name))) return 'الموظف مسجل على هذا المشروع بالفعل';
+    if(o.endOld){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(String(o.endOldDate||''))) return 'اختر تاريخ انتهاء العمل على المشروع القديم';
+    }
+    const n=JSON.parse(JSON.stringify(src));
+    n.id='e'+Date.now()+Math.random().toString(36).slice(2,5);
+    n.linkedEmpId=src.id;
+    n.project=pObj.name; n.region=pObj.region||src.region||'';
+    n.empcode=nextEmployeeCode(n.region,'');
+    n.jobtitle=job; n.startdate=o.startDate;
+    n.statuses=[]; n.statusPeriods=[]; n.otherded=''; delete n.projectSince; delete n.projectHistory;
+    const b0=solveBasicForTotal(total,AUTO_HOUSING_PCT,AUTO_TRANSPORT_PCT,AUTO_OTHER_PCT);
+    const h=allowanceAmount(b0,AUTO_HOUSING_PCT), t=allowanceAmount(b0,AUTO_TRANSPORT_PCT), x=allowanceAmount(b0,AUTO_OTHER_PCT);
+    const residual=Math.round(total*100)-Math.round((b0+h+t+x)*100);
+    n.basicsalary=Math.round((b0+residual/100)*100)/100; n.housingPct=AUTO_HOUSING_PCT; n.transportPct=AUTO_TRANSPORT_PCT; n.otherallowPct=AUTO_OTHER_PCT;
+    n.housing=h; n.transport=t; n.otherallow=x; n.lastwage=Math.round(total*100)/100;
+    const nowIso=new Date().toISOString();
+    employees.push(n);
+    commencements.push({id:'cm'+Date.now()+Math.random().toString(36).slice(2,7),empId:n.id,employeeName:n.fullname||'',empcode:n.empcode||'',project:n.project,region:n.region||'',dept:n.dept||'',jobtitle:n.jobtitle||'',contractId:contract.id||'',contractCode:contract.contractCode||'',startDate:o.startDate,types:['تعيين على مشروع إضافي'],otherType:'',linkedFrom:src.id,updatedAt:nowIso});
+    if(o.endOld){
+      // انتهاء العمل على المشروع القديم: حالة «مخالصة» من التاريخ (يبقى راتب شهره المستحق فقط، ولا يظهر بعده)
+      const others=empStatusPeriods(src).filter(pp=>pp.k!=='settle');
+      src.statusPeriods=[...others,{k:'settle',from:o.endOldDate,to:''}]; src.statuses=[];
+    }
+    saveEmployees(); saveCommencements();
+    try{ renderAllEmployees(); }catch(_){}
+    try{ renderAttendance(); }catch(_){}
+    try{ renderReports(); }catch(_){}
+    try{ renderCommencementList(); }catch(_){}
+    return '';
+  }
+  function openAddProjectDialog(e){
+    if(!employeeContractInfo(e.id).contract){ empCtxAlert('لا يمكن إضافة الموظف على مشروع آخر: لا يوجد له عقد.'); return; }
+    if(!commencementForEmployee(e.id)){ empCtxAlert('لا يمكن إضافة الموظف على مشروع آخر: لا توجد له مباشرة.'); return; }
+    document.getElementById('empAddProjectOverlay')?.remove();
+    const taken=empGroupMembers(e).map(m=>m.project);
+    const popts=projects.filter(x=>!taken.some(t=>sameProjectName(t,x.name))).map(x=>`<option value="${escapeAttr(x.name)}">${escapeHtml(x.name)}</option>`).join('');
+    const jobs=uniqueSorted([...employees.map(x=>x.jobtitle),e.jobtitle].filter(Boolean));
+    const jopts=jobs.map(j=>`<option value="${escapeAttr(j)}"${j===e.jobtitle?' selected':''}>${escapeHtml(j)}</option>`).join('');
+    const ov=document.createElement('div'); ov.className='overlay open'; ov.id='empAddProjectOverlay'; ov.style.cssText='align-items:center;justify-content:center';
+    ov.innerHTML=`<div class="card project-warning-box" role="dialog" aria-modal="true" dir="rtl" style="max-height:92vh;overflow:auto"><h3>إضافة الموظف على مشروع آخر</h3><div class="project-warning-text"><p><b>${escapeHtml(e.fullname||'')}</b> — مشروعه الحالي: <b>${escapeHtml(e.project||'—')}</b> — راتبه الحالي: <b>${money(lastWageTotal(e))}</b></p><div class="field"><label>المشروع الجديد</label><select id="ap_project"><option value="">اختر المشروع</option>${popts}</select></div><div class="field"><label>الوظيفة على المشروع الجديد</label><select id="ap_job">${jopts}</select></div><div class="field"><label>إجمالي الراتب على المشروع الجديد</label><input type="number" step="0.01" min="0" id="ap_total" placeholder="يُعبّأ تلقائياً من راتب فئة المشروع إن وُجد"><small id="ap_hint" style="display:block;opacity:.8"></small></div><div class="field"><label>تاريخ بداية العمل على المشروع الجديد</label><input type="date" id="ap_date" value="${todayISO()}"></div><div class="field"><label>العمل على المشروع القديم (${escapeHtml(e.project||'—')})</label><label style="display:block"><input type="radio" name="ap_old" value="keep" checked> يستمر (يعمل على المشروعين معاً)</label><label style="display:block"><input type="radio" name="ap_old" value="end"> ينتهي عمله عليه من تاريخ: <input type="date" id="ap_enddate" value="${todayISO()}"></label></div><p style="font-size:12px;opacity:.85">يُنشأ للموظف سجل مستقل على المشروع الجديد (كود وظيفي وراتب وحضور ومسير وحالات خاصة به)، ويبقى السجل القديم بحضوره ومسيره وراتبه كما هو. العقد نفسه لا يتغير، ويمكنك لاحقاً إيقاف الموظف أو إعطاؤه إجازة على مشروع دون الآخر من ملف كل سجل.</p></div><div class="project-warning-actions"><button type="button" class="btn btn-primary" id="ap_ok">إضافة على المشروع</button><button type="button" class="btn" id="ap_cancel">إلغاء</button></div></div>`;
+    document.body.appendChild(ov);
+    const close=()=>ov.remove();
+    ov.addEventListener('mousedown',ev=>{ if(ev.target===ov) close(); });
+    const $p=id=>document.getElementById(id);
+    const autoSalary=()=>{
+      const pn=$p('ap_project').value, job=$p('ap_job').value, hint=$p('ap_hint'); hint.textContent='';
+      const proj=projects.find(x=>sameProjectName(x.name,pn)), key=roleCapacityKey(job);
+      if(proj&&key){ const t=projectRoleSalary(proj,key); if(t>0){ $p('ap_total').value=t; hint.textContent=`راتب فئة «${job}» في مشروع ${pn}: ${money(t)} (يمكنك تعديله)`; return; } hint.textContent=`لا يوجد راتب محدد لفئة «${job}» في هذا المشروع — اكتبه يدوياً`; }
+    };
+    $p('ap_project').onchange=autoSalary; $p('ap_job').onchange=autoSalary;
+    $p('ap_cancel').onclick=close;
+    $p('ap_ok').onclick=()=>{
+      const np=$p('ap_project').value, job=$p('ap_job').value;
+      if(np){ const w=validateEmployeeCapacity({jobtitle:job,project:np}, ''); if(w && !confirm(`تنبيه: المشروع «${w.project}» وصل للحد الأقصى من ${w.role} (${w.current} من ${w.limit}). هل تريد المتابعة؟`)) return; }
+      const endOld=document.querySelector('input[name=ap_old]:checked')?.value==='end';
+      const err=addEmployeeToProject(e,{project:np,jobtitle:job,total:$p('ap_total').value,startDate:$p('ap_date').value,endOld,endOldDate:$p('ap_enddate').value});
+      if(err){ showToast('⚠ '+err); return; }
+      close(); showToast('تم إنشاء سجل الموظف على المشروع الجديد');
+    };
   }
   function projectOfEmployee(e){ return projects.find(p=>String(p.name||'')===String(e?.project||'')); }
   function policyForProjectName(name){
@@ -3007,7 +3087,9 @@
     const alertHtml=alerts.length?alerts.map(a=>`<span class="employee-alert-chip">⚠ ${escapeHtml(a)}</span>`).join(''):'<span class="employee-ok-chip">لا توجد تنبيهات مسجلة حاليًا</span>';
     document.getElementById('employeeProfileModal')?.remove();
     const modal=document.createElement('div'); modal.id='employeeProfileModal'; modal.className='employee-profile-modal';
-    modal.innerHTML=`<div class="employee-profile-backdrop" data-profile-close></div><article class="employee-profile-dialog" role="dialog" aria-modal="true" aria-label="الملف الشامل للموظف"><header class="employee-profile-header"><div><span class="employee-profile-kicker">ملف الموظف الشامل</span><h2>${escapeHtml(e.fullname||'—')}</h2><p>${escapeHtml(e.empcode||'—')} · ${escapeHtml(e.jobtitle||'—')} · ${escapeHtml(e.project||'—')}</p></div><button type="button" class="btn icon-btn" data-profile-close aria-label="إغلاق">✕</button></header><div class="employee-profile-content"><section class="employee-profile-section employee-status-section" data-status-host></section><section class="employee-profile-section employee-source-section" data-source-action="personal" title="كليك يمين لفتح شاشة إدخال الموظف"><div class="employee-profile-fields">${personal.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section employee-source-section" data-source-action="contract" title="كليك يمين لفتح بيانات العقد"><div class="employee-profile-fields">${contractFields.map(x=>kv(x[0],x[1])).join('')}${kv('تاريخ المباشرة',cm?.startDate?fmtDMY(cm.startDate):'لا توجد مباشرة')}${kv('المشروع في المباشرة',cm?.project||'—')}</div></section><section class="employee-profile-section employee-source-section" data-source-action="personal" title="كليك يمين لفتح شاشة إدخال الموظف"><div class="employee-profile-fields">${bankFields.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section"><h3>الحضور والانصراف <span class="employee-section-count">${monthNames.length} شهر</span></h3><div class="employee-attendance-summary">${Object.entries(attendanceCounts).map(([code,count])=>`<span><b>${count}</b> ${escapeHtml(attCodeLabel(code)||code)}</span>`).join('')||'لا توجد سجلات ضمن الفترة'}</div>${table(['الشهر','عدد الأيام المسجلة','التفصيل'],attendanceRows,'لا توجد سجلات حضور من تاريخ المباشرة حتى اليوم')}</section><section class="employee-profile-section"><h3>مسيرات الرواتب <span class="employee-section-count">${months.length} شهر</span></h3><p class="employee-history-hint">اضغط على الشهر لعرض المسير، أو كليك يمين لفتح مسير الإدخال للعرض فقط.</p>${table(['الشهر','إجمالي المستحقات','إجمالي الخصومات','صافي الراتب'],payrollRows,'لا توجد أشهر رواتب ضمن الفترة')}</section><section class="employee-profile-section"><h3>سجل التغطيات <span class="employee-section-count">${empCov.length} سجل</span></h3>${table(['التاريخ','المغطّي','الغائب','الموقع / المشروع','الحالة','المستحق','ملاحظات'],covRows,'لا توجد تغطيات مرتبطة بهذا الموظف')}</section><section class="employee-profile-section"><h3>إجراءات الموظف <span class="employee-section-count">${empActs.length} إجراء</span></h3>${table(['التاريخ','الرمز','الإجراء','الأيام','ملاحظات'],actRows,'لا توجد إجراءات مسجلة')}</section><section class="employee-profile-section"><h3>التنبيهات والملاحظات</h3><div class="employee-alert-list">${alertHtml}</div>${e.notes?`<p class="employee-profile-notes">${escapeHtml(e.notes)}</p>`:''}</section></div></article>`;
+    const grp=empGroupMembers(e);
+    const projRows=grp.map(m=>{ const st=empStatusInfo(m).text; const cs=commencementForEmployee(m.id)?.startDate; return `<tr${m.id===e.id?' style="font-weight:800"':''}><td>${escapeHtml(m.project||'—')}${m.id===e.id?' (هذا السجل)':''}</td><td>${escapeHtml(m.jobtitle||'—')}</td><td>${money(lastWageTotal(m))}</td><td>${cs?fmtDMY(cs):'—'}</td><td>${escapeHtml(st||'على رأس العمل')}</td></tr>`; }).join('');
+    modal.innerHTML=`<div class="employee-profile-backdrop" data-profile-close></div><article class="employee-profile-dialog" role="dialog" aria-modal="true" aria-label="الملف الشامل للموظف"><header class="employee-profile-header"><div><span class="employee-profile-kicker">ملف الموظف الشامل</span><h2>${escapeHtml(e.fullname||'—')}</h2><p>${escapeHtml(e.empcode||'—')} · ${escapeHtml(e.jobtitle||'—')} · ${escapeHtml(e.project||'—')}</p></div><button type="button" class="btn icon-btn" data-profile-close aria-label="إغلاق">✕</button></header><div class="employee-profile-content"><section class="employee-profile-section employee-status-section" data-status-host></section><section class="employee-profile-section employee-source-section" data-source-action="personal" title="كليك يمين لفتح شاشة إدخال الموظف"><div class="employee-profile-fields">${personal.map(x=>kv(x[0],x[1])).join('')}</div></section><section class="employee-profile-section employee-source-section" data-source-action="contract" title="كليك يمين لفتح بيانات العقد"><div class="employee-profile-fields">${contractFields.map(x=>kv(x[0],x[1])).join('')}${kv('تاريخ المباشرة',cm?.startDate?fmtDMY(cm.startDate):'لا توجد مباشرة')}${kv('المشروع في المباشرة',cm?.project||'—')}</div></section><section class="employee-profile-section employee-source-section" data-source-action="personal" title="كليك يمين لفتح شاشة إدخال الموظف"><div class="employee-profile-fields">${bankFields.map(x=>kv(x[0],x[1])).join('')}</div></section>${grp.length>1?`<section class="employee-profile-section"><h3>تعييناته على المشاريع <span class="employee-section-count">${grp.length} مشروع</span></h3>${table(['المشروع','الوظيفة','إجمالي الراتب','تاريخ المباشرة','الحالة'],projRows,'')}</section>`:''}<section class="employee-profile-section"><h3>الحضور والانصراف <span class="employee-section-count">${monthNames.length} شهر</span></h3><div class="employee-attendance-summary">${Object.entries(attendanceCounts).map(([code,count])=>`<span><b>${count}</b> ${escapeHtml(attCodeLabel(code)||code)}</span>`).join('')||'لا توجد سجلات ضمن الفترة'}</div>${table(['الشهر','عدد الأيام المسجلة','التفصيل'],attendanceRows,'لا توجد سجلات حضور من تاريخ المباشرة حتى اليوم')}</section><section class="employee-profile-section"><h3>مسيرات الرواتب <span class="employee-section-count">${months.length} شهر</span></h3><p class="employee-history-hint">اضغط على الشهر لعرض المسير، أو كليك يمين لفتح مسير الإدخال للعرض فقط.</p>${table(['الشهر','إجمالي المستحقات','إجمالي الخصومات','صافي الراتب'],payrollRows,'لا توجد أشهر رواتب ضمن الفترة')}</section><section class="employee-profile-section"><h3>سجل التغطيات <span class="employee-section-count">${empCov.length} سجل</span></h3>${table(['التاريخ','المغطّي','الغائب','الموقع / المشروع','الحالة','المستحق','ملاحظات'],covRows,'لا توجد تغطيات مرتبطة بهذا الموظف')}</section><section class="employee-profile-section"><h3>إجراءات الموظف <span class="employee-section-count">${empActs.length} إجراء</span></h3>${table(['التاريخ','الرمز','الإجراء','الأيام','ملاحظات'],actRows,'لا توجد إجراءات مسجلة')}</section><section class="employee-profile-section"><h3>التنبيهات والملاحظات</h3><div class="employee-alert-list">${alertHtml}</div>${e.notes?`<p class="employee-profile-notes">${escapeHtml(e.notes)}</p>`:''}</section></div></article>`;
     document.body.appendChild(modal); document.body.classList.add('employee-profile-open');
     renderEmployeeStatusSection(modal,e);
     modal.querySelectorAll('.employee-source-section').forEach(sec=>sec.addEventListener('contextmenu',ev=>{
@@ -4432,6 +4514,7 @@
       });
     },
     profile(e){ openProfile(e.id); },
+    addProject(e){ openAddProjectDialog(e); },
     project(e){
       const p=projects.find(x=>sameProjectName(x.name,e.project));
       if(!e.project){ empCtxAlert('الموظف غير مسجل على مشروع'); return; }
@@ -4468,6 +4551,7 @@
       {k:'comm', t:hasComm?'مباشرة الموظف (معاينة)':'مباشرة الموظف (عمل مباشرة)'},
       {k:'profile', t:'عرض بيانات الموظف'},
       {k:'project', t:'عرض مشروع الموظف'},
+      {k:'addProject', t:'إضافة على مشروع آخر'},
       {k:'makeAction', t:'عمل إجراء'},
       {k:'previewAtt', t:'معاينة الحضور والانصراف'},
       {k:'previewPayroll', t:'معاينة مسير الرواتب'}
@@ -5171,7 +5255,7 @@
   /* ===== employee contracts ===== */
   function contractFor(empId, contractId){
     if(contractId) return contracts.find(c=>c.id===contractId && c.empId===empId)||{};
-    return contracts.find(c=>c.empId===empId)||{};
+    return contracts.find(c=>c.empId===empId)||employeeContractInfo(empId).contract||{};
   }
   function contractDurationParts(start,end){
     if(!start || !end) return null;
@@ -5631,7 +5715,7 @@
   function contractForEmployeeProject(e, projectName){
     const pn=String(projectName||e?.project||'').trim();
     return contracts.filter(c=>c.empId===e?.id && String(c.location||e?.project||'').trim()===pn)
-      .sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''))[0] || null;
+      .sort((a,b)=>(b.updatedAt||'').localeCompare(a.updatedAt||''))[0] || employeeContractInfo(e?.id).contract || null;
   }
   function formatGregorianArabic(dateStr){
     if(!dateStr)return '';
