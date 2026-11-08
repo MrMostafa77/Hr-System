@@ -546,8 +546,19 @@
     <section id="view-employeepromotions" style="display:none">
       <div class="topbar"><div class="pagetitle"><h1>ترقيات الموظفين</h1><p>إدارة ترقيات وتحديثات الموظفين</p></div><div class="topbar-actions"><button class="btn mobile-menu-btn icon-btn" data-menu>☰</button></div></div>
       <div class="card" style="margin-top:16px">
-        <div class="card-head"><div><h3>ترقيات الموظفين</h3><p class="muted">هذه الشاشة مخصصة لإضافة وإدارة ترقيات الموظفين.</p></div></div>
-        <div class="empty-state">لا توجد ترقيات موظفين مسجلة حالياً.</div>
+        <div class="card-head"><div><h3>إضافة راتب جديد لحارس من تاريخ معيّن</h3><p class="muted">الراتب الجديد يُحتسب من التاريخ المحدد فقط، والشهور السابقة تبقى بالراتب القديم. لتصحيح الراتب بأثر رجعي على كل الشهور استخدم «تعديل الموظف».</p></div></div>
+        <div class="payroll-info-note" id="promoNote" style="display:none">تسجيل الترقيات يحتاج صلاحية المالية.</div>
+        <div class="att-toolbar payroll-toolbar">
+          <div class="payroll-filter-group payroll-search-wide"><label>الحارس</label><select id="promoEmp"><option value="">اختر الحارس</option></select></div>
+          <div class="payroll-filter-group"><label>إجمالي الراتب الجديد</label><input type="number" id="promoTotal" min="0" step=".01" placeholder="مثال: 3500"></div>
+          <div class="payroll-filter-group"><label>يبدأ من تاريخ</label><input type="date" id="promoDate"></div>
+          <div class="payroll-filter-group"><label>ملاحظة (اختياري)</label><input type="text" id="promoNoteText" placeholder="مثال: ترقية إلى مشرف"></div>
+          <button type="button" class="btn btn-primary" id="promoAddBtn">تسجيل الراتب الجديد</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:16px">
+        <div class="card-head"><div><h3>سجل الترقيات</h3></div></div>
+        <div class="table-wrap"><table class="payroll-table"><thead><tr><th>م</th><th>الحارس</th><th>المشروع</th><th>الراتب السابق</th><th>الراتب الجديد</th><th>من تاريخ</th><th>ملاحظة</th><th></th></tr></thead><tbody id="promoBody"></tbody></table></div>
       </div>
     </section>
 

@@ -934,6 +934,7 @@
     if(view==='salesorderreport') window.HRSales?.renderOrderReport();
     if(view==='invoicereport') window.HRSales?.renderInvoiceReport();
     if(view==='users') window.HRUsers?.render();
+    if(view==='employeepromotions') renderEmployeePromotions();
     if(view==='reports'){
       const activeReport=document.querySelector('.nav-child[data-view="reports"].active');
       const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك'};
@@ -2481,6 +2482,19 @@
     const dm=document.getElementById('f_delegate_memo'); data.delegate_memo=dm?.dataset.value||data.delegate_memo||''; data.delegate_memo_name=dm?.files?.[0]?.name || data.delegate_memo_name || '';
     data.lastwage=Number(data.basicsalary||0)+Number(data.housing||0)+Number(data.transport||0)+Number(data.otherallow||0);
     { const oldE=employees.find(x=>String(x.id)===String(id)); if(oldE?.linkedEmpId) data.linkedEmpId=oldE.linkedEmpId; data.statuses=Array.isArray(oldE?.statuses)?oldE.statuses:[]; if(Array.isArray(oldE?.statusPeriods)) data.statusPeriods=oldE.statusPeriods; }   // الحالة تُدار من ملف الموظف فقط
+    let guardSalaryNote=null;
+    { // راتب الحراس: التعديل من «تعديل الموظف» = تصحيح بأثر رجعي. أما الراتب من تاريخ معيّن فمكانه «ترقيات الموظفين»
+      const oldE=employees.find(x=>String(x.id)===String(id));
+      if(oldE && Array.isArray(oldE.salaryHistory)) data.salaryHistory=oldE.salaryHistory;
+      if(oldE && isGuardEmployee(data) && ['basicsalary','housing','transport','otherallow'].some(k=>(Number(oldE[k])||0)!==(Number(data[k])||0))){
+        const h=empSalaryHist(oldE); let fromYm='', fromDate='';
+        if(h.length>=2){
+          const last=h[h.length-1]; fromDate=String(last.from||''); fromYm=fromDate.slice(0,7);
+          data.salaryHistory=h.map(x=>x===last?{...x,basic:Number(data.basicsalary)||0,housing:Number(data.housing)||0,transport:Number(data.transport)||0,otherallow:Number(data.otherallow)||0}:x);
+        }
+        guardSalaryNote={name:data.fullname,oldTotal:Number(oldE.lastwage)||0,newTotal:Number(data.lastwage)||0,fromYm,fromDate,hasPromos:h.length>=2};
+      }
+    }
     delete data.contracttype; delete data.contractstatus; delete data.contractduration; delete data.contractend; delete data.gosi;
     const errors={};
     if(!data.firstname) errors.firstname='الاسم مطلوب.';
@@ -2537,6 +2551,18 @@
         html:`الموظف المضاف الآن راتبه الإجمالي <b>${money(siWarning.gross)}</b> مخالف لقوانين التأمينات الاجتماعية لأن راتبه الإجمالي أقل من <b>(${money(siWarning.min)})</b>. هل تريد المتابعة؟`
       });
     }
+    if(guardSalaryNote){
+      const g=guardSalaryNote;
+      warnings.push({
+        title:'ملاحظة: تعديل راتب حارس',
+        html:`راتب <b>${escapeHtml(g.name||'')}</b> سيتغيّر من <b>${money(g.oldTotal)}</b> إلى <b>${money(g.newTotal)}</b>.<br><br>`
+          +(g.hasPromos
+            ?`• التعديل من هنا يصحّح <b>راتب آخر ترقية</b> (من ${escapeHtml(fmtDMY(g.fromDate))}) وما بعده فقط، أما الشهور السابقة لها فتبقى بالراتب القديم.<br>`
+            :`• التعديل من هنا يسري على <b>كل الشهور</b> في المسير حتى الشهور المنتهية، وكأن الراتب كان هكذا من البداية.<br>`)
+          +`• لو تريد الراتب الجديد <b>من تاريخ معيّن</b> وتبقى الشهور القديمة بالراتب القديم: اضغط «لا لم أكن انتبه لذلك»، ثم أضفه من شاشة <b>ترقيات الموظفين</b>.<br>`
+          +`• الرواتب التي سبق ترحيلها على كشف البنك تبقى بأرقامها القديمة؛ ألغِ ترحيلها ثم رحّلها من جديد لتأخذ الراتب الجديد.<br><br>هل تريد المتابعة؟`
+      });
+    }
     if(warnings.length){
       const proceed=await confirmProjectEmployeeWarnings(warnings);
       if(!proceed){ showToast('لم يتم حفظ الموظف.'); return; }
@@ -2550,6 +2576,7 @@
       showToast('تم حفظ بيانات الموظف، لكن تعذر رفع ملف أو أكثر. يمكنك رفعها من تبويب «ملفات الموظف» لاحقاً.');
     }
     if(idx>=0) employees[idx] = data; else employees.push(data);
+    if(guardSalaryNote) payDropSnaps(id,guardSalaryNote.fromYm);   // يُعاد حساب الشهور المنتهية بالراتب الجديد
     // احفظ محلياً فوراً، ثم انتظر حفظ Firestore قبل إغلاق النموذج حتى لا يعيد
     // الـ realtime snapshot القديم البيانات مرة أخرى.
     persistLocal();
@@ -2587,7 +2614,8 @@
   // أجر اليوم حسب شهر تاريخ معيّن (للإجراءات والجزاءات)
   function empDayRateOn(e,iso){
     const ym=/^\d{4}-\d{2}/.test(String(iso||''))?String(iso).slice(0,7):currentMonthStr();
-    return empDayRate(e,daysInMonth(ym));
+    const s=empSalaryHist(e).length>=2?empSalaryAt(e,String(iso||'').slice(0,10)):null;
+    return empDayRate(s?{...e,basicsalary:s.basic,housing:s.housing,transport:s.transport,otherallow:s.otherallow}:e,daysInMonth(ym));
   }
   /* ===== إضافة الموظف على مشروع آخر (سجل مستقل لكل مشروع) =====
      كل تعيين على مشروع = سجل موظف مستقل: راتبه وحضوره ومسيره وحالاته (إيقاف/إجازة/...) وسعته ولائحة جزاءاته
@@ -2892,7 +2920,28 @@
     if(!cols||!cols.length) return false;
     return empStatusPeriods(e).some(p=>(p.k==='stop'||p.k==='resign'||p.k==='settle'||p.k==='absent') && p.from && cols[0].iso>=p.from);
   }
+  /* ===== ترقيات الحراس: راتب جديد من تاريخ معيّن (salaryHistory) =====
+     كل عنصر: {from:'YYYY-MM-DD' ('' = الراتب الأصلي), basic, housing, transport, otherallow, at}
+     الشهور قبل التاريخ تُحسب بالراتب القديم، ومن التاريخ بالراتب الجديد (الشهر المختلط يُحسب بمتوسط الأيام). */
+  function empSalaryHist(e){ return Array.isArray(e?.salaryHistory)?e.salaryHistory.filter(x=>x&&typeof x==='object').slice().sort((a,b)=>String(a.from||'').localeCompare(String(b.from||''))):[]; }
+  function empSalaryAt(e,iso){ const h=empSalaryHist(e); if(!h.length) return null; let pick=null; h.forEach(x=>{ if(!x.from||x.from<=iso) pick=x; }); return pick||h[0]; }
+  function payEffectiveEmp(e,cols){
+    const h=empSalaryHist(e); if(h.length<2||!cols||!cols.length) return e;
+    const acc={basic:0,housing:0,transport:0,otherallow:0};
+    cols.forEach(c=>{ const s=empSalaryAt(e,c.iso); Object.keys(acc).forEach(k=>{ acc[k]+=Number(s[k])||0; }); });
+    const n=cols.length;
+    return {...e,basicsalary:r2(acc.basic/n),housing:r2(acc.housing/n),transport:r2(acc.transport/n),otherallow:r2(acc.otherallow/n)};
+  }
+  // مسح النسخ المثبّتة لمسير الموظف من شهر معيّن فصاعدًا ('' = كل الشهور) ليُعاد حسابها بالراتب الجديد
+  function payDropSnaps(empId,fromYm){
+    Object.keys(payrollRecords||{}).forEach(ym=>{
+      if(!/^\d{4}-\d{2}$/.test(ym)||(fromYm&&ym<fromYm)) return;
+      const rec=payrollRecords[ym]&&payrollRecords[ym][empId]; if(rec&&rec.snap) delete rec.snap;
+    });
+  }
+  function empSalaryTotal(x){ return r2((Number(x?.basic)||0)+(Number(x?.housing)||0)+(Number(x?.transport)||0)+(Number(x?.otherallow)||0)); }
   function payrollComputeStatement(e,cols,sumIn){
+    e=payEffectiveEmp(e,cols);
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
     const basic=Number(e.basicsalary)||0,housing=Number(e.housing)||0,transport=Number(e.transport)||0,otherAllow=Number(e.otherallow)||0;
     const MD=payMonthDaysFor(cols), monthlyGross=basic+housing+transport+otherAllow, day=empDayRate(e,MD);
@@ -3569,6 +3618,59 @@
     const list=payrollFilteredList(ym).filter(e=>paySelected.has(String(e.id)));
     if(!list.length){ showToast('حدّد موظفًا واحدًا على الأقل من الخانات بجانب الأسماء'); return; }
     payrollBankExport(list,ym,{selected:true});
+  });
+  /* ===== شاشة ترقيات الموظفين (الحراس): راتب جديد من تاريخ ===== */
+  function promoGuards(){ return employees.filter(isGuardEmployee).slice().sort((a,b)=>String(a.project||'').localeCompare(String(b.project||''),'ar')||String(a.fullname||'').localeCompare(String(b.fullname||''),'ar')); }
+  function renderEmployeePromotions(){
+    const sel=document.getElementById('promoEmp'), body=document.getElementById('promoBody'), note=document.getElementById('promoNote'); if(!sel||!body) return;
+    const fin=pdrCanFinance(); if(note) note.style.display=fin?'none':'';
+    const old=sel.value, gs=promoGuards();
+    sel.innerHTML='<option value="">اختر الحارس</option>'+gs.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'—')}${e.empcode?' — '+escapeHtml(e.empcode):''}${e.project?' — '+escapeHtml(e.project):''}</option>`).join('');
+    if(gs.some(e=>String(e.id)===old)) sel.value=old;
+    const rows=[];
+    gs.forEach(e=>{ const h=empSalaryHist(e); for(let i=1;i<h.length;i++) rows.push({e,prev:h[i-1],cur:h[i],idx:i}); });
+    rows.sort((a,b)=>String(b.cur.from||'').localeCompare(String(a.cur.from||'')));
+    body.innerHTML=rows.map((r,i)=>`<tr><td class="mono">${i+1}</td><td><b>${escapeHtml(r.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(r.e.empcode||'')}</small></td><td>${escapeHtml(r.e.project||'—')}</td><td class="mono">${fmt(empSalaryTotal(r.prev))}</td><td class="mono" style="font-weight:700;color:var(--teal)">${fmt(empSalaryTotal(r.cur))}</td><td class="mono">${escapeHtml(fmtDMY(r.cur.from))}</td><td>${escapeHtml(r.cur.note||'')}</td><td>${fin?`<button type="button" class="btn btn-sm" data-promo-del="${escapeAttr(r.e.id)}" data-promo-from="${escapeAttr(r.cur.from)}">حذف</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد ترقيات مسجلة حالياً.</td></tr>';
+  }
+  function promoApplyLatest(e,h){
+    const last=h[h.length-1]; e.basicsalary=last.basic; e.housing=last.housing; e.transport=last.transport; e.otherallow=last.otherallow;
+    e.lastwage=empSalaryTotal(last);
+  }
+  function empPromoAdd(empId,total,from,note){
+    if(!pdrCanFinance()) return 'تسجيل الترقيات يحتاج صلاحية المالية';
+    const e=employees.find(x=>String(x.id)===String(empId)); if(!e) return 'اختر الحارس';
+    if(!isGuardEmployee(e)) return 'الترقيات متاحة للحراس فقط';
+    if(!(total>0)) return 'اكتب إجمالي الراتب الجديد';
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(from||''))) return 'اختر تاريخ بداية الراتب الجديد';
+    let h=empSalaryHist(e);
+    if(!h.length) h=[{from:'',basic:Number(e.basicsalary)||0,housing:Number(e.housing)||0,transport:Number(e.transport)||0,otherallow:Number(e.otherallow)||0,at:''}];   // الراتب الأصلي قبل أول ترقية
+    if(h.some(x=>String(x.from||'')===from)) return 'يوجد راتب مسجل لهذا الحارس بنفس التاريخ';
+    const hp=Number(e.housingPct)||0, tp=Number(e.transportPct)||0, op=Number(e.otherallowPct)||0;
+    const b0=solveBasicForTotal(total,hp,tp,op), hh=allowanceAmount(b0,hp), tt=allowanceAmount(b0,tp), oo=allowanceAmount(b0,op);
+    const resid=Math.round(total*100)-Math.round((b0+hh+tt+oo)*100);
+    h=[...h,{from,basic:Math.round((b0+resid/100)*100)/100,housing:hh,transport:tt,otherallow:oo,at:new Date().toISOString(),note:String(note||'').trim()}].sort((a,b)=>String(a.from||'').localeCompare(String(b.from||'')));
+    e.salaryHistory=h; promoApplyLatest(e,h);
+    payDropSnaps(e.id,from.slice(0,7));
+    persistCloud(`تم تسجيل الراتب الجديد للحارس ${e.fullname||''} من ${fmtDMY(from)}`);
+    try{ renderReports(); }catch(_){}
+    try{ renderEmployeeTable(); }catch(_){}
+    return '';
+  }
+  document.getElementById('promoAddBtn')?.addEventListener('click',()=>{
+    const err=empPromoAdd(document.getElementById('promoEmp')?.value,Number(document.getElementById('promoTotal')?.value)||0,document.getElementById('promoDate')?.value||'',document.getElementById('promoNoteText')?.value||'');
+    if(err){ showToast(err); return; }
+    ['promoTotal','promoDate','promoNoteText'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    renderEmployeePromotions();
+  });
+  document.getElementById('promoBody')?.addEventListener('click',ev=>{
+    const b=ev.target.closest('[data-promo-del]'); if(!b) return;
+    if(!pdrCanFinance()){ showToast('حذف الترقية يحتاج صلاحية المالية'); return; }
+    const e=employees.find(x=>String(x.id)===String(b.dataset.promoDel)), from=b.dataset.promoFrom; if(!e) return;
+    if(!confirm(`حذف الراتب الجديد للحارس ${e.fullname||''} الذي يبدأ من ${fmtDMY(from)}؟ سيرجع الحساب للراتب السابق من هذا التاريخ.`)) return;
+    let h=empSalaryHist(e).filter(x=>String(x.from||'')!==from);
+    e.salaryHistory=h.length>=2?h:[]; if(h.length) promoApplyLatest(e,h);
+    payDropSnaps(e.id,String(from).slice(0,7));
+    persistCloud('تم حذف الترقية'); try{ renderReports(); }catch(_){} renderEmployeePromotions();
   });
   /* ===== export / import ===== */
   document.getElementById('exportBtn')?.addEventListener('click', ()=>{
