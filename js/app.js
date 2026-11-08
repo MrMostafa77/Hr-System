@@ -801,8 +801,14 @@
     const blob=new Blob(['\ufeff',html],{type:'application/vnd.ms-excel;charset=utf-8'});
     const url=URL.createObjectURL(blob),a=document.createElement('a'); a.href=url; a.download=exportFileBase()+'.xls'; document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url); showToast('تم تصدير التبويب بصيغة Excel');
   }
+  // وضع «ورقة واحدة كاملة» أثناء طباعة المباشرات والمستندات فقط (يعمل مع زر الطباعة وCtrl+P)
+  window.addEventListener('beforeprint',()=>{ document.body.classList.toggle('print-onepage',['documents','commencements'].includes(currentView)); });
+  window.addEventListener('afterprint',()=>{ document.body.classList.remove('print-onepage'); });
   function printCurrentForExport(){
     if(currentView==='contracts'){ downloadContractPdf(); return; }
+    // المباشرات والمستندات ورق رسمي A4 كامل (كليشة + علامة مائية): نطبعها بقواعد الطباعة الخاصة بها بدون هوامش إضافية
+    if(currentView==='commencements'){ printCurrentCommencement(); return; }
+    if(currentView==='documents'){ window.print(); return; }
     const id='exportPrintStyle'; document.getElementById(id)?.remove();
     const st=document.createElement('style'); st.id=id;
     // الأسماء والأرقام كاملة على سطر واحد: نقيس عرض أعرض جدول ثم نختار الاتجاه ونصغّر ليناسب الصفحة
