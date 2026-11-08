@@ -2705,6 +2705,26 @@
     const days = (rec && rec.days!=='' && rec.days!=null) ? (Number(rec.days)||0) : 1;
     return {amount:r2(days*dayRate), name:(rec&&rec.type)||'', item:null};
   }
+  /* ===== إجراءات الإضافة (ق تطبيق / ض إضافي): تُضاف للراتب ولا تُخصم =====
+     المبلغ = المبلغ اليدوي إن وُجد، وإلا عدد الأيام (الافتراضي 1) × أجر اليوم من راتب المشروع (× 1.5 للإضافي) */
+  const ACT_ADD_CODES=['ق','ض'];
+  function actAddFactor(code){ return code==='ض' ? OVERTIME_FACTOR : 1; }
+  function recordAddAmount(rec, code, dayRate){
+    if(rec && rec.manualAmount!=null && rec.manualAmount!=='') return r2(rec.manualAmount);
+    const hasD = rec && rec.days!=='' && rec.days!=null;
+    const days = hasD ? (Number(rec.days)||0) : 1;
+    return r2(days*dayRate*actAddFactor(code));
+  }
+  function attAdditionsFor(e, cols, dayRate){
+    const out={overtime:0,app:0}, isoSet=new Set(cols.map(c=>c.iso));
+    const recs=(penalties||[]).filter(p=>String(p.empId)===String(e.id) && isoSet.has(String(p.date||'').slice(0,10)) && ACT_ADD_CODES.includes(penRecCode(p)));
+    recs.forEach(rec=>{ const code=penRecCode(rec); out[code==='ض'?'overtime':'app']+=recordAddAmount(rec,code,dayRate); });
+    // أيام «ض» المسجلة في الحضور بدون إجراء مسجل: يوم إضافي افتراضي (أجر اليوم × 1.5)
+    const otRec=new Set(recs.filter(r=>penRecCode(r)==='ض').map(r=>String(r.date||'').slice(0,10)));
+    cols.forEach(c=>{ if(!otRec.has(c.iso) && attCodeAt(c.ym,e.id,c.d)==='ض') out.overtime+=dayRate*OVERTIME_FACTOR; });
+    out.overtime=r2(out.overtime); out.app=r2(out.app);
+    return out;
+  }
   function attDeductionsFor(e, cols, dayRate){
     const list=policyFor(e), out={absence:0,withdrawal:0,penalty:0,absenceCount:0,items:[]};
     const DED=['غ','س','ج'];
@@ -2782,7 +2802,7 @@
      الشهر المنتهي: تُحفظ نسخة منه (داخل payrollRecords[الشهر][الموظف].snap) ولا تتغير
      حتى لو تغيّر راتب الموظف أو لائحة المشروع، إلا إذا تغيّر حضور الموظف في ذلك الشهر
      أو إجراءاته أو تعديلات المسير (مكافأة/خصومات...) — وعندها يُعاد الحساب بنفس الراتب المثبّت. */
-  const PAY_SNAP_KEYS=['day','basic','housing','transport','otherAllow','monthlyGross','overtime','bonus','totalEarned','nonWorkDays','nonWorkDed','absenceDays','absence','penalty','withdrawal','gosi','uniform','newspaper','advance','other','deduction','net','insuranceBase','workDays'];
+  const PAY_SNAP_KEYS=['day','basic','housing','transport','otherAllow','monthlyGross','overtime','appAdd','bonus','totalEarned','nonWorkDays','nonWorkDed','absenceDays','absence','penalty','withdrawal','gosi','uniform','newspaper','advance','other','deduction','net','insuranceBase','workDays'];
   const PAY_SUM_ZERO={'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0,'إجازة':0,'مرضية':0};
   function payCanFreeze(){ return !(window.HRAuth&&typeof window.HRAuth.canFinance==='function') || !!window.HRAuth.canFinance(); }
   // الموظف يدخل مسير الشهر فقط إذا باشر في هذا الشهر أو قبله (أول حضور له لا يقع بعد نهاية الشهر)
@@ -2876,7 +2896,7 @@
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
     const basic=Number(e.basicsalary)||0,housing=Number(e.housing)||0,transport=Number(e.transport)||0,otherAllow=Number(e.otherallow)||0;
     const MD=payMonthDaysFor(cols), monthlyGross=basic+housing+transport+otherAllow, day=empDayRate(e,MD);
-    const overtime=r2((sum['ض']||0)*day*OVERTIME_FACTOR), bonus=Number(a.bonus)||0, totalEarned=r2(monthlyGross+overtime+bonus);
+    const addn=attAdditionsFor(e,cols,day), overtime=addn.overtime, appAdd=addn.app, bonus=Number(a.bonus)||0, totalEarned=r2(monthlyGross+overtime+appAdd+bonus);
     const notStarted=employeeNotStartedFor(e,cols);
     // فترة لم تنتهِ بعد (الشهر الجاري): يُستحق الراتب بعدد الأيام المنقضية فقط (من المباشرة حتى اليوم) ويزيد يوميًا تلقائيًا حتى اكتمال الشهر
     const periodOpen=cols.length>0 && cols[cols.length-1].iso>todayISO();
@@ -2895,7 +2915,7 @@
     const uniform=Number(a.uniform)||0,newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0,other=Number(a.other)||0;
     const deduction=r2(nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance+other);
     const stI=empStatusInfo(e,cols);
-    return {held:stI.held,statusText:stI.text,ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
+    return {held:stI.held,statusText:stI.text,ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,appAdd,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
   }
   function payrollStatementFor(e){
     const ym=document.getElementById('payrollMonth')?.value||payrollAvailableMonths()[0]||currentMonthStr();
@@ -3088,7 +3108,7 @@
       const a=p.adjustment||{};
       const detail=`<div class="employee-payroll-detail"><div class="employee-payroll-detail-grid">${[
         ['الأجر اليومي',fmt(p.day)],['الأساسي',fmt(p.basic)],['بدل السكن',fmt(p.housing)],['بدل المواصلات',fmt(p.transport)],
-        ['بدلات أخرى',fmt(p.otherAllow)],['إضافي',fmt(p.overtime)],['مكافآت',fmt(a.bonus)],['إجمالي المستحقات',fmt(p.totalEarned)],
+        ['بدلات أخرى',fmt(p.otherAllow)],['إضافي',fmt(p.overtime)],['تطبيق',fmt(p.appAdd)],['مكافآت',fmt(a.bonus)],['إجمالي المستحقات',fmt(p.totalEarned)],
         ['خصم عدم المباشرة',fmt(p.nonWorkDed)],['التأمينات',fmt(p.gosi)],['خصم الغياب',fmt(p.absence)],['الجزاءات',fmt(p.penalty)],
         ['الانسحاب',fmt(p.withdrawal)],['السلف',fmt(a.advance)],['خصومات أخرى',fmt((Number(a.uniform)||0)+(Number(a.newspaper)||0)+(Number(a.other)||0))],['إجمالي الخصومات',fmt(p.deduction)],
         ['صافي الراتب',fmt(p.net)]
@@ -3221,9 +3241,9 @@
           return `<tr><td>${escapeHtml(r.label)}</td><td class="mono">${fmt(r.cap)}</td><td class="mono">${fmt(r.emps.length)}${r.emps.length>r.cap&&r.k!=='other'?' <span class="pdr-pill pdr-up">زيادة</span>':(r.emps.length<r.cap?' <span class="pdr-pill pdr-down">نقص</span>':'')}</td><td class="mono">${r.hasCost?money(r.budget):'—'}</td><td class="mono">${money(earned)}</td><td>${r.hasCost?pdrDiffPill(earned-r.budget,'ريال'):'—'}</td><td class="mono">${money(net)}</td></tr>`;}).join('')||'<tr><td colspan="7" class="empty-note">لا توجد بيانات.</td></tr>'
       }<tr class="pj-bd-total"><td>الإجمالي</td><td class="mono">${fmt(t.cap)}</td><td class="mono">${fmt(t.headcount)}</td><td class="mono">${money(t.budget)}</td><td class="mono">${money(t.earned)}</td><td>${pdrDiffPill(t.earned-t.budget,'ريال')}</td><td class="mono">${money(t.net)}</td></tr></tbody></table></div>`;
       const rows=[]; roleKeys.forEach(k=>d.roles[k].emps.forEach(x=>rows.push({role:d.roles[k].label,...x})));
-      h+=`<div class="pj-bd-title" style="font-size:13px">تفصيل رواتب الأفراد</div><div class="table-wrap"><table class="payroll-table pj-bd pdr-table"><thead>${th('م','الاسم','الوظيفة','الراتب الشهري','أيام العمل','إضافي + مكافأة','إجمالي المستحق','الخصومات','الصافي')}</thead><tbody>${
+      h+=`<div class="pj-bd-title" style="font-size:13px">تفصيل رواتب الأفراد</div><div class="table-wrap"><table class="payroll-table pj-bd pdr-table"><thead>${th('م','الاسم','الوظيفة','الراتب الشهري','أيام العمل','إضافي + تطبيق + مكافأة','إجمالي المستحق','الخصومات','الصافي')}</thead><tbody>${
         rows.map((x,i)=>{const st=x.st; return st
-          ?`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td class="mono">${money(st.monthlyGross)}</td><td class="mono">${fmt(x.worked)}</td><td class="mono">${money(st.overtime+st.bonus)}</td><td class="mono">${money(st.totalEarned)}</td><td class="mono">${money(st.deduction)}</td><td class="mono"><b>${money(st.net)}</b></td></tr>`
+          ?`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td class="mono">${money(st.monthlyGross)}</td><td class="mono">${fmt(x.worked)}</td><td class="mono">${money(st.overtime+(st.appAdd||0)+st.bonus)}</td><td class="mono">${money(st.totalEarned)}</td><td class="mono">${money(st.deduction)}</td><td class="mono"><b>${money(st.net)}</b></td></tr>`
           :`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td colspan="6" class="empty-note">لا يدخل في رواتب هذا الشهر (لا يوجد عقد أو مباشرة، أو لم يباشر بعد)</td></tr>`;}).join('')||'<tr><td colspan="9" class="empty-note">لا يوجد موظفون على هذا المشروع.</td></tr>'
       }</tbody></table></div>`;
     }
@@ -3285,7 +3305,7 @@
       }
     }catch(err){ console.error(err); }
     const ym=document.getElementById('payrollMonth')?.value,body=document.getElementById('reportTableBody'); if(!body)return;
-    if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="25" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
+    if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="26" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(), pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
     const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
     document.getElementById('payrollCount').textContent=`${list.length} موظف`;
@@ -3295,7 +3315,7 @@
       return `<tr data-pay-row="${escapeAttr(e.id)}"${p.held?' class="pay-held"':''}>
       <td class="mono g1 st1">${i+1}</td><td class="g1 st2"><label class="pay-sel"><input type="checkbox" data-pay-sel="${escapeAttr(e.id)}" ${paySelected.has(String(e.id))?'checked':''}></label><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td class="g1">${escapeHtml(e.project||e.region||'—')}</td><td class="g1">${escapeHtml(e.jobtitle||'—')}</td>
       <td class="mono g2">${fmt(p.day)}</td><td class="mono g2">${fmt(p.basic)}</td><td class="mono g2">${fmt(p.housing)}</td><td class="mono g2">${fmt(p.transport)}</td><td class="mono g2">${fmt(p.otherAllow)}</td><td class="mono g2 tot">${fmt(p.monthlyGross)}</td>
-      <td class="mono g2">${fmt(p.overtime)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
+      <td class="mono g2">${fmt(p.overtime)}</td><td class="mono g2">${fmt(p.appAdd)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
       <td class="mono g3" ${red(p.nonWorkDed)}>${fmt(p.nonWorkDed)}${p.nonWorkDays?`<small class="pay-red-note">${p.nonWorkDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.gosi)}</td>
       <td class="mono g3" ${red(p.absence)}>${fmt(p.absence)}${p.absenceDays?`<small class="pay-red-note">${p.absenceDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.penalty)}</td><td class="mono g3">${fmt(p.withdrawal)}</td>
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="uniform" data-emp="${escapeAttr(e.id)}" value="${Number(a.uniform)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
@@ -3305,7 +3325,7 @@
       <td class="mono g3 tot" ${red(p.deduction)}>${fmt(p.deduction)}</td><td class="mono g4 tot" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
       <td class="g5">${payrollRecords[p.ym]?.[e.id]?.bank?'<small class="pay-status-note posted">✓ مرحّل للبنك</small>':''}${p.statusText?`<small class="pay-status-note${p.held?' held':''}">${escapeHtml(p.statusText)}</small>`:''}<select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
       </tr>`;
-    }).join('')||'<tr><td colspan="25" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
+    }).join('')||'<tr><td colspan="26" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
     body.querySelectorAll('[data-pay-sel]').forEach(cb=>cb.addEventListener('change',()=>{ cb.checked?paySelected.add(cb.dataset.paySel):paySelected.delete(cb.dataset.paySel); paySelRefresh(); }));
     paySelRefresh();
@@ -3973,7 +3993,7 @@
   const PP_COLS=[
     {h:'م',k:r=>r.i,t:'i'},{h:'الاسم',k:r=>r.name,t:'s',w:25},{h:'المشروع',k:r=>r.location,t:'s',w:24},{h:'الوظيفة',k:r=>r.job,t:'s',w:16},
     {h:'اليوم',k:r=>r.p.day,t:'n'},{h:'الأساسي',k:r=>r.p.basic,t:'n',sum:1},{h:'بدل السكن',k:r=>r.p.housing,t:'n',sum:1},{h:'بدل المواصلات',k:r=>r.p.transport,t:'n',sum:1},{h:'بدلات أخرى',k:r=>r.p.otherAllow,t:'n',sum:1},
-    {h:'الأجر الأخير',k:r=>r.p.monthlyGross,t:'n',sum:1,b:1,tot:1},{h:'إضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'مكافآت',k:r=>r.p.bonus,t:'n',sum:1},{h:'إجمالي الراتب',k:r=>r.p.totalEarned,t:'n',sum:1,b:1,tot:1},
+    {h:'الأجر الأخير',k:r=>r.p.monthlyGross,t:'n',sum:1,b:1,tot:1},{h:'إضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'تطبيق',k:r=>r.p.appAdd,t:'n',sum:1},{h:'مكافآت',k:r=>r.p.bonus,t:'n',sum:1},{h:'إجمالي الراتب',k:r=>r.p.totalEarned,t:'n',sum:1,b:1,tot:1},
     {h:'خصم عدم دوام',k:r=>r.p.nonWorkDed,t:'n',sum:1},{h:'تأمينات اجتماعية',k:r=>r.p.gosi,t:'n',sum:1},{h:'غيابات',k:r=>r.p.absence,t:'n',sum:1},{h:'جزاءات',k:r=>r.p.penalty,t:'n',sum:1},{h:'انسحاب',k:r=>r.p.withdrawal,t:'n',sum:1},
     {h:'البدلة',k:r=>r.p.uniform,t:'n',sum:1},{h:'الصحيفة',k:r=>r.p.newspaper,t:'n',sum:1},{h:'سلف',k:r=>r.p.advance,t:'n',sum:1},{h:'أخرى',k:r=>r.p.other,t:'n',sum:1},{h:'إجمالي الخصومات',k:r=>r.p.deduction,t:'n',sum:1,b:1,tot:1},{h:'صافي الراتب',k:r=>r.p.net,t:'n',sum:1,b:1,net:1,tot:1},
     {h:'إجراء داخلي',k:r=>[r.p.statusText,r.p.adjustment?.internalAction].filter(Boolean).join(' — '),t:'s',w:22}
@@ -4278,6 +4298,9 @@
     if(d){ const on=actState.daysManual||isOther; d.classList.toggle('on',on); d.textContent=on&&!isOther?'−':'+'; d.disabled=isOther; d.title=on?'العودة لعدد الأيام من اللائحة':'تحديد عدد الأيام يدويًا'; }
     if(m){ m.classList.toggle('on',actState.amountManual); m.textContent=actState.amountManual?'−':'+'; m.title=actState.amountManual?'العودة للحساب من اللائحة':'تحديد المبلغ يدويًا'; }
     const other=$a('p_typeOtherWrap'); if(other) other.style.display=isOther?'':'none';
+    { const c=$a('p_code')?.value||'', isAdd=ACT_ADD_CODES.includes(c), dl=$a('p_daysLbl'), ml=$a('p_amountLbl');
+      if(dl) dl.textContent=isAdd?'عدد الأيام':'عدد أيام الخصم';
+      if(ml) ml.textContent=isAdd?(c==='ض'?'قيمة الإضافي (ريال) — تُضاف للراتب':'قيمة التطبيق (ريال) — تُضاف للراتب'):'قيمة الخصم (ريال)'; }
   }
   function actFormRec(){
     const isOther=($a('p_type')?.value||'')===ACT_OTHER;
@@ -4289,6 +4312,12 @@
   function actionCalc(emp, rec){
     const code=rec.code||'ج', isDed=['غ','س','ج'].includes(code);
     const day=empDayRateOn(emp,rec.date);
+    if(ACT_ADD_CODES.includes(code)){
+      const man=rec.manualAmount!=null && rec.manualAmount!=='', hasD0=rec.days!=='' && rec.days!=null, d0=hasD0?(Number(rec.days)||0):1;
+      const amt0=man ? (Number(rec.manualAmount)||0) : d0*day*actAddFactor(code);
+      return {days:d0, amount:r2(amt0), item:null, isDed:false, isAdd:true,
+        source: man ? 'مبلغ محدد يدويًا (يُضاف للراتب)' : (code==='ض' ? `إضافي: ${d0} يوم × أجر اليوم × ${OVERTIME_FACTOR} من راتب المشروع (يُضاف للراتب)` : `تطبيق: ${d0} يوم × أجر اليوم من راتب المشروع (يُضاف للراتب)`)};
+    }
     const item=policyItemByName(policyForProjectName(rec.project||emp?.project), rec.type);
     let days, amount, source;
     const hasD=rec.days!=='' && rec.days!=null;
@@ -4304,18 +4333,20 @@
     const name=actTypeName();
     const item=name?policyItemByName(policyForProjectName(proj),name):null;
     const dEdit=actState.daysManual||isOther;
+    const codeNow=$a('p_code')?.value||'ج', isAdd=ACT_ADD_CODES.includes(codeNow);
     daysEl.readOnly=!dEdit;
-    if(!dEdit) daysEl.value=item?(item.fixed?'':String(policyEffDays(item))):'';
+    if(!dEdit) daysEl.value=isAdd?'1':(item?(item.fixed?'':String(policyEffDays(item))):'');
     amtEl.readOnly=!actState.amountManual;
     if(!actState.amountManual){
       const code=$a('p_code')?.value||'ج', isDed=['غ','س','ج'].includes(code);
       const day=empDayRateOn(emp,$a('p_date')?.value);
       let amt=0; if(item && !dEdit) amt=policyAmount(item,day); else amt=(Number(daysEl.value)||0)*day;
-      amtEl.value=(isDed && emp && (item||dEdit)) ? String(Math.round(amt*100)/100) : '';
+      if(isAdd){ amt=(daysEl.value===''?1:(Number(daysEl.value)||0))*day*actAddFactor(code); amtEl.value=emp?String(Math.round(amt*100)/100):''; }
+      else amtEl.value=(isDed && emp && (item||dEdit)) ? String(Math.round(amt*100)/100) : '';
     }
     const note=$a('p_calcNote');
     if(note){
-      note.textContent = !proj ? '' : (actState.amountManual ? 'المبلغ محدد يدويًا' : (dEdit ? 'عدد الأيام محدد يدويًا — المبلغ = الأيام × أجر اليوم' : (item ? 'محسوب من لائحة مشروع '+proj : 'اختر الإجراء لتحديد أيام الخصم')))+(emp?` — أجر اليوم ${r2(empDayRateOn(emp,$a('p_date')?.value))} ريال (الراتب الإجمالي ÷ ${daysInMonth(String($a('p_date')?.value||currentMonthStr()).slice(0,7))} يوم)`:'');
+      note.textContent = !proj ? '' : (actState.amountManual ? 'المبلغ محدد يدويًا' : (isAdd ? (codeNow==='ض' ? `إضافي: المبلغ = الأيام × أجر اليوم × ${OVERTIME_FACTOR} من راتب المشروع — يُضاف للراتب` : 'تطبيق: المبلغ = الأيام × أجر اليوم من راتب المشروع — يُضاف للراتب') : dEdit ? 'عدد الأيام محدد يدويًا — المبلغ = الأيام × أجر اليوم' : (item ? 'محسوب من لائحة مشروع '+proj : 'اختر الإجراء لتحديد أيام الخصم')))+(emp?` — أجر اليوم ${r2(empDayRateOn(emp,$a('p_date')?.value))} ريال (الراتب الإجمالي ÷ ${daysInMonth(String($a('p_date')?.value||currentMonthStr()).slice(0,7))} يوم)`:'');
     }
     actSyncButtons(); actRenderPolicyPanel();
   }
@@ -4334,7 +4365,10 @@
   $a('p_project')?.addEventListener('change', actOnProject);
   $a('p_emp')?.addEventListener('change', ()=>{ actSyncEmpSearch(); actUpdateCalc(); });
   $a('p_type')?.addEventListener('change', actOnType);
-  $a('p_code')?.addEventListener('change', actUpdateCalc);
+  $a('p_code')?.addEventListener('change', ()=>{
+    if(ACT_ADD_CODES.includes($a('p_code').value)){ if($a('p_type')) $a('p_type').value=''; if($a('p_typeOther')) $a('p_typeOther').value=''; actState.daysManual=false; }
+    actUpdateCalc();
+  });
   $a('p_days')?.addEventListener('input', actUpdateCalc);
   $a('p_daysPlus')?.addEventListener('click', ()=>{ actState.daysManual=!actState.daysManual; actUpdateCalc(); if(actState.daysManual) $a('p_days').focus(); });
   $a('p_amountPlus')?.addEventListener('click', ()=>{ actState.amountManual=!actState.amountManual; if(!actState.amountManual) $a('p_amount').value=''; actUpdateCalc(); if(actState.amountManual) $a('p_amount').focus(); });
@@ -4350,12 +4384,12 @@
     const proj=rec.project||emp.project||'';
     const codeTxt=penCodeText(rec.code?rec:{...rec,code:'ج'});
     const daysTxt = calc.item && !rec.manualDays && !(rec.manualAmount!=null&&rec.manualAmount!=='') ? policyDaysText(calc.item) : (calc.days===''||calc.days==null ? '—' : String(calc.days)+' يوم');
-    const amtTxt = calc.isDed ? ppNf(calc.amount)+' ريال' : '—';
+    const amtTxt = (calc.isDed||calc.isAdd) ? ppNf(calc.amount)+' ريال' : '—';
     const cells=[
       ['اسم الحارس',emp.fullname||'—'],['الرقم الوظيفي',emp.empcode||'—'],
       ['الوظيفة',emp.jobtitle||'—'],['رقم الهوية',emp.idnum||'—'],
       ['المنطقة',emp.region||'—'],['تاريخ الإجراء',rec.date?fmtDMY(rec.date):'—'],
-      ['نوع الإجراء',codeTxt],['أيام الخصم',daysTxt],
+      ['نوع الإجراء',codeTxt],[calc.isAdd?'عدد الأيام':'أيام الخصم',daysTxt],
     ];
     const m={title:'نموذج إجراء موظف', page:'A4 portrait', paperW:794, css:ACT_SHEET_CSS, cls:'ac-paper',
       fileBase:`اجراء_${emp.fullname||'حارس'}_${rec.date||todayISO()}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_')};
@@ -4364,8 +4398,8 @@
       <div class="ac-band">المشروع: ${escapeHtml(proj||'—')}</div>
       <div class="ac-grid">${cells.map(([k,v])=>`<div class="ac-cell"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join('')}
         <div class="ac-cell full"><span>المخالفة / سبب الإجراء</span><b>${escapeHtml(rec.type||'—')}</b></div>
-        <div class="ac-cell full big"><span>قيمة الخصم</span><b>${escapeHtml(amtTxt)}</b></div>
-        <div class="ac-cell full"><span>أساس الحساب</span><b>${escapeHtml(calc.isDed?calc.source:'إجراء لا يترتب عليه خصم')}</b></div>
+        <div class="ac-cell full big"><span>${calc.isAdd?'قيمة الإضافة (تُضاف للراتب)':'قيمة الخصم'}</span><b>${escapeHtml(amtTxt)}</b></div>
+        <div class="ac-cell full"><span>أساس الحساب</span><b>${escapeHtml((calc.isDed||calc.isAdd)?calc.source:'إجراء لا يترتب عليه خصم')}</b></div>
         <div class="ac-cell full notes"><span>ملاحظات</span><b>${escapeHtml(rec.notes||'')}</b></div></div>
       <div class="ac-sign"><div>الحارس<i></i></div><div>مدير المشروع<i></i></div><div>الموارد البشرية<i></i></div></div>`;
     return m;
@@ -4404,7 +4438,7 @@
     const code=(rec.code&&ATT_CODES.includes(rec.code))?rec.code:(/انسحاب/.test(String(rec.type||''))?'س':'ج');
     const typeName=ATT_CODE_LABELS[code]||code;
     const daysTxt = calc.item && !rec.manualDays && !(rec.manualAmount!=null&&rec.manualAmount!=='') ? policyDaysText(calc.item) : (calc.days===''||calc.days==null ? '—' : String(calc.days)+' يوم');
-    const amtTxt = calc.isDed ? ppNf(calc.amount)+' ريال' : '—';
+    const amtTxt = (calc.isDed||calc.isAdd) ? ppNf(calc.amount)+' ريال' : '—';
     const d=String(rec.date||'').slice(0,10), dateTxt=d?`${covWeekday(d)} ${fmtDMY(d)}`:'';
     const day=empDayRateOn(emp,rec.date);
     const t1=`<table class="doc-mini-table"><tbody>
@@ -4415,10 +4449,10 @@
       <tr><th>رقم الهوية / الإقامة</th><td>${blank(emp.idnum)}</td><th>الجنسية</th><td>${blank(emp.nationality)}</td></tr>
       <tr><th>المسمى الوظيفي</th><td>${blank(emp.jobtitle)}</td><th>الأجر اليومي (ريال)</th><td>${day?escapeHtml(ppNf(day)):blank('')}</td></tr></tbody></table>`;
     const t3=`<table class="doc-mini-table"><tbody>
-      <tr><th>نوع الإجراء</th><td>${blank(typeName)}</td><th>أيام الخصم</th><td>${blank(daysTxt==='—'?'':daysTxt)}</td></tr>
+      <tr><th>نوع الإجراء</th><td>${blank(typeName)}</td><th>${calc.isAdd?'عدد الأيام':'أيام الخصم'}</th><td>${blank(daysTxt==='—'?'':daysTxt)}</td></tr>
       <tr><th>المخالفة / سبب الإجراء</th><td colspan="3">${blank(rec.type)}</td></tr>
-      <tr><th>أساس الحساب</th><td colspan="3">${escapeHtml(calc.isDed?calc.source:'إجراء لا يترتب عليه خصم')}</td></tr>
-      <tr><th>قيمة الخصم</th><td colspan="3"><b>${escapeHtml(amtTxt)}</b></td></tr></tbody></table>`;
+      <tr><th>أساس الحساب</th><td colspan="3">${escapeHtml((calc.isDed||calc.isAdd)?calc.source:'إجراء لا يترتب عليه خصم')}</td></tr>
+      <tr><th>${calc.isAdd?'قيمة الإضافة (تُضاف للراتب)':'قيمة الخصم'}</th><td colspan="3"><b>${escapeHtml(amtTxt)}</b></td></tr></tbody></table>`;
     const box=(title,name)=>`<div class="cov-sign"><b>${title}</b><span>الاسم: ${name?`<u>${escapeHtml(name)}</u>`:'..............................'}</span><span>التوقيع: ..............................</span><span>التاريخ: ..............................</span></div>`;
     const sign=`<div class="cov-sign-row">${box('الحارس',emp.fullname)}${box('مدير المشروع','')}${box('الموارد البشرية','')}</div>`;
     const body=`<p>تقرر اتخاذ الإجراء الموضحة بياناته أدناه بحق الحارس${emp.fullname?` <b>${escapeHtml(emp.fullname)}</b>`:''}${proj?` في مشروع / موقع <b>${escapeHtml(proj)}</b>`:''}${dateTxt?` بتاريخ <b>${escapeHtml(dateTxt)}</b>`:''}، وفق البيانات التالية:</p>
@@ -4601,6 +4635,7 @@
       const pcode = penRecCode(p);
       const recInfo = emp ? recordPolicyAmount(emp, p, pcode, empDayRateOn(emp,p.date), policyForProjectName(p.project||emp.project)) : {amount:0,item:null};
       const penAmount = (emp && ['غ','س','ج'].includes(pcode)) ? recInfo.amount : 0;
+      const addAmt = (emp && ACT_ADD_CODES.includes(pcode)) ? recordAddAmount(p, pcode, empDayRateOn(emp,p.date)) : 0;
       const manual = (p.manualAmount!=null && p.manualAmount!=='') || p.manualDays;
       const daysText = (!manual && recInfo.item) ? policyDaysText(recInfo.item) : (p.days??'');
       return `<tr data-emp="${escapeAttr(p.empId)}">
@@ -4610,7 +4645,7 @@
         <td><b>${escapeHtml(penCodeText(p))}</b></td>
         <td>${escapeHtml(p.type||'')}</td>
         <td class="mono">${escapeHtml(String(daysText))}${manual?' <small>(يدوي)</small>':''}</td>
-        <td class="mono">${penAmount?escapeHtml(fmt(penAmount)):'—'}</td>
+        <td class="mono">${penAmount?escapeHtml(fmt(penAmount)):(addAmt?`<span style="color:#067647;font-weight:700">+ ${escapeHtml(fmt(addAmt))}</span>`:'—')}</td>
         <td>${escapeHtml(p.notes||'')}</td>
         <td style="white-space:nowrap"><button class="btn btn-sm btn-ghost" data-show="${p.id}" title="عرض الإجراء">عرض</button> <button class="btn icon-btn btn-ghost btn-danger" data-del="${p.id}" title="حذف">✕</button></td>
       </tr>`;
@@ -4636,6 +4671,7 @@
     if(!emp){ showToast('اختر الموظف'); return; }
     const rec=actFormRec();
     if(!rec.type) rec.type=ATT_CODE_LABELS[rec.code]||'';
+    if(ACT_ADD_CODES.includes(rec.code) && rec.manualAmount==null && !(Number(rec.days)>0)){ showToast('حدد عدد الأيام أو المبلغ'); return; }
     if(['غ','س','ج'].includes(rec.code) && rec.manualAmount==null && !(Number(rec.days)>0) && !(policyItemByName(policyForProjectName(rec.project),rec.type)?.fixed && !rec.manualDays)){
       showToast('حدد عدد أيام الخصم أو المبلغ'); return;
     }
@@ -4647,7 +4683,7 @@
     savePenalties();
     actResetForm();
     renderPenalties();
-    showToast('تم تسجيل الجزاء');
+    showToast(ACT_ADD_CODES.includes(rec.code)?'تم تسجيل الإجراء — المبلغ سيُضاف للراتب':'تم تسجيل الجزاء');
   });
   function renderAttendanceAndPenalties(){ renderAttendance(); renderPenalties(); }
 
