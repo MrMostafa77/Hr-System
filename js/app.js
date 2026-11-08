@@ -3307,8 +3307,8 @@
     const ym=document.getElementById('payrollMonth')?.value,body=document.getElementById('reportTableBody'); if(!body)return;
     if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="26" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(), pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
-    const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
-    document.getElementById('payrollCount').textContent=`${list.length} موظف`;
+    const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf)&&payPostOk(e,ym));
+    { const np=list.filter(e=>payIsPosted(ym,e.id)).length; document.getElementById('payrollCount').textContent=`${list.length} موظف — مرحّل ${np} | غير مرحّل ${list.length-np}`; }
     body.innerHTML=list.map((e,i)=>{
       const p=payrollStatementForCols(e,monthCols(ym)),a=p.adjustment||{},action=a.internalAction||'';
       const red=v=>Number(v)>0?' style="color:#b42318;font-weight:700"':'';
@@ -3323,7 +3323,7 @@
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="advance" data-emp="${escapeAttr(e.id)}" value="${Number(a.advance)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="other" data-emp="${escapeAttr(e.id)}" value="${Number(a.other)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="mono g3 tot" ${red(p.deduction)}>${fmt(p.deduction)}</td><td class="mono g4 tot" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
-      <td class="g5">${payrollRecords[p.ym]?.[e.id]?.bank?'<small class="pay-status-note posted">✓ مرحّل للبنك</small>':''}${p.statusText?`<small class="pay-status-note${p.held?' held':''}">${escapeHtml(p.statusText)}</small>`:''}<select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
+      <td class="g5">${payrollRecords[p.ym]?.[e.id]?.bank?'<small class="pay-status-note posted">✓ مرحّل للبنك</small>':'<small class="pay-status-note unposted">○ غير مرحّل</small>'}${p.statusText?`<small class="pay-status-note${p.held?' held':''}">${escapeHtml(p.statusText)}</small>`:''}<select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
       </tr>`;
     }).join('')||'<tr><td colspan="26" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
@@ -3331,11 +3331,11 @@
     paySelRefresh();
   }
   const payrollMonth=document.getElementById('payrollMonth'); if(payrollMonth)payrollMonth.addEventListener('change',renderReports);
-  ['payrollSearch','payrollProjectFilter','payrollRegionFilter'].forEach(id=>{document.getElementById(id)?.addEventListener('input',renderReports);document.getElementById(id)?.addEventListener('change',renderReports);});
+  ['payrollSearch','payrollProjectFilter','payrollRegionFilter','payrollPostFilter'].forEach(id=>{document.getElementById(id)?.addEventListener('input',renderReports);document.getElementById(id)?.addEventListener('change',renderReports);});
   document.getElementById('payrollPreviewAllBtn')?.addEventListener('click',()=>{
     const ym=document.getElementById('payrollMonth')?.value;if(!ym){showToast('لا يوجد شهر حضور وانصراف متاح');return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(),pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
-    const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf)&&payPostOk(e,ym));
     openPayrollPreview({list,cols:monthCols(ym),single:false});
   });
   document.getElementById('payrollRecalcBtn')?.addEventListener('click',()=>{
@@ -3348,16 +3348,33 @@
     const ym=document.getElementById('payrollMonth')?.value;
     if(!ym){showToast('لا يوجد شهر حضور وانصراف متاح');return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(),pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
-    const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf)&&payPostOk(e,ym));
     if(!list.length){showToast('لا يوجد موظفون مطابقون للطباعة');return;}
     const model=buildPayrollModel(list,monthCols(ym),false);
     ppPrint(model);
   });
 
+  /* ===== حالة الترحيل: فلتر + إلغاء ترحيل الكل / موظفين معينين ===== */
+  function payIsPosted(ym,id){ const r=payrollRecords&&payrollRecords[ym]&&payrollRecords[ym][id]; return !!(r&&r.bank); }
+  function payPostOk(e,ym){
+    const f=document.getElementById('payrollPostFilter')?.value||''; if(!f) return true;
+    const posted=payIsPosted(ym,e.id); return f==='posted'?posted:!posted;
+  }
+  function payrollUnpost(list,ym,label){
+    if(!pdrCanFinance()){ showToast('إلغاء الترحيل يحتاج صلاحية المالية'); return; }
+    const targets=list.filter(e=>payIsPosted(ym,e.id));
+    if(!targets.length){ showToast('لا يوجد موظفون مرحّلون ضمن الاختيار الحالي'); return; }
+    if(!confirm(`إلغاء ترحيل ${targets.length} موظف ${label||''} من كشف البنك لشهر ${monthLabel(ym)}؟\nسيرجعون لقائمة «غير المرحّلين» ويختفون من صفحة كشف البنك.`)) return;
+    targets.forEach(e=>{ const rec=payrollRecords[ym][e.id]; if(rec) delete rec.bank; });
+    persistCloud(`تم إلغاء ترحيل ${targets.length} موظف`);
+    showToast(`تم إلغاء ترحيل ${targets.length} موظف`);
+    try{ renderReports(); }catch(_){}
+    try{ renderBankReport(); }catch(_){}
+  }
   /* ===== ترحيل الرواتب على كشف البنك (Excel) ===== */
   function payrollFilteredList(ym){
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(),pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
-    return payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf));
+    return payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf)&&payPostOk(e,ym));
   }
   function paySelRefresh(){
     const tbl=document.querySelector('.payroll-statement-table'); if(tbl) tbl.classList.toggle('pay-select-mode',paySelMode);
@@ -3534,6 +3551,17 @@
     payrollBankExport(list,ym,{skipHeld:true});
   });
   document.getElementById('payrollBankSelBtn')?.addEventListener('click',()=>{ paySelMode=!paySelMode; if(!paySelMode) paySelected.clear(); document.querySelectorAll('#reportTableBody [data-pay-sel]').forEach(b=>{ b.checked=paySelected.has(b.dataset.paySel); }); paySelRefresh(); });
+  document.getElementById('payrollUnpostAllBtn')?.addEventListener('click',()=>{
+    const ym=document.getElementById('payrollMonth')?.value; if(!ym){ showToast('لا يوجد شهر مسير متاح'); return; }
+    payrollUnpost(payrollFilteredList(ym),ym,'(كل المعروضين)');
+  });
+  document.getElementById('payrollUnpostSelBtn')?.addEventListener('click',()=>{ document.getElementById('payrollBankSelBtn')?.click(); });
+  document.getElementById('paySelUnpostBtn')?.addEventListener('click',()=>{
+    const ym=document.getElementById('payrollMonth')?.value; if(!ym){ showToast('لا يوجد شهر مسير متاح'); return; }
+    const list=payrollFilteredList(ym).filter(e=>paySelected.has(String(e.id)));
+    if(!list.length){ showToast('حدّد موظفًا واحدًا على الأقل من الخانات بجانب الأسماء'); return; }
+    payrollUnpost(list,ym,'محددين');
+  });
   document.getElementById('paySelCancelBtn')?.addEventListener('click',()=>{ paySelMode=false; paySelected.clear(); document.querySelectorAll('#reportTableBody [data-pay-sel]').forEach(b=>{ b.checked=false; }); paySelRefresh(); });
   document.getElementById('paySelAll')?.addEventListener('change',ev=>{ document.querySelectorAll('#reportTableBody [data-pay-sel]').forEach(b=>{ b.checked=ev.target.checked; ev.target.checked?paySelected.add(b.dataset.paySel):paySelected.delete(b.dataset.paySel); }); paySelRefresh(); });
   document.getElementById('paySelExportBtn')?.addEventListener('click',()=>{
