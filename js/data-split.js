@@ -131,6 +131,26 @@
   // هل هذه الوثيقة بالنسق القديم (كل شيء داخل main)؟
   const isLegacy = general => !!general && general.schema !== 2;
 
-  root.HRSplit = { split, merge, isLegacy, EMP_FIN, COV_FIN, CONTRACT_FIN, PROJ_GENERAL };
+  // ---------- نصوص العقود (customHtml) في مستندات مستقلة ----------
+  // نص كل عقد ~15-19KB، ومع كثرة العقود كان يملأ الوثيقة المالية (حد 1MB). لذلك يُفصل هنا:
+  // الوثيقة المالية تبقى بدون customHtml، وكل نص يُحفظ في hr_finance/ctr_<id> (انظر firebase-init.js).
+  function extractContractHtml(finance){
+    const html = {}, slimContracts = {};
+    const src = (finance && finance.contracts && typeof finance.contracts === 'object') ? finance.contracts : {};
+    Object.keys(src).forEach(id => {
+      const { customHtml, ...rest } = src[id] || {};
+      if(typeof customHtml === 'string' && customHtml) html[id] = customHtml;
+      if(Object.keys(rest).length) slimContracts[id] = rest;
+    });
+    return { slim: { ...(finance || {}), contracts: slimContracts }, html };
+  }
+  // إعادة النصوص داخل بيانات المالية (للعرض داخل التطبيق كما كانت). ما لا نص له في htmlMap يبقى كما هو.
+  function withContractHtml(finance, htmlMap){
+    const contracts = { ...((finance && finance.contracts) || {}) };
+    Object.keys(htmlMap || {}).forEach(id => { contracts[id] = { ...(contracts[id] || {}), customHtml: htmlMap[id] }; });
+    return { ...(finance || {}), contracts };
+  }
+
+  root.HRSplit = { split, merge, isLegacy, extractContractHtml, withContractHtml, EMP_FIN, COV_FIN, CONTRACT_FIN, PROJ_GENERAL };
   if(typeof module !== 'undefined' && module.exports) module.exports = root.HRSplit;
 })(typeof window !== 'undefined' ? window : globalThis);

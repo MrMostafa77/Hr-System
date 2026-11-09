@@ -2,7 +2,7 @@
 // المستخدمون يُنشؤون في Firebase Authentication، وصلاحياتهم تُحفظ في hr_users/{uid}.
 import { initializeApp, deleteApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { collection, getDocs, getDoc, doc, setDoc, updateDoc, deleteDoc, query, where, documentId } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let users = [];
@@ -237,6 +237,8 @@ async function onTableClick(ev){
 const DOC_LIMIT = 1048576; // الحد الأقصى لمستند Firestore الواحد (1 MiB)
 const fmtKB = n => Math.round(n / 1024).toLocaleString('en-US') + ' KB';
 const bytesOf = o => new Blob([JSON.stringify(o ?? null)]).size;
+// نصوص العقود: كل عقد في مستند مستقل hr_finance/ctr_<id>
+const ctrQ = fs => query(collection(fs, 'hr_finance'), where(documentId(), '>=', 'ctr_'), where(documentId(), '<=', 'ctr_\uf8ff'));
 
 function bkMsg(text, kind){
   const el = document.getElementById('bk_msg');
@@ -274,6 +276,8 @@ async function readAllForBackup(includeFiles){
   out.docs.general = g.exists() ? g.data() : null;
   const f = await getDoc(doc(fs, 'hr_finance', 'main'));
   out.docs.finance = f.exists() ? f.data() : null;
+  const c = await getDocs(ctrQ(fs));
+  out.docs.contractHtml = c.docs.map(d => ({ id: d.id, data: d.data() }));   // نصوص العقود
   const u = await getDocs(collection(fs, 'hr_users'));
   out.docs.users = u.docs.map(d => ({ id: d.id, data: d.data() }));
   if(includeFiles){
@@ -331,7 +335,16 @@ async function onRestoreFile(ev){
 
     bkMsg('جاري الاسترجاع...');
     const fs = window.FB.firestore;
-    if(f) await setDoc(doc(fs, 'hr_finance', 'main'), f);
+    if(f){
+      // نصوص العقود تُكتب في مستنداتها المستقلة أولاً (من النسخة الجديدة contractHtml أو من النسخ القديمة داخل المالي)، ثم المالي مختصراً
+      const { slim, html } = window.HRSplit.extractContractHtml(f);
+      const texts = { ...html };
+      (b.docs.contractHtml || []).forEach(it => { if(it && it.data && typeof it.data.html === 'string') texts[String(it.id).replace(/^ctr_/, '')] = it.data.html; });
+      for(const id of Object.keys(texts)){
+        await setDoc(doc(fs, 'hr_finance', 'ctr_' + id), { html: texts[id], updatedAt: new Date().toISOString() });
+      }
+      await setDoc(doc(fs, 'hr_finance', 'main'), slim);
+    }
     await setDoc(doc(fs, 'hr_system', 'main'), g);
     for(const item of (b.docs.employeeFiles || [])){
       await setDoc(doc(fs, 'hr_system', 'main', 'employee_files', item.id), item.data);
@@ -349,14 +362,16 @@ async function renderMeter(){
   if(!el) return;
   try{
     const fs = window.FB.firestore;
-    const [g, f, e] = await Promise.all([
+    const [g, f, e, c] = await Promise.all([
       getDoc(doc(fs, 'hr_system', 'main')),
       getDoc(doc(fs, 'hr_finance', 'main')),
-      getDocs(collection(fs, 'hr_system', 'main', 'employee_files'))
+      getDocs(collection(fs, 'hr_system', 'main', 'employee_files')),
+      getDocs(ctrQ(fs))
     ]);
     const gs = g.exists() ? bytesOf(g.data()) : 0;
     const fsz = f.exists() ? bytesOf(f.data()) : 0;
     let filesTotal = 0; e.docs.forEach(d => { filesTotal += bytesOf(d.data()); });
+    let ctrTotal = 0; c.docs.forEach(d => { ctrTotal += bytesOf(d.data()); });
     const line = (label, n) => {
       const pct = n / DOC_LIMIT * 100;
       const color = pct >= 90 ? '#e25555' : (pct >= 70 ? '#d9822b' : '#2e9e5b');
@@ -365,6 +380,7 @@ async function renderMeter(){
     const worst = Math.max(gs, fsz) / DOC_LIMIT;
     el.innerHTML = `<b>حجم البيانات (تقريبي):</b>` + line('البيانات العامة', gs) + line('البيانات المالية', fsz)
       + `<div>ملفات الموظفين: ${e.size} ملف (${fmtKB(filesTotal)})</div>`
+      + `<div>نصوص العقود: ${c.size} عقد (${fmtKB(ctrTotal)}) — كل عقد في مستند مستقل</div>`
       + (worst >= 0.7 ? `<div style="color:#d9822b;margin-top:6px"><b>تنبيه:</b> أحد المستندين اقترب من الحد الأقصى في Firestore (1 MB). عند تجاوزه يفشل الحفظ في السحابة. خذ نسخة احتياطية الآن وتواصل مع المطوّر لتقسيم البيانات.</div>` : '');
   }catch(err){
     console.error(err);

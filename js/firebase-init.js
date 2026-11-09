@@ -2,7 +2,7 @@
 // No npm/build step is required; this project is static and GitHub/Firebase Hosting ready.
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, writeBatch, runTransaction } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, deleteDoc, onSnapshot, writeBatch, runTransaction, collection, getDocs, query, where, documentId } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { firebaseConfig, APP_CHECK_SITE_KEY } from './firebase-config.js';
 import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-storage.js';
 
@@ -30,7 +30,22 @@ const stable = v => Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
 const stamp = o => ({ ...o, updatedAt: new Date().toISOString() });
 const stripStamp = o => { const { updatedAt, ...rest } = o || {}; return rest; };
 const emptyFinance = () => ({ schema: 2, employees: {}, projects: {}, coverage: {}, contracts: {}, payrollRecords: {}, projectAccounts: [], invoices: [] });
-const sig = { general: null, finance: null };   // آخر محتوى كُتب/قُرئ لتفادي الكتابة المكررة
+const sig = { general: null, finance: null, ctr: {} };   // آخر محتوى كُتب/قُرئ لتفادي الكتابة المكررة
+
+// ===== نصوص العقود: كل عقد في مستند مستقل hr_finance/ctr_<id> (القواعد تغطيه ضمن hr_finance/{docId} بصلاحية المالية) =====
+const CTR_PREFIX = 'ctr_';
+const ctrRef = id => doc(firestore, 'hr_finance', CTR_PREFIX + id);
+const ctrQuery = () => query(collection(firestore, 'hr_finance'), where(documentId(), '>=', CTR_PREFIX), where(documentId(), '<=', CTR_PREFIX + '\uf8ff'));
+const ctrMapOf = snap => { const m = {}; snap.forEach(d => { const h = d.data()?.html; if(typeof h === 'string'){ const id = d.id.slice(CTR_PREFIX.length); m[id] = h; sig.ctr[id] = stable(h); } }); return m; };
+async function readContractHtml(){ return ctrMapOf(await getDocs(ctrQuery())); }
+async function writeContractHtml(htmlMap){   // يكتب فقط ما تغيّر
+  const jobs = [];
+  Object.keys(htmlMap).forEach(id => {
+    const s = stable(htmlMap[id]);
+    if(sig.ctr[id] !== s) jobs.push(setDoc(ctrRef(id), { html: htmlMap[id], updatedAt: new Date().toISOString() }).then(() => { sig.ctr[id] = s; }));
+  });
+  await Promise.all(jobs);
+}
 
 
 window.FB = {
@@ -114,8 +129,22 @@ window.FB = {
     if(!canFin()) return S.merge(general, null);
     const fsnap = await getDoc(financeRef);
     const finance = fsnap.exists() ? stripStamp(fsnap.data()) : emptyFinance();
-    sig.finance = stable(finance);
-    return S.merge(general, finance);
+    const ctr = await readContractHtml();
+    const { slim, html } = S.extractContractHtml(finance);
+    try{
+      if(Object.keys(html).length){
+        // ترحيل لمرة واحدة: نصوص العقود ما زالت داخل المستند المالي → انقلها لمستندات مستقلة أولاً، ثم أعد كتابة المالي مختصراً
+        const toMove = {}; Object.keys(html).forEach(id => { if(!(id in ctr)) toMove[id] = html[id]; });
+        if(Object.keys(toMove).length) await writeContractHtml(toMove);
+        await setDoc(financeRef, stamp(slim));
+      }
+      sig.finance = stable(slim);
+      return S.merge(general, S.withContractHtml(slim, { ...html, ...ctr }));
+    }catch(err){
+      console.error('تعذر ترحيل نصوص العقود لمستندات مستقلة (يُستخدم النسق الحالي):', err);
+      sig.finance = stable(slim);   // لا نكتب المالي كاملاً من جديد؛ الكتابة التالية ستحاول من جديد
+      return S.merge(general, S.withContractHtml(finance, ctr));
+    }
   },
   saveState: async (state) => {
     const S = window.HRSplit;
@@ -127,8 +156,10 @@ window.FB = {
     if(gs !== sig.general) jobs.push(setDoc(stateRef, stamp(general)).then(() => { sig.general = gs; }));
     // من لا يملك صلاحية المالية لا يكتب وثيقة المالية أبداً (وبياناته أصلاً لا تحتوي الحقول المالية)
     if(canFin()){
-      const fs = stable(finance);
-      if(fs !== sig.finance) jobs.push(setDoc(financeRef, stamp(finance)).then(() => { sig.finance = fs; }));
+      const { slim, html } = S.extractContractHtml(finance);
+      await writeContractHtml(html);   // نصوص العقود أولاً (المتغيّر منها فقط) ثم المستند المالي المختصر
+      const fs = stable(slim);
+      if(fs !== sig.finance) jobs.push(setDoc(financeRef, stamp(slim)).then(() => { sig.finance = fs; }));
     }
     await Promise.all(jobs);
   },
@@ -136,10 +167,10 @@ window.FB = {
     const S = window.HRSplit;
     if(isSingle()) return onSnapshot(stateRef, snap => callback(snap.exists() ? snap.data() : null), err => console.error('Firestore realtime sync failed:', err));
     const needFin = canFin();
-    const cache = { general: null, finance: null, gReady: false, fReady: !needFin };
+    const cache = { general: null, finance: null, ctr: {}, gReady: false, fReady: !needFin, cReady: !needFin };
     const emit = () => {
-      if(!cache.gReady || !cache.fReady || !cache.general) return;
-      callback(S.merge(cache.general, needFin ? (cache.finance || emptyFinance()) : null));
+      if(!cache.gReady || !cache.fReady || !cache.cReady || !cache.general) return;
+      callback(S.merge(cache.general, needFin ? S.withContractHtml(cache.finance || emptyFinance(), cache.ctr) : null));
     };
     const u1 = onSnapshot(stateRef, snap => {
       cache.gReady = true;
@@ -158,7 +189,13 @@ window.FB = {
         emit();
       }, err => console.error('Firestore finance sync failed:', err));
     }
-    return () => { u1(); u2(); };
+    let u3 = () => {};
+    if(needFin){
+      u3 = onSnapshot(ctrQuery(), snap => {
+        cache.cReady = true; cache.ctr = ctrMapOf(snap); emit();
+      }, err => console.error('Firestore contracts sync failed:', err));
+    }
+    return () => { u1(); u2(); u3(); };
   }
 };
 
