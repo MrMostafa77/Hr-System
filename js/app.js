@@ -939,6 +939,7 @@
     if(view==='invoicereport') window.HRSales?.renderInvoiceReport();
     if(view==='users') window.HRUsers?.render();
     if(view==='employeepromotions') renderEmployeePromotions();
+    if(view==='projectpromotions') renderProjectPromotions();
     if(view==='reports'){
       const activeReport=document.querySelector('.nav-child[data-view="reports"].active');
       const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك'};
@@ -3657,7 +3658,6 @@
     body.innerHTML=rows.map((r,i)=>{ const p=empSalaryTotal(r.prev), c=empSalaryTotal(r.cur);
       return `<tr><td class="mono">${i+1}</td><td><b>${escapeHtml(r.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(r.e.empcode||'')}</small></td><td>${escapeHtml(r.e.project||'—')}</td><td class="mono">${fmt(p)}</td><td class="mono" style="font-weight:700">${fmt(c)}</td><td>${promoDiffPill(c-p)}</td><td class="mono">${escapeHtml(fmtDMY(r.cur.from))}</td><td>${escapeHtml(r.cur.note||'')}</td><td>${fin?`<button type="button" class="btn btn-sm" data-promo-del="${escapeAttr(r.e.id)}" data-promo-from="${escapeAttr(r.cur.from)}">حذف</button>`:''}</td></tr>`; }).join('')
       ||'<tr><td colspan="9" class="empty-note">لا توجد تعديلات رواتب مسجلة حالياً.</td></tr>';
-    renderProjectPromotions();
   }
   function promoApplyLatest(e,h){
     const last=h[h.length-1]; e.basicsalary=last.basic; e.housing=last.housing; e.transport=last.transport; e.otherallow=last.otherallow;
@@ -3753,7 +3753,7 @@
     const err=projPromoAdd(document.getElementById('promoProj')?.value,document.getElementById('promoRole')?.value,qRaw===''?NaN:Number(qRaw),document.getElementById('promoProjDate')?.value||'',document.getElementById('promoProjNote')?.value||'');
     if(err){ showToast(err); return; }
     ['promoQty','promoProjDate','promoProjNote'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-    renderEmployeePromotions();
+    renderProjectPromotions();
   });
   document.getElementById('promoProjBody')?.addEventListener('click',ev=>{
     const b=ev.target.closest('[data-projpromo-del]'); if(!b) return;
@@ -3763,7 +3763,7 @@
     const h=projCapHist(p,role).filter(x=>String(x.from||'')!==from), others=(p.capacityHistory||[]).filter(x=>x&&x.role!==role);
     if(h.length>=2){ p.capacityHistory=[...others,...h]; p[role]=h[h.length-1].qty; }
     else { p.capacityHistory=others; if(h.length) p[role]=h[0].qty; }
-    persistCloud('تم حذف التعديل'); try{ renderProjects(); renderProjectCapacity(); }catch(_){} renderEmployeePromotions();
+    persistCloud('تم حذف التعديل'); try{ renderProjects(); renderProjectCapacity(); }catch(_){} renderProjectPromotions();
   });
   /* ===== export / import ===== */
   document.getElementById('exportBtn')?.addEventListener('click', ()=>{

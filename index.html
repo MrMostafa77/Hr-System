@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://db.onlinewebfonts.com">
 <link href="https://db.onlinewebfonts.com/c/7d411bb0357d6fd29347455b7d207995?family=JF+Flat+Regular" rel="stylesheet">
 <script>try{document.documentElement.setAttribute('data-theme',localStorage.getItem('hr_theme_v1')==='light'?'light':'dark');}catch(e){document.documentElement.setAttribute('data-theme','dark');}</script>
-<link rel="stylesheet" href="css/style.css?v=20261109a">
+<link rel="stylesheet" href="css/style.css?v=20261109b">
 </head>
 <body>
 
@@ -538,8 +538,17 @@
     <section id="view-projectpromotions" style="display:none">
       <div class="topbar"><div class="pagetitle"><h1>ترقيات المشاريع</h1><p>إدارة ترقيات وتحديثات المشاريع</p></div><div class="topbar-actions"><button class="btn mobile-menu-btn icon-btn" data-menu>☰</button></div></div>
       <div class="card" style="margin-top:16px">
-        <div class="card-head"><div><h3>ترقيات المشاريع</h3><p class="muted">هذه الشاشة مخصصة لإضافة وإدارة ترقيات المشاريع.</p></div></div>
-        <div class="empty-state">لا توجد ترقيات مشاريع مسجلة حالياً.</div>
+        <div class="card-head"><div><h3>زيادة أو نقص عدد الأفراد في المشروع</h3><p class="muted">اختر المشروع والفئة وأدخل العدد الجديد وتاريخ التعديل: يُحتسب العدد الجديد (في حساب المشروع) <b>من هذا التاريخ فقط</b> ويبقى العدد القديم للشهور السابقة.</p></div></div>
+        <div class="att-toolbar payroll-toolbar">
+          <div class="payroll-filter-group payroll-search-wide"><label>المشروع</label><select id="promoProj"><option value="">اختر المشروع</option></select></div>
+          <div class="payroll-filter-group"><label>الفئة</label><select id="promoRole"></select></div>
+          <div class="payroll-filter-group"><label>العدد الحالي</label><input type="text" id="promoCur" readonly></div>
+          <div class="payroll-filter-group"><label>العدد الجديد</label><input type="number" id="promoQty" min="0" step="1"></div>
+          <div class="payroll-filter-group"><label>يبدأ من تاريخ</label><input type="date" id="promoProjDate"></div>
+          <div class="payroll-filter-group"><label>ملاحظة (اختياري)</label><input type="text" id="promoProjNote" placeholder="مثال: زيادة بأمر المشروع"></div>
+          <button type="button" class="btn btn-primary" id="promoProjAddBtn">تسجيل العدد الجديد</button>
+        </div>
+        <div class="table-wrap"><table class="payroll-table"><thead><tr><th>م</th><th>المشروع</th><th>الفئة</th><th>العدد السابق</th><th>العدد الجديد</th><th>الفرق</th><th>من تاريخ</th><th>ملاحظة</th><th></th></tr></thead><tbody id="promoProjBody"></tbody></table></div>
       </div>
     </section>
 
@@ -570,19 +579,6 @@
       <div class="card" style="margin-top:16px">
         <div class="card-head"><div><h3>سجل تعديلات الرواتب</h3></div></div>
         <div class="table-wrap"><table class="payroll-table"><thead><tr><th>م</th><th>الموظف</th><th>المشروع</th><th>الراتب السابق</th><th>الراتب الجديد</th><th>الفرق</th><th>من تاريخ</th><th>ملاحظة</th><th></th></tr></thead><tbody id="promoBody"></tbody></table></div>
-      </div>
-      <div class="card" style="margin-top:16px">
-        <div class="card-head"><div><h3>ترقيات المشاريع — زيادة أو نقص عدد الأفراد</h3><p class="muted">اختر المشروع والفئة وأدخل العدد الجديد وتاريخ التعديل: يُحتسب العدد الجديد (في حساب المشروع) <b>من هذا التاريخ فقط</b> ويبقى العدد القديم للشهور السابقة.</p></div></div>
-        <div class="att-toolbar payroll-toolbar">
-          <div class="payroll-filter-group payroll-search-wide"><label>المشروع</label><select id="promoProj"><option value="">اختر المشروع</option></select></div>
-          <div class="payroll-filter-group"><label>الفئة</label><select id="promoRole"></select></div>
-          <div class="payroll-filter-group"><label>العدد الحالي</label><input type="text" id="promoCur" readonly></div>
-          <div class="payroll-filter-group"><label>العدد الجديد</label><input type="number" id="promoQty" min="0" step="1"></div>
-          <div class="payroll-filter-group"><label>يبدأ من تاريخ</label><input type="date" id="promoProjDate"></div>
-          <div class="payroll-filter-group"><label>ملاحظة (اختياري)</label><input type="text" id="promoProjNote" placeholder="مثال: زيادة بأمر المشروع"></div>
-          <button type="button" class="btn btn-primary" id="promoProjAddBtn">تسجيل العدد الجديد</button>
-        </div>
-        <div class="table-wrap"><table class="payroll-table"><thead><tr><th>م</th><th>المشروع</th><th>الفئة</th><th>العدد السابق</th><th>العدد الجديد</th><th>الفرق</th><th>من تاريخ</th><th>ملاحظة</th><th></th></tr></thead><tbody id="promoProjBody"></tbody></table></div>
       </div>
     </section>
 
@@ -1297,7 +1293,7 @@
 <script src="js/access.js?v=20261026a" type="module"></script>
 <script src="js/data.js?v=20261011f" defer></script>
 <script src="js/sales.js?v=20261102a" defer></script>
-<script src="js/app.js?v=20261109a" defer></script>
+<script src="js/app.js?v=20261109b" defer></script>
 <script>
 (function(){
   function fallbackEmployeeCancel(e){
