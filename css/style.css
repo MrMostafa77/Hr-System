@@ -2897,3 +2897,9 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
   body.print-onepage #view-commencements .comm-paper-bg{width:210mm !important;height:296mm !important;max-height:none !important;object-fit:fill !important}
 }
 .pay-status-note.unposted{color:#6b7780;font-weight:600}
+
+/* الصرف في كشف البنك */
+.bank-table tr.bk-paid td{background:rgba(34,160,90,.10)}
+.bank-table .bk-paid-tag{color:#15803d}
+tr.pay-paid td{background:rgba(34,160,90,.07)}
+tr.pay-paid input[disabled],tr.pay-paid select[disabled]{opacity:.65;cursor:not-allowed}

@@ -942,7 +942,7 @@
     if(view==='projectpromotions') renderProjectPromotions();
     if(view==='reports'){
       const activeReport=document.querySelector('.nav-child[data-view="reports"].active');
-      const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك',delegations:'التفاويش'};
+      const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك',delegations:'التفاويض'};
       const title=titleMap[activeReport?.dataset.report||'payroll']||'تقارير الرواتب';
       const h=document.querySelector('#view-reports .pagetitle h1');
       if(h) h.textContent=title;
@@ -2790,11 +2790,16 @@
     let coded=0; cols.forEach(c=>{ const k=attCodeAt(c.ym, empId, c.d); if(k && k!=='-' && k!=='إجازة') coded++; });
     return Math.min(payMonthDaysFor(cols), coded);
   }
+  function payIsPaid(ym,id){ const r=payrollRecords&&payrollRecords[ym]&&payrollRecords[ym][id]; return !!(r&&r.bank&&r.bank.paidAt); }
+  // موظف تم صرف راتبه في شهر: مسيره مقفول (حضور/جزاءات/مكافآت/خصومات/إعادة احتساب) حتى «إلغاء الصرف» من كشف البنك
+  function payPaidLock(ym,id){ return payIsPaid(ym,id); }
+  function payPaidLockToast(){ showToast('تم صرف راتب هذا الموظف لهذا الشهر — لا يمكن التعديل إلا بعد «إلغاء الصرف» من كشف البنك'); }
   function payrollAdjustmentFor(ym, empId){
     return (payrollRecords?.[ym]?.[empId]) || {bonus:0,uniform:0,newspaper:0,advance:0,other:0,internalAction:'',note:''};
   }
   function updatePayrollField(empId,field,value){
     const ym=document.getElementById('payrollMonth')?.value; if(!ym)return;
+    if(payPaidLock(ym,empId)){ payPaidLockToast(); renderReports(); return; }
     if(!payrollRecords[ym]) payrollRecords[ym]={};
     payrollRecords[ym][empId]={...payrollAdjustmentFor(ym,empId),[field]:(['bonus','uniform','newspaper','advance','other'].includes(field)?(Number(value)||0):value)};
     persistCloud(); renderReports();
@@ -2871,6 +2876,7 @@
   }
   function payrollStatementForCols(e,cols,sumIn){
     const ym=cols.length?cols[0].ym:currentMonthStr();
+    if(cols.length&&cols[0].d===1&&cols.length===daysInMonth(ym)&&cols.every(c=>c.ym===ym)){ const pr=payrollRecords&&payrollRecords[ym]&&payrollRecords[ym][e.id]; if(pr&&pr.bank&&pr.bank.paidAt&&pr.snap&&pr.snap.v===2&&pr.snap.p) return payStatementFromSnap(pr.snap,cols,payrollAdjustmentFor(ym,e.id)); }   // مصروف: الأرقام مثبّتة ولا تتغير
     if(!payFreezeApplies(ym,cols) || employeeNotStartedFor(e,cols)) return payrollComputeStatement(e,cols,sumIn);
     const a=payrollAdjustmentFor(ym,e.id), fp=payInputsFingerprint(e,cols,a), snap=a.snap;
     if(snap && snap.v===2 && snap.fp===fp && snap.p) return payStatementFromSnap(snap,cols,a);          // نسخة مثبتة وسليمة
@@ -2883,7 +2889,7 @@
   // إعادة احتساب شهر منتهي بالرواتب الحالية (بحذف النسخ المثبتة ليعاد تثبيتها)
   function payUnfreezeMonth(ym){
     let n=0; const m=payrollRecords[ym]||{};
-    Object.keys(m).forEach(id=>{ if(m[id]&&m[id].snap){ delete m[id].snap; n++; } });
+    Object.keys(m).forEach(id=>{ if(m[id]&&m[id].snap&&!payIsPaid(ym,id)){ delete m[id].snap; n++; } });
     return n;
   }
   /* ===== حالة الموظف وأثرها على المسير =====
@@ -2941,7 +2947,7 @@
   function payDropSnaps(empId,fromYm){
     Object.keys(payrollRecords||{}).forEach(ym=>{
       if(!/^\d{4}-\d{2}$/.test(ym)||(fromYm&&ym<fromYm)) return;
-      const rec=payrollRecords[ym]&&payrollRecords[ym][empId]; if(rec&&rec.snap) delete rec.snap;
+      const rec=payrollRecords[ym]&&payrollRecords[ym][empId]; if(rec&&rec.snap&&!payIsPaid(ym,empId)) delete rec.snap;
     });
   }
   function empSalaryTotal(x){ return r2((Number(x?.basic)||0)+(Number(x?.housing)||0)+(Number(x?.transport)||0)+(Number(x?.otherallow)||0)); }
@@ -3336,7 +3342,7 @@
     w.document.close(); setTimeout(()=>w.print(),400);
   });
 
-  /* ===== تقرير التفاويش (الحراس أصحاب التفويض البنكي) ===== */
+  /* ===== تقرير التفاويض (الحراس أصحاب التفويض البنكي) ===== */
   const delRepState={q:'',project:''};
   function delegationRows(){
     const rows=[];
@@ -3371,7 +3377,7 @@
   document.getElementById('delRepPrintBtn')?.addEventListener('click',()=>{
     const rows=delegationFiltered(); if(!rows.length){ showToast('لا توجد بيانات للطباعة'); return; }
     const w=window.open('','_blank'); if(!w){ showToast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
-    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>التفاويش</title><style>body{font-family:Tahoma,Arial,sans-serif;margin:14px;color:#111}h2{text-align:center}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #bbb;padding:5px 6px;text-align:center}th{background:#dce6f5}@page{size:A4 landscape;margin:8mm}</style></head><body><h2>التفاويش</h2><table><thead><tr><th>م</th><th>اسم الحارس</th><th>اسم المفوض</th><th>هوية المفوض</th><th>آيبان المفوض</th><th>اسم البنك</th><th>كود البنك</th></tr></thead><tbody>${delegationTableRows(rows)}</tbody></table></body></html>`);
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>التفاويض</title><style>body{font-family:Tahoma,Arial,sans-serif;margin:14px;color:#111}h2{text-align:center}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #bbb;padding:5px 6px;text-align:center}th{background:#dce6f5}@page{size:A4 landscape;margin:8mm}</style></head><body><h2>التفاويض</h2><table><thead><tr><th>م</th><th>اسم الحارس</th><th>اسم المفوض</th><th>هوية المفوض</th><th>آيبان المفوض</th><th>اسم البنك</th><th>كود البنك</th></tr></thead><tbody>${delegationTableRows(rows)}</tbody></table></body></html>`);
     w.document.close(); w.focus(); setTimeout(()=>{ try{w.print();}catch(_){} },300);
   });
 
@@ -3420,9 +3426,10 @@
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="advance" data-emp="${escapeAttr(e.id)}" value="${Number(a.advance)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="other" data-emp="${escapeAttr(e.id)}" value="${Number(a.other)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="mono g3 tot" ${red(p.deduction)}>${fmt(p.deduction)}</td><td class="mono g4 tot" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
-      <td class="g5">${payrollRecords[p.ym]?.[e.id]?.bank?'<small class="pay-status-note posted">✓ مرحّل للبنك</small>':'<small class="pay-status-note unposted">○ غير مرحّل</small>'}${p.statusText?`<small class="pay-status-note${p.held?' held':''}">${escapeHtml(p.statusText)}</small>`:''}<select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
+      <td class="g5">${payrollRecords[p.ym]?.[e.id]?.bank?(payIsPaid(p.ym,e.id)?'<small class="pay-status-note posted">🔒 تم الصرف</small>':'<small class="pay-status-note posted">✓ مرحّل للبنك</small>'):'<small class="pay-status-note unposted">○ غير مرحّل</small>'}${p.statusText?`<small class="pay-status-note${p.held?' held':''}">${escapeHtml(p.statusText)}</small>`:''}<select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
       </tr>`;
     }).join('')||'<tr><td colspan="26" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
+    { const ymL=document.getElementById('payrollMonth')?.value; body.querySelectorAll('tr[data-pay-row]').forEach(tr=>{ if(payPaidLock(ymL,tr.dataset.payRow)){ tr.classList.add('pay-paid'); tr.querySelectorAll('[data-pay-field]').forEach(el=>{ el.disabled=true; el.title='تم الصرف — ألغِ الصرف من كشف البنك للتعديل'; }); } }); }
     body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
     body.querySelectorAll('[data-pay-sel]').forEach(cb=>cb.addEventListener('change',()=>{ cb.checked?paySelected.add(cb.dataset.paySel):paySelected.delete(cb.dataset.paySel); paySelRefresh(); }));
     paySelRefresh();
@@ -3459,8 +3466,10 @@
   }
   function payrollUnpost(list,ym,label){
     if(!pdrCanFinance()){ showToast('إلغاء الترحيل يحتاج صلاحية المالية'); return; }
-    const targets=list.filter(e=>payIsPosted(ym,e.id));
-    if(!targets.length){ showToast('لا يوجد موظفون مرحّلون ضمن الاختيار الحالي'); return; }
+    const paidN=list.filter(e=>payIsPaid(ym,e.id)).length;
+    const targets=list.filter(e=>payIsPosted(ym,e.id)&&!payIsPaid(ym,e.id));
+    if(!targets.length){ showToast(paidN?'الموظفون المعروضون تم صرفهم — ألغِ الصرف من كشف البنك أولًا':'لا يوجد موظفون مرحّلون ضمن الاختيار الحالي'); return; }
+    if(paidN) showToast(`تم تجاهل ${paidN} موظف تم صرفهم`);
     if(!confirm(`إلغاء ترحيل ${targets.length} موظف ${label||''} من كشف البنك لشهر ${monthLabel(ym)}؟\nسيرجعون لقائمة «غير المرحّلين» ويختفون من صفحة كشف البنك.`)) return;
     targets.forEach(e=>{ const rec=payrollRecords[ym][e.id]; if(rec) delete rec.bank; });
     persistCloud(`تم إلغاء ترحيل ${targets.length} موظف`);
@@ -3549,6 +3558,7 @@
   async function payrollBankExport(list,ym,opts){
     opts=opts||{};
     if(!pdrCanFinance()){ showToast('ترحيل الرواتب يحتاج صلاحية المالية'); return; }
+    { const before=list.length; list=list.filter(e=>!payIsPaid(ym,e.id)); if(before!==list.length) showToast(`تم استبعاد ${before-list.length} موظف تم صرفهم`); if(!list.length) return; }
     if(!window.JSZip){ showToast('مكتبة Excel غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
     const cols=monthCols(ym); let held=0, zero=0, noIban=0; const posted=[];
     list.forEach(e=>{
@@ -3574,6 +3584,7 @@
   }
   /* ===== صفحة كشف البنك: المرحَّلون فقط + فلاتر + إجمالي متغير ===== */
   const bankState={month:'',q:'',project:'',region:''};
+  const bankSel={mode:'',ids:new Set()};   // mode: ''|'pay'|'unpay'
   const bankNum=n=>'SAR '+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   function bankMonths(){ return Object.keys(payrollRecords||{}).filter(ym=>/^\d{4}-\d{2}$/.test(ym)&&Object.values(payrollRecords[ym]||{}).some(r=>r&&r.bank)).sort().reverse(); }
   function bankPostedRows(ym){
@@ -3581,7 +3592,7 @@
     Object.keys(m).forEach(id=>{
       const b=m[id]&&m[id].bank; if(!b) return;
       const e=employees.find(x=>String(x.id)===String(id))||{};
-      out.push({id,name:e.fullname||b.name||'',iban:String(e.iban||'').replace(/\s+/g,'').toUpperCase(),empno:e.empcode||'',idnum:e.idnum||'',dept:e.dept||'',job:e.jobtitle||'',project:e.project||'',region:e.region||'',total:b.total,basic:b.basic,housing:b.housing,other:b.other,ded:b.ded,at:b.at||'',remarks:'إيداع راتب'});
+      out.push({id,name:e.fullname||b.name||'',iban:String(e.iban||'').replace(/\s+/g,'').toUpperCase(),empno:e.empcode||'',idnum:e.idnum||'',dept:e.dept||'',job:e.jobtitle||'',project:e.project||'',region:e.region||'',total:b.total,basic:b.basic,housing:b.housing,other:b.other,ded:b.ded,at:b.at||'',paid:!!b.paidAt,paidAt:b.paidAt||'',remarks:'إيداع راتب'});
     });
     return out.sort((a,b)=>String(a.empno).localeCompare(String(b.empno),'ar',{numeric:true})||String(a.name).localeCompare(String(b.name),'ar'));
   }
@@ -3591,13 +3602,13 @@
   }
   function bankTotals(rows){ const t={total:0,basic:0,housing:0,other:0,ded:0}; rows.forEach(x=>{ Object.keys(t).forEach(k=>{ t[k]+=Number(x[k])||0; }); }); Object.keys(t).forEach(k=>{ t[k]=r2(t[k]); }); return t; }
   function bankSheetHtml(rows,forPrint){
-    const t=bankTotals(rows), act=!forPrint&&pdrCanFinance();
+    const t=bankTotals(rows), act=!forPrint&&pdrCanFinance(), selOn=act&&!!bankSel.mode;
     const heads=[['Employee IBAN','أيبان الموظف'],['Employee Name','إسم الموظف'],['Employee Number','الرقم الوظيفي'],['ID Number','رقم الهوية'],['Total Salary','الراتب الإجمالي'],['Basic Salary','الراتب الأساسي'],['Housing Allowance','بدل السكن'],['Other Earnings','بدلات أخرى'],['Deductions','الخصومات'],['Employee Remarks','ملاحظات الموظف'],['Employee Job Title','الوظيفة']];
-    const body=rows.map((x,i)=>`<tr><td class="bk-ltr">${x.iban?escapeHtml(x.iban):'<span class="bk-warn">بدون آيبان</span>'}</td><td class="bk-name">${escapeHtml(x.name||'—')}</td><td class="bk-num">${escapeHtml(x.empno||String(i+1))}</td><td class="bk-num">${escapeHtml(x.idnum||'')}</td><td class="bk-num bk-total">${bankNum(x.total)}</td><td class="bk-num">${bankNum(x.basic)}</td><td class="bk-num">${bankNum(x.housing)}</td><td class="bk-num">${bankNum(x.other)}</td><td class="bk-num">${bankNum(x.ded)}</td><td>${escapeHtml(x.remarks)}</td><td>${escapeHtml(x.job||'')}</td><td>${escapeHtml(x.project||'—')}</td><td class="bk-small">${x.at?escapeHtml(fmtDMY(String(x.at).slice(0,10))):''}</td>${act?`<td class="no-print"><button type="button" class="btn btn-sm" data-bank-unpost="${escapeAttr(x.id)}" title="يرجع الموظف لقائمة غير المرحّلين">إلغاء الترحيل</button></td>`:''}</tr>`).join('');
+    const body=rows.map((x,i)=>{ const paid=!!x.paid, elig=bankSel.mode==='pay'?!paid:paid; return `<tr${paid?' class="bk-paid"':''}>${selOn?(elig?`<td class="no-print"><input type="checkbox" data-bank-sel="${escapeAttr(x.id)}" ${bankSel.ids.has(String(x.id))?'checked':''}></td>`:'<td class="no-print"></td>'):''}<td class="bk-ltr">${x.iban?escapeHtml(x.iban):'<span class="bk-warn">بدون آيبان</span>'}</td><td class="bk-name">${escapeHtml(x.name||'—')}</td><td class="bk-num">${escapeHtml(x.empno||String(i+1))}</td><td class="bk-num">${escapeHtml(x.idnum||'')}</td><td class="bk-num bk-total">${bankNum(x.total)}</td><td class="bk-num">${bankNum(x.basic)}</td><td class="bk-num">${bankNum(x.housing)}</td><td class="bk-num">${bankNum(x.other)}</td><td class="bk-num">${bankNum(x.ded)}</td><td>${escapeHtml(x.remarks)}</td><td>${escapeHtml(x.job||'')}</td><td>${escapeHtml(x.project||'—')}</td><td class="bk-small">${x.at?escapeHtml(fmtDMY(String(x.at).slice(0,10))):''}</td><td class="bk-small">${paid?`<b class="bk-paid-tag">✓ تم الصرف</b><br>${escapeHtml(fmtDMY(String(x.paidAt).slice(0,10)))}`:'—'}</td>${act?`<td class="no-print">${paid?`<button type="button" class="btn btn-sm" data-bank-unpay="${escapeAttr(x.id)}" title="يفتح التعديل على مسير الموظف من جديد">إلغاء الصرف</button>`:`<button type="button" class="btn btn-sm" data-bank-unpost="${escapeAttr(x.id)}" title="يرجع الموظف لقائمة غير المرحّلين">إلغاء الترحيل</button>`}</td>`:''}</tr>`}).join('');
     return `<div class="bank-sheet"><div class="bank-banner"><b>ARB WPS Payroll Payments File</b><span>ملف دفع الرواتب لمصرف الراجحي</span></div>
-      <div class="table-wrap"><table class="bank-table"><thead><tr>${heads.map(h=>`<th><b>${h[0]}</b><span>${h[1]}</span></th>`).join('')}<th><b>Project</b><span>المشروع</span></th><th><b>Posted</b><span>تاريخ الترحيل</span></th>${act?'<th class="no-print"></th>':''}</tr></thead>
-      <tbody>${body||`<tr><td colspan="${act?14:13}" class="empty-note">لا يوجد موظفون مرحّلون مطابقون للفلاتر.</td></tr>`}</tbody>
-      <tfoot><tr class="bank-foot"><td colspan="4">الإجمالي — ${rows.length} موظف</td><td class="bk-num bk-total">${bankNum(t.total)}</td><td class="bk-num">${bankNum(t.basic)}</td><td class="bk-num">${bankNum(t.housing)}</td><td class="bk-num">${bankNum(t.other)}</td><td class="bk-num">${bankNum(t.ded)}</td><td colspan="${act?5:4}"></td></tr></tfoot></table></div></div>`;
+      <div class="table-wrap"><table class="bank-table"><thead><tr>${selOn?'<th class="no-print"></th>':''}${heads.map(h=>`<th><b>${h[0]}</b><span>${h[1]}</span></th>`).join('')}<th><b>Project</b><span>المشروع</span></th><th><b>Posted</b><span>تاريخ الترحيل</span></th><th><b>Payment</b><span>حالة الصرف</span></th>${act?'<th class="no-print"></th>':''}</tr></thead>
+      <tbody>${body||`<tr><td colspan="${(act?15:14)+(selOn?1:0)}" class="empty-note">لا يوجد موظفون مرحّلون مطابقون للفلاتر.</td></tr>`}</tbody>
+      <tfoot><tr class="bank-foot"><td colspan="${4+(selOn?1:0)}">الإجمالي — ${rows.length} موظف</td><td class="bk-num bk-total">${bankNum(t.total)}</td><td class="bk-num">${bankNum(t.basic)}</td><td class="bk-num">${bankNum(t.housing)}</td><td class="bk-num">${bankNum(t.other)}</td><td class="bk-num">${bankNum(t.ded)}</td><td colspan="${act?6:5}"></td></tr></tfoot></table></div></div>`;
   }
   function renderBankReport(){
     const out=document.getElementById('bankOutput'); if(!out) return;
@@ -3613,11 +3624,75 @@
     rsel.innerHTML='<option value="">كل المناطق</option>'+regs.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join(''); rsel.value=bankState.region;
     if(qin&&qin.value!==bankState.q) qin.value=bankState.q;
     const rows=bankFilteredRows(), t=bankTotals(rows);
+    { const vis=new Set(rows.map(x=>String(x.id))); [...bankSel.ids].forEach(id=>{ if(!vis.has(id)) bankSel.ids.delete(id); }); }
     const cnt=document.getElementById('bankCount'); if(cnt) cnt.textContent=`${rows.length} من ${all.length} موظف`;
     if(!months.length){ out.innerHTML='<div class="empty-note">لا توجد رواتب مرحّلة بعد. من «تقارير الرواتب» اضغط «ترحيل الرواتب كلها» أو «ترحيل موظفين معينين» وستظهر هنا.</div>'; return; }
-    out.innerHTML=`<div class="bank-summary"><div><small>عدد الموظفين</small><b>${rows.length}</b></div><div class="main"><small>إجمالي الرواتب (Total Salary)</small><b>${bankNum(t.total)}</b></div><div><small>الأساسي</small><b>${bankNum(t.basic)}</b></div><div><small>بدل السكن</small><b>${bankNum(t.housing)}</b></div><div><small>بدلات أخرى</small><b>${bankNum(t.other)}</b></div><div><small>الخصومات</small><b>${bankNum(t.ded)}</b></div></div>`+bankSheetHtml(rows,false);
+    out.innerHTML=`<div class="bank-summary"><div><small>عدد الموظفين</small><b>${rows.length}</b></div><div class="main"><small>إجمالي الرواتب (Total Salary)</small><b>${bankNum(t.total)}</b></div><div><small>الأساسي</small><b>${bankNum(t.basic)}</b></div><div><small>بدل السكن</small><b>${bankNum(t.housing)}</b></div><div><small>بدلات أخرى</small><b>${bankNum(t.other)}</b></div><div><small>الخصومات</small><b>${bankNum(t.ded)}</b></div><div><small>تم صرفهم</small><b>${rows.filter(x=>x.paid).length} / ${rows.length}</b></div></div>`+bankSheetHtml(rows,false);
+    bankSelRefresh();
   }
-  document.getElementById('bankMonth')?.addEventListener('change',e=>{ bankState.month=e.target.value; renderBankReport(); });
+  /* ===== الصرف: تم الصرف الكل / موظفين معينين + إلغاء الصرف (القفل على المسير) ===== */
+  function bankSelRefresh(){
+    const bar=document.getElementById('bankSelBar'); if(!bar) return;
+    bar.style.display=bankSel.mode?'':'none';
+    const tx=document.getElementById('bankSelText'); if(tx) tx.textContent=bankSel.mode==='pay'?'اختر الموظفين لتسجيل «تم الصرف»':'اختر الموظفين لإلغاء الصرف';
+    const n=document.getElementById('bankSelCount'); if(n) n.textContent=String(bankSel.ids.size);
+  }
+  function bankSetPaid(ids,paid){
+    if(!pdrCanFinance()){ showToast('الصرف يحتاج صلاحية المالية'); return 0; }
+    const ym=bankState.month, m=(payrollRecords&&payrollRecords[ym])||{}; let n=0; const at=new Date().toISOString();
+    ids.forEach(id=>{
+      const rec=m[id]; if(!rec||!rec.bank) return;
+      if(paid){
+        if(rec.bank.paidAt) return;
+        // نثبّت أرقام المسير قبل الصرف حتى لا تتغير بعده
+        try{ const e=employees.find(x=>String(x.id)===String(id)), cols=monthCols(ym);
+          if(e&&!rec.snap){ const a=payrollAdjustmentFor(ym,id), st=payrollComputeStatement(e,cols); payStoreSnap(ym,id,st,payInputsFingerprint(e,cols,a)); }
+        }catch(err){ console.error(err); }
+        rec.bank.paidAt=at; n++;
+      } else { if(rec.bank.paidAt){ delete rec.bank.paidAt; n++; } }
+    });
+    if(n) persistCloud(paid?`تم تسجيل صرف ${n} موظف`:`تم إلغاء صرف ${n} موظف`);
+    return n;
+  }
+  function bankPayAll(paid){
+    const rows=bankFilteredRows().filter(x=>paid?!x.paid:x.paid);
+    if(!rows.length){ showToast(paid?'لا يوجد موظفون غير مصروفين ضمن المعروض':'لا يوجد موظفون مصروفون ضمن المعروض'); return; }
+    const msg=paid?`تأكيد «تم الصرف» لـ ${rows.length} موظف عن ${monthLabel(bankState.month)}؟\nبعد الصرف لا يمكن تعديل مسير هؤلاء (حضور/جزاءات/مكافآت/خصومات/إعادة احتساب) إلا بعد «إلغاء الصرف» من هنا.`:`إلغاء صرف ${rows.length} موظف عن ${monthLabel(bankState.month)}؟\nسيصبح مسيرهم قابلًا للتعديل من جديد.`;
+    if(!confirm(msg)) return;
+    const n=bankSetPaid(rows.map(x=>x.id),paid); showToast(paid?`تم تسجيل صرف ${n} موظف`:`تم إلغاء صرف ${n} موظف`); renderBankReport();
+  }
+  function bankStartSel(mode){
+    if(!pdrCanFinance()){ showToast('الصرف يحتاج صلاحية المالية'); return; }
+    bankSel.mode=(bankSel.mode===mode)?'':mode; bankSel.ids.clear(); renderBankReport();
+  }
+  document.getElementById('bankPayAllBtn')?.addEventListener('click',()=>bankPayAll(true));
+  document.getElementById('bankUnpayAllBtn')?.addEventListener('click',()=>bankPayAll(false));
+  document.getElementById('bankPaySelBtn')?.addEventListener('click',()=>bankStartSel('pay'));
+  document.getElementById('bankUnpaySelBtn')?.addEventListener('click',()=>bankStartSel('unpay'));
+  document.getElementById('bankSelCancelBtn')?.addEventListener('click',()=>{ bankSel.mode=''; bankSel.ids.clear(); renderBankReport(); });
+  document.getElementById('bankSelAllBtn')?.addEventListener('click',()=>{
+    const want=bankSel.mode==='pay'?x=>!x.paid:x=>x.paid; const rows=bankFilteredRows().filter(want);
+    const all=rows.length&&rows.every(x=>bankSel.ids.has(String(x.id))); bankSel.ids.clear(); if(!all) rows.forEach(x=>bankSel.ids.add(String(x.id))); renderBankReport();
+  });
+  document.getElementById('bankSelConfirmBtn')?.addEventListener('click',()=>{
+    if(!bankSel.ids.size){ showToast('حدّد موظفًا واحدًا على الأقل'); return; }
+    const paid=bankSel.mode==='pay', ids=[...bankSel.ids];
+    const msg=paid?`تأكيد «تم الصرف» لـ ${ids.length} موظف؟ بعد الصرف لا يمكن تعديل مسيرهم إلا بعد «إلغاء الصرف».`:`إلغاء صرف ${ids.length} موظف؟ سيصبح مسيرهم قابلًا للتعديل من جديد.`;
+    if(!confirm(msg)) return;
+    const n=bankSetPaid(ids,paid); bankSel.mode=''; bankSel.ids.clear(); showToast(paid?`تم تسجيل صرف ${n} موظف`:`تم إلغاء صرف ${n} موظف`); renderBankReport();
+  });
+  document.getElementById('bankOutput')?.addEventListener('change',e=>{
+    const c=e.target.closest('[data-bank-sel]'); if(!c) return;
+    c.checked?bankSel.ids.add(c.dataset.bankSel):bankSel.ids.delete(c.dataset.bankSel); bankSelRefresh();
+  });
+  document.getElementById('bankOutput')?.addEventListener('click',e=>{
+    const b=e.target.closest('[data-bank-unpay]'); if(!b) return;
+    if(!pdrCanFinance()){ showToast('إلغاء الصرف يحتاج صلاحية المالية'); return; }
+    const id=b.dataset.bankUnpay, rec=payrollRecords[bankState.month]&&payrollRecords[bankState.month][id]; if(!rec||!rec.bank) return;
+    if(!confirm(`إلغاء صرف ${rec.bank.name||'الموظف'} عن ${monthLabel(bankState.month)}؟ سيصبح مسيره قابلًا للتعديل من جديد.`)) return;
+    bankSetPaid([id],false); showToast('تم إلغاء الصرف'); renderBankReport();
+  });
+  document.getElementById('bankMonth')?.addEventListener('change',e=>{ bankState.month=e.target.value; bankSel.ids.clear(); renderBankReport(); });
   document.getElementById('bankProject')?.addEventListener('change',e=>{ bankState.project=e.target.value; renderBankReport(); });
   document.getElementById('bankRegion')?.addEventListener('change',e=>{ bankState.region=e.target.value; renderBankReport(); });
   document.getElementById('bankSearch')?.addEventListener('input',e=>{ bankState.q=e.target.value; const pos=e.target.selectionStart; renderBankReport(); const el=document.getElementById('bankSearch'); if(el){ el.focus(); try{el.setSelectionRange(pos,pos);}catch(_){} } });
@@ -3638,6 +3713,7 @@
     const b=e.target.closest('[data-bank-unpost]'); if(!b) return;
     if(!pdrCanFinance()){ showToast('إلغاء الترحيل يحتاج صلاحية المالية'); return; }
     const id=b.dataset.bankUnpost, rec=payrollRecords[bankState.month]&&payrollRecords[bankState.month][id]; if(!rec||!rec.bank) return;
+    if(rec.bank.paidAt){ showToast('تم الصرف — اضغط «إلغاء الصرف» أولًا'); return; }
     const nm=rec.bank.name||'الموظف';
     if(!confirm(`إلغاء ترحيل ${nm} من كشف البنك لشهر ${monthLabel(bankState.month)}؟`)) return;
     delete rec.bank; persistCloud(`تم إلغاء ترحيل ${nm}`); renderBankReport();
@@ -4115,10 +4191,11 @@
     }));
     body.querySelectorAll('.att-save-btn').forEach(btn=>btn.addEventListener('click', ()=>{
       const row=body.querySelector(`tr[data-att-row="${btn.dataset.emp}"]`); if(!row) return;
-      const empId=btn.dataset.emp;
+      const empId=btn.dataset.emp; let lockedAtt=false;
       row.querySelectorAll('.att-select').forEach(sel=>{
         if(sel.disabled) return;
         const ymx=sel.dataset.ym, day=sel.dataset.day, code=sel.value;
+        if(payPaidLock(ymx,empId)){ try{ sel.value=attCodeAt(ymx,empId,day)||''; }catch(_){} sel.disabled=true; lockedAtt=true; return; }
         attendance[ymx]=attendance[ymx]||{}; attendance[ymx][empId]=attendance[ymx][empId]||{};
         if(code && code!==autoAttendanceCode(ymx,empId,day)) attendance[ymx][empId][day]=code; else delete attendance[ymx][empId][day];
         sel.disabled=true;
@@ -4126,7 +4203,7 @@
       saveAttendance(); btn.disabled=true;
       const sums=attSummaryForCols(cols, empId); sums.work=attWorkDays(cols, empId);
       row.querySelectorAll('.sum-col').forEach(cell=>{ cell.textContent=sums[cell.dataset.sum]||0; });
-      showToast('تم حفظ الحضور للموظف');
+      if(lockedAtt) payPaidLockToast(); else showToast('تم حفظ الحضور للموظف');
     }));
   }
   /* ===== تحديث الحضور التلقائي يومياً ===== */
@@ -4921,6 +4998,7 @@
     }));
     body.querySelectorAll('[data-del]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
+        { const pp=penalties.find(x=>x.id===btn.dataset.del); if(pp&&payPaidLock(String(pp.date||'').slice(0,7),pp.empId)){ payPaidLockToast(); return; } }
         if(confirm('هل تريد حذف هذا الجزاء؟')){
           penalties = penalties.filter(p=>p.id!==btn.dataset.del);
           savePenalties(); renderPenalties();
@@ -4934,6 +5012,7 @@
     if(!$a('p_project').value){ showToast('اختر المشروع'); return; }
     if(!emp){ showToast('اختر الموظف'); return; }
     const rec=actFormRec();
+    if(payPaidLock(String(rec.date||'').slice(0,7),emp.id)){ payPaidLockToast(); return; }
     if(!rec.type) rec.type=ATT_CODE_LABELS[rec.code]||'';
     if(ACT_ADD_CODES.includes(rec.code) && rec.manualAmount==null && !(Number(rec.days)>0)){ showToast('حدد عدد الأيام أو المبلغ'); return; }
     if(['غ','س','ج'].includes(rec.code) && rec.manualAmount==null && !(Number(rec.days)>0) && !(policyItemByName(policyForProjectName(rec.project),rec.type)?.fixed && !rec.manualDays)){
@@ -5037,6 +5116,7 @@
   }
   function covSetCell(empId, k, code){
     if(!empId||!k||!code) return;
+    if(payPaidLock(k.ym,empId)) return;
     attendance[k.ym]=attendance[k.ym]||{}; attendance[k.ym][empId]=attendance[k.ym][empId]||{};
     if(code!==autoAttendanceCode(k.ym,empId,k.day)) attendance[k.ym][empId][k.day]=code; else delete attendance[k.ym][empId][k.day];
   }

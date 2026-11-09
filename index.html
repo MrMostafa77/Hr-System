@@ -67,7 +67,7 @@
           <a class="navlink nav-child" data-view="reports" data-report="payroll"><span>تقارير الرواتب</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="employees"><span>تقارير الموظفين</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="bank"><span>كشف البنك</span></a>
-          <a class="navlink nav-child" data-view="reports" data-report="delegations"><span>التفاويش</span></a>
+          <a class="navlink nav-child" data-view="reports" data-report="delegations"><span>التفاويض</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="projects"><span>تقارير المشاريع</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="coverage"><span>تقارير التغطيات</span></a>
         </div>
@@ -1184,11 +1184,18 @@
           <button class="btn btn-primary" id="bankDownloadBtn" title="تنزيل الكشف المعروض بصيغة ملف دفع الرواتب لمصرف الراجحي">تنزيل Excel (الراجحي)</button>
           <button class="btn" id="bankPrintBtn">طباعة</button>
         </div>
+        <div class="action-row" style="margin:0 0 12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" id="bankPayAllBtn" title="تسجيل صرف كل الموظفين المعروضين (غير المصروفين)">تم الصرف الكل</button>
+          <button class="btn" id="bankPaySelBtn" title="اختيار موظفين بعينهم وتسجيل صرفهم">تم صرف موظفين معينين</button>
+          <button class="btn" id="bankUnpayAllBtn" title="إلغاء صرف كل المصروفين المعروضين">إلغاء الصرف الكل</button>
+          <button class="btn" id="bankUnpaySelBtn" title="اختيار موظفين بعينهم وإلغاء صرفهم">إلغاء صرف موظفين معينين</button>
+        </div>
+        <div class="pay-sel-bar" id="bankSelBar" style="display:none"><span id="bankSelText"></span> — <b id="bankSelCount">0</b> محدد <button class="btn btn-sm" id="bankSelAllBtn">تحديد الكل</button><button class="btn btn-sm btn-primary" id="bankSelConfirmBtn">تأكيد</button><button class="btn btn-sm" id="bankSelCancelBtn">إلغاء</button></div>
         <div id="bankOutput"></div>
       </div>
 
       <div id="delegationsReportPanel" class="card section-card" style="display:none">
-        <div class="employee-report-toolbar"><div><h2>التفاويش</h2><p>الحراس أصحاب «التفويض البنكي»: بيانات المفوض وآيبانه والبنك.</p></div><span class="pill pill-gray" id="delRepCount">0 سجل</span></div>
+        <div class="employee-report-toolbar"><div><h2>التفاويض</h2><p>الحراس أصحاب «التفويض البنكي»: بيانات المفوض وآيبانه والبنك.</p></div><span class="pill pill-gray" id="delRepCount">0 سجل</span></div>
         <div class="att-toolbar payroll-toolbar" style="margin:12px 0">
           <div class="payroll-filter-group payroll-search-wide"><label>بحث بالاسم أو الهوية أو الآيبان</label><input type="search" id="delRepSearch" placeholder="بحث"></div>
           <div class="payroll-filter-group"><label>المشروع</label><select id="delRepProject"><option value="">كل المشاريع</option></select></div>
