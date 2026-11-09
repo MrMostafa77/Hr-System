@@ -7,7 +7,7 @@
   // ===== الحقول المالية لكل نوع =====
   const EMP_FIN = ['basicsalary','housingPct','housing','transportPct','transport','otherallowPct','otherallow',
     'otherded','gosi','lastwage','bankname','iban','accountno','bankcode','bankAccountType',
-    'delegate_name','delegate_memo','holder_name','ibans','ibanHistory','salaryHistory','payHistory'];
+    'delegate_name','delegate_id','delegate_memo','holder_name','ibans','ibanHistory','salaryHistory','payHistory'];
 
   // المشروع: ما يبقى عاماً (بيانات تعريفية + أعداد فقط)، وكل ما عداه مالي
   const PROJ_GENERAL = ['id','name','region','cr','vatNo','address','phones','emails','repId','repName',

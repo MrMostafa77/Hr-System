@@ -2,10 +2,10 @@
 // الملف يُحمَّل قبل app.js، ويتم ضبط profile بعد تسجيل الدخول من firebase-init.js.
 (function(){
   'use strict';
-  const REPORTS = ['payroll','employees','projects','coverage','bank'];
+  const REPORTS = ['payroll','employees','projects','coverage','bank','delegations'];
   // شاشات ليس لها رابط في القائمة الجانبية وتتبع صلاحية شاشة أخرى
   // شاشات تعتمد كلياً على بيانات مالية: لا تُفتح إلا لمن لديه صلاحية المالية
-  const FIN_ONLY = ['projectaccounts','reports:payroll','reports:bank','sales','salesorder','allinvoices','salesorderreport','invoicereport'];
+  const FIN_ONLY = ['projectaccounts','reports:payroll','reports:bank','reports:delegations','sales','salesorder','allinvoices','salesorderreport','invoicereport'];
   const ALIASES = { employees:['add','all-employees'], allprojects:['projects'], 'commencement-list':['commencements'] };
 
   const HRAuth = {

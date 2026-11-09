@@ -67,6 +67,7 @@
           <a class="navlink nav-child" data-view="reports" data-report="payroll"><span>تقارير الرواتب</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="employees"><span>تقارير الموظفين</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="bank"><span>كشف البنك</span></a>
+          <a class="navlink nav-child" data-view="reports" data-report="delegations"><span>التفاويش</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="projects"><span>تقارير المشاريع</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="coverage"><span>تقارير التغطيات</span></a>
         </div>
@@ -506,6 +507,7 @@
           <div class="field-grid bank-data-grid">
             <div class="field full"><label>نوع الحساب البنكي</label><div class="bank-account-type-box"><label><input type="radio" name="bankAccountType" value="حساب شخصي" checked> حساب شخصي</label><label><input type="radio" name="bankAccountType" value="تفويض بنكي"> تفويض بنكي</label></div></div>
             <div class="field full delegate-only"><label>اسم المفوض</label><input type="text" id="f_delegate_name" placeholder="اسم المفوض"></div>
+            <div class="field delegate-only"><label>هوية المفوض</label><input type="text" id="f_delegate_id" class="mono" placeholder="رقم الهوية / الإقامة" maxlength="15" inputmode="numeric"></div>
             <div class="field delegate-only"><label>مذكرة التفويض</label><div class="delegate-memo-row"><button type="button" class="btn btn-sm" id="delegateMemoBtn">تحميل مذكرة التفويض</button><input type="file" id="f_delegate_memo" accept=".pdf,.jpg,.jpeg,.png" hidden><span id="delegateMemoName"></span></div></div>
             <div class="field"><label>رقم الايبان البنكي <span class="req">*</span></label><input type="text" id="f_iban" class="mono" placeholder="SA..." maxlength="24" inputmode="text" required></div>
             <div class="field"><label>اسم البنك</label><input type="text" id="f_bankname" readonly></div>
@@ -1183,6 +1185,16 @@
           <button class="btn" id="bankPrintBtn">طباعة</button>
         </div>
         <div id="bankOutput"></div>
+      </div>
+
+      <div id="delegationsReportPanel" class="card section-card" style="display:none">
+        <div class="employee-report-toolbar"><div><h2>التفاويش</h2><p>الحراس أصحاب «التفويض البنكي»: بيانات المفوض وآيبانه والبنك.</p></div><span class="pill pill-gray" id="delRepCount">0 سجل</span></div>
+        <div class="att-toolbar payroll-toolbar" style="margin:12px 0">
+          <div class="payroll-filter-group payroll-search-wide"><label>بحث بالاسم أو الهوية أو الآيبان</label><input type="search" id="delRepSearch" placeholder="بحث"></div>
+          <div class="payroll-filter-group"><label>المشروع</label><select id="delRepProject"><option value="">كل المشاريع</option></select></div>
+          <button class="btn" id="delRepPrintBtn">طباعة</button>
+        </div>
+        <div class="table-wrap"><table class="payroll-table"><thead><tr><th>م</th><th>اسم الحارس</th><th>اسم المفوض</th><th>هوية المفوض</th><th>آيبان المفوض</th><th>اسم البنك</th><th>كود البنك</th></tr></thead><tbody id="delRepBody"></tbody></table></div>
       </div>
 
       <div id="coverageReportsPanel" class="card section-card" style="display:none">

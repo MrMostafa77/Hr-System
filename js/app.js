@@ -942,7 +942,7 @@
     if(view==='projectpromotions') renderProjectPromotions();
     if(view==='reports'){
       const activeReport=document.querySelector('.nav-child[data-view="reports"].active');
-      const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك'};
+      const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك',delegations:'التفاويش'};
       const title=titleMap[activeReport?.dataset.report||'payroll']||'تقارير الرواتب';
       const h=document.querySelector('#view-reports .pagetitle h1');
       if(h) h.textContent=title;
@@ -1750,7 +1750,7 @@
   };
 
   const formFields = ['firstname','fathername','grandname','familyname','fullname','idnum','nationality','dob','gender','iddate_issue','iddate_expiry','idplace',
-    'phone','email','address','emname','emphone','empcode','jobtitle','dept','startdate','region','project','basicsalary','housingPct','housing','transportPct','transport','otherallowPct','otherallow','otherded','bankname','iban','accountno','bankcode','bankAccountType','delegate_name','delegate_memo','lastwage'];
+    'phone','email','address','emname','emphone','empcode','jobtitle','dept','startdate','region','project','basicsalary','housingPct','housing','transportPct','transport','otherallowPct','otherallow','otherded','bankname','iban','accountno','bankcode','bankAccountType','delegate_name','delegate_id','delegate_memo','lastwage'];
 
   function fillNationalityAndIssueRegion(){
     const n=document.getElementById('f_nationality');
@@ -3149,7 +3149,7 @@
     const table=(heads,rows,empty)=>`<div class="employee-profile-table-wrap"><table class="employee-profile-table"><thead><tr>${heads.map(h=>`<th>${escapeHtml(h)}</th>`).join('')}</tr></thead><tbody>${rows||`<tr><td colspan="${heads.length}" class="empty-note">${escapeHtml(empty)}</td></tr>`}</tbody></table></div>`;
     const personal=[['الاسم الأول',e.firstname],['اسم الأب',e.fathername],['اسم الجد',e.grandname],['اسم العائلة',e.familyname],['الاسم الكامل',e.fullname],['الكود الوظيفي',e.empcode],['رقم الهوية',e.idnum],['الجنسية',e.nationality],['تاريخ الميلاد',e.dob],['الجنس',e.gender],['تاريخ إصدار الهوية',e.iddate_issue],['تاريخ انتهاء الهوية',e.iddate_expiry],['مكان إصدار الهوية',e.idplace],['الجوال',e.phone],['البريد الإلكتروني',e.email],['العنوان',e.address],['اسم جهة الطوارئ',e.emname],['جوال جهة الطوارئ',e.emphone],['المنطقة',e.region],['المشروع',e.project],['القسم',e.dept],['الوظيفة',e.jobtitle],['تاريخ بدء العمل المسجل',e.startdate]];
     const contractFields=c?[['رقم العقد',c.contractNo||c.contractCode||c.code||c.id],['تاريخ البداية',c.startDate||c.startdate],['تاريخ النهاية',c.endDate||c.enddate],['المدة',c.duration||c.period],['الحالة',ci.status],['الراتب الأساسي',fmt(e.basicsalary)],['بدل السكن',fmt(e.housing)],['نسبة بدل السكن',e.housingPct],['بدل المواصلات',fmt(e.transport)],['نسبة بدل المواصلات',e.transportPct],['بدلات أخرى',fmt(e.otherallow)],['نسبة البدلات الأخرى',e.otherallowPct],['خصومات أخرى',fmt(e.otherded)],['إجمالي الراتب',fmt(lastWageTotal(e))],['آخر أجر مسجل',fmt(e.lastwage)]]:[['حالة العقد','بدون عقد'],['الراتب الأساسي',fmt(e.basicsalary)],['بدل السكن',fmt(e.housing)],['بدل المواصلات',fmt(e.transport)],['بدلات أخرى',fmt(e.otherallow)],['خصومات أخرى',fmt(e.otherded)],['إجمالي الراتب',fmt(lastWageTotal(e))]];
-    const bankFields=[['اسم البنك',e.bankname],['رقم الآيبان',e.iban],['رقم الحساب',e.accountno],['رمز البنك',e.bankcode],['نوع الحساب',e.bankAccountType],['اسم المفوض',e.delegate_name],['ملاحظات التفويض',e.delegate_memo]];
+    const bankFields=[['اسم البنك',e.bankname],['رقم الآيبان',e.iban],['رقم الحساب',e.accountno],['رمز البنك',e.bankcode],['نوع الحساب',e.bankAccountType],['اسم المفوض',e.delegate_name],['هوية المفوض',e.delegate_id],['ملاحظات التفويض',e.delegate_memo]];
     const monthNames=months.slice().reverse();
     const attendanceRows=monthNames.map(ym=>{
       const mc=att.slice().filter(x=>x.date.slice(0,7)===ym);
@@ -3336,14 +3336,54 @@
     w.document.close(); setTimeout(()=>w.print(),400);
   });
 
+  /* ===== تقرير التفاويش (الحراس أصحاب التفويض البنكي) ===== */
+  const delRepState={q:'',project:''};
+  function delegationRows(){
+    const rows=[];
+    (employees||[]).forEach(e=>{
+      if(!(e.bankAccountType==='تفويض بنكي'||String(e.delegate_name||'').trim())) return;
+      const list=employeeIbanList(e), base={guard:e.fullname||'',delegate:e.delegate_name||'',did:e.delegate_id||'',project:e.project||''};
+      if(!list.length){ rows.push({...base,iban:'',bank:'',code:''}); return; }
+      list.forEach(x=>{ const info=ibanBankInfo(String(x.iban||'').replace(/\s/g,'')); rows.push({...base,iban:x.iban||'',bank:x.bankname||info.bankname||'',code:x.bankcode||info.bankcode||''}); });
+    });
+    return rows;
+  }
+  function delegationFiltered(){
+    const q=delRepState.q.trim().toLowerCase(), pr=delRepState.project;
+    return delegationRows().filter(r=>(!pr||r.project===pr)&&(!q||[r.guard,r.delegate,r.did,r.iban].some(v=>String(v||'').toLowerCase().includes(q))));
+  }
+  function delegationTableRows(rows){
+    return rows.map((r,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(r.guard)}</td><td>${escapeHtml(r.delegate)}</td><td dir="ltr">${escapeHtml(r.did)}</td><td dir="ltr" class="mono">${escapeHtml(r.iban)}</td><td>${escapeHtml(r.bank)}</td><td dir="ltr">${escapeHtml(r.code)}</td></tr>`).join('');
+  }
+  function renderDelegationsReport(){
+    const body=document.getElementById('delRepBody'); if(!body) return;
+    const all=delegationRows(), psel=document.getElementById('delRepProject'), qin=document.getElementById('delRepSearch');
+    const projs=[...new Set(all.map(r=>r.project).filter(Boolean))].sort();
+    if(!projs.includes(delRepState.project)) delRepState.project='';
+    psel.innerHTML='<option value="">كل المشاريع</option>'+projs.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join(''); psel.value=delRepState.project;
+    if(qin&&qin.value!==delRepState.q) qin.value=delRepState.q;
+    const rows=delegationFiltered();
+    const cnt=document.getElementById('delRepCount'); if(cnt) cnt.textContent=`${rows.length} من ${all.length} سجل`;
+    body.innerHTML=rows.length?delegationTableRows(rows):'<tr><td colspan="7" class="empty-note">لا توجد تفاويش بنكية. اختر «تفويض بنكي» في تبويب البنك بملف الموظف وأدخل بيانات المفوض.</td></tr>';
+  }
+  document.getElementById('delRepProject')?.addEventListener('change',e=>{ delRepState.project=e.target.value; renderDelegationsReport(); });
+  document.getElementById('delRepSearch')?.addEventListener('input',e=>{ delRepState.q=e.target.value; const pos=e.target.selectionStart; renderDelegationsReport(); const el=document.getElementById('delRepSearch'); if(el){ el.focus(); try{el.setSelectionRange(pos,pos);}catch(_){} } });
+  document.getElementById('delRepPrintBtn')?.addEventListener('click',()=>{
+    const rows=delegationFiltered(); if(!rows.length){ showToast('لا توجد بيانات للطباعة'); return; }
+    const w=window.open('','_blank'); if(!w){ showToast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>التفاويش</title><style>body{font-family:Tahoma,Arial,sans-serif;margin:14px;color:#111}h2{text-align:center}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #bbb;padding:5px 6px;text-align:center}th{background:#dce6f5}@page{size:A4 landscape;margin:8mm}</style></head><body><h2>التفاويش</h2><table><thead><tr><th>م</th><th>اسم الحارس</th><th>اسم المفوض</th><th>هوية المفوض</th><th>آيبان المفوض</th><th>اسم البنك</th><th>كود البنك</th></tr></thead><tbody>${delegationTableRows(rows)}</tbody></table></body></html>`);
+    w.document.close(); w.focus(); setTimeout(()=>{ try{w.print();}catch(_){} },300);
+  });
+
   function renderReports(){
-    const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel'), bankMode=window.currentReport==='bank', bankPanel=document.getElementById('bankReportsPanel');
+    const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel'), bankMode=window.currentReport==='bank', bankPanel=document.getElementById('bankReportsPanel'), delMode=window.currentReport==='delegations', delPanel=document.getElementById('delegationsReportPanel');
     if(covPanel)covPanel.style.display=coverageMode?'':'none';
+    if(delPanel)delPanel.style.display=delMode?'':'none';
     if(bankPanel)bankPanel.style.display=bankMode?'':'none';   // كل تقرير في تبويبه فقط: لا يبقى كشف البنك ظاهرًا في تقارير الموظفين/المشاريع
     // أزرار الشريط العلوي خاصة بمسير الرواتب فقط
-    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':''; });
-    if(card)card.style.display=(projectMode||employeeMode||coverageMode||bankMode)?'none':'';
-    { const sb=document.getElementById('paySelBar'); if(sb&&(projectMode||employeeMode||coverageMode||bankMode)) sb.style.display='none'; }
+    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode||bankMode||delMode)?'none':''; });
+    if(card)card.style.display=(projectMode||employeeMode||coverageMode||bankMode||delMode)?'none':'';
+    { const sb=document.getElementById('paySelBar'); if(sb&&(projectMode||employeeMode||coverageMode||bankMode||delMode)) sb.style.display='none'; }
     if(panel)panel.style.display=projectMode?'':'none';
     if(employeePanel)employeePanel.style.display=employeeMode?'':'none';
     if(projectMode){renderProjects();renderProjectCapacity();try{renderProjectDetailReport();}catch(err){console.error(err);}return;}
@@ -3351,6 +3391,7 @@
     if(bankPanel)bankPanel.style.display=bankMode?'':'none';
     if(coverageMode){renderCoverageReport();return;}
     if(bankMode){renderBankReport();return;}
+    if(delMode){renderDelegationsReport();return;}
     refreshPayrollMonthOptions();refreshPayrollFilters();
     try{
       const dg=document.getElementById('payrollDiag');
