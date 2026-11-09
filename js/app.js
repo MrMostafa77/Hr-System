@@ -727,6 +727,10 @@
     data.costTotal=sumRows(projectBreakdown().cost).ex;
     if(!data.name||!data.region){showToast('يرجى إدخال اسم المشروع واختيار المنطقة');return;}
     const existing=projects.find(x=>x.id===data.id);
+    if(existing&&Array.isArray(existing.capacityHistory)&&existing.capacityHistory.length){   // حفظ سجل تعديلات الأعداد من التاريخ
+      data.capacityHistory=existing.capacityHistory;
+      Object.keys(roleCapacityLabels).forEach(k=>{ const h=projCapHist(existing,k); if(h.length>=2) data[k]=h[h.length-1].qty; });
+    }
     const capacityError=validateProjectCapacities(existing?existing.name:data.name,null,data);
     if(capacityError){showToast(capacityError);}
     const idx=projects.findIndex(x=>x.id===data.id);if(idx>=0)projects[idx]=data;else projects.push(data);
@@ -2486,7 +2490,7 @@
     { // راتب الحراس: التعديل من «تعديل الموظف» = تصحيح بأثر رجعي. أما الراتب من تاريخ معيّن فمكانه «ترقيات الموظفين»
       const oldE=employees.find(x=>String(x.id)===String(id));
       if(oldE && Array.isArray(oldE.salaryHistory)) data.salaryHistory=oldE.salaryHistory;
-      if(oldE && isGuardEmployee(data) && ['basicsalary','housing','transport','otherallow'].some(k=>(Number(oldE[k])||0)!==(Number(data[k])||0))){
+      if(oldE && (isGuardEmployee(data)||empSalaryHist(oldE).length>=2) && ['basicsalary','housing','transport','otherallow'].some(k=>(Number(oldE[k])||0)!==(Number(data[k])||0))){
         const h=empSalaryHist(oldE); let fromYm='', fromDate='';
         if(h.length>=2){
           const last=h[h.length-1]; fromDate=String(last.from||''); fromYm=fromDate.slice(0,7);
@@ -3231,8 +3235,9 @@
     const revRows=[]; const rv=p.revenueItems||{};
     Object.keys(projectKinds).forEach(k=>{
       if(!Array.isArray(rv[k])) return;
+      const pf=PDR_ROLES.includes(k)?projQtyFactor(p,k,cols).factor:1;   // عدد الأفراد حسب التاريخ
       rv[k].forEach(r=>{
-        const qty=Number(r.quantity)||0, unit=Number(r.unit)||0, ex=qty*unit, v=ex*vat/100;
+        const qty=r2((Number(r.quantity)||0)*pf), unit=Number(r.unit)||0, ex=qty*unit, v=ex*vat/100;
         if(!qty&&!unit) return;
         revRows.push({name:projectKinds[k]+(r.type?` — ${r.type}`:''),qty,unit,ex,vat:v,inc:ex+v});
       });
@@ -3240,7 +3245,8 @@
     // الفئات البشرية
     const roles={}; PDR_ROLES.forEach(k=>{
       const cv=(p.costItems&&Array.isArray(p.costItems[k]))?p.costItems[k]:[];
-      roles[k]={k,label:roleCapacityLabels[k],cap:projectRoleCapacity(p,k),budget:cv.reduce((a,r)=>a+(Number(r.quantity)||0)*(Number(r.unit)||0),0),hasCost:cv.length>0,emps:[]};
+      const pf=projQtyFactor(p,k,cols);
+      roles[k]={k,label:roleCapacityLabels[k],cap:pf.avg!=null?pf.avg:projectRoleCapacity(p,k),budget:cv.reduce((a,r)=>a+(Number(r.quantity)||0)*(Number(r.unit)||0),0)*pf.factor,hasCost:cv.length>0,emps:[]};
     });
     roles.other={k:'other',label:'وظائف أخرى / غير محددة',cap:0,budget:0,hasCost:false,emps:[]};
     employees.filter(e=>sameProjectName(e.project,p.name)).forEach(e=>{
@@ -3619,58 +3625,145 @@
     if(!list.length){ showToast('حدّد موظفًا واحدًا على الأقل من الخانات بجانب الأسماء'); return; }
     payrollBankExport(list,ym,{selected:true});
   });
-  /* ===== شاشة ترقيات الموظفين (الحراس): راتب جديد من تاريخ ===== */
-  function promoGuards(){ return employees.filter(isGuardEmployee).slice().sort((a,b)=>String(a.project||'').localeCompare(String(b.project||''),'ar')||String(a.fullname||'').localeCompare(String(b.fullname||''),'ar')); }
+  /* ===== شاشة ترقيات الموظفين والمشاريع ===== */
+  function promoEligible(e){ try{ return employeeContractStatus(e)==='ساري' && employeeCommencementStatus(e)==='مباشر'; }catch(_){ return false; } }
+  function promoDiffPill(d){ d=Math.round((Number(d)||0)*100)/100; if(!d) return '<span class="pdr-pill pdr-ok">بدون تغيير</span>'; return d>0?`<span class="pdr-pill pdr-up">زيادة ${fmt(Math.abs(d))}</span>`:`<span class="pdr-pill pdr-down">نقص ${fmt(Math.abs(d))}</span>`; }
+  function promoSalaryNums(e){ return {basic:Number(e.basicsalary)||0,housing:Number(e.housing)||0,transport:Number(e.transport)||0,otherallow:Number(e.otherallow)||0}; }
+  function promoUpdateTotal(){
+    const g=id=>Number(document.getElementById(id)?.value)||0, t=document.getElementById('promoTotalShow');
+    if(t) t.value=fmt(r2(g('promoBasic')+g('promoHousing')+g('promoTransport')+g('promoOther')));
+  }
+  function promoFillFromEmp(empId){
+    const e=employees.find(x=>String(x.id)===String(empId)), s=e?promoSalaryNums(e):{basic:'',housing:'',transport:'',otherallow:''};
+    document.getElementById('promoBasic').value=s.basic; document.getElementById('promoHousing').value=s.housing;
+    document.getElementById('promoTransport').value=s.transport; document.getElementById('promoOther').value=s.otherallow;
+    promoUpdateTotal();
+  }
   function renderEmployeePromotions(){
-    const sel=document.getElementById('promoEmp'), body=document.getElementById('promoBody'), note=document.getElementById('promoNote'); if(!sel||!body) return;
-    const fin=pdrCanFinance(); if(note) note.style.display=fin?'none':'';
-    const old=sel.value, gs=promoGuards();
-    sel.innerHTML='<option value="">اختر الحارس</option>'+gs.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'—')}${e.empcode?' — '+escapeHtml(e.empcode):''}${e.project?' — '+escapeHtml(e.project):''}</option>`).join('');
-    if(gs.some(e=>String(e.id)===old)) sel.value=old;
+    const empBody=document.getElementById('promoEmpBody'), body=document.getElementById('promoBody'), sel=document.getElementById('promoEmp'); if(!empBody||!body||!sel) return;
+    const fin=pdrCanFinance(), note=document.getElementById('promoNote'); if(note) note.style.display=fin?'none':'';
+    const q=String(document.getElementById('promoSearch')?.value||'').trim().toLowerCase();
+    const all=employees.filter(promoEligible).slice().sort((a,b)=>String(a.project||'').localeCompare(String(b.project||''),'ar')||String(a.fullname||'').localeCompare(String(b.fullname||''),'ar'));
+    const list=q?all.filter(e=>[e.empcode,e.fullname,e.project].some(v=>String(v||'').toLowerCase().includes(q))):all;
+    const old=sel.value;
+    sel.innerHTML='<option value="">اختر الموظف</option>'+all.map(e=>`<option value="${escapeAttr(e.id)}">${escapeHtml(e.fullname||'—')}${e.empcode?' — '+escapeHtml(e.empcode):''}${e.project?' — '+escapeHtml(e.project):''}</option>`).join('');
+    if(all.some(e=>String(e.id)===old)) sel.value=old;
+    empBody.innerHTML=list.map((e,i)=>{ const h=empSalaryHist(e), last=h.length>=2?h[h.length-1]:null;
+      return `<tr><td class="mono">${i+1}</td><td class="mono">${escapeHtml(e.empcode||'')}</td><td><b>${escapeHtml(e.fullname||'—')}</b></td><td>${escapeHtml(e.project||'—')}</td><td class="mono">${fmt(empSalaryTotal(promoSalaryNums(e)&&{basic:e.basicsalary,housing:e.housing,transport:e.transport,otherallow:e.otherallow}))}</td><td class="mono">${last?escapeHtml(fmtDMY(last.from)):'—'}</td><td>${fin?`<button type="button" class="btn btn-sm" data-promo-pick="${escapeAttr(e.id)}">تعديل الراتب</button>`:''}</td></tr>`; }).join('')
+      ||'<tr><td colspan="7" class="empty-note">لا يوجد موظفون لديهم عقد ومباشرة حالياً.</td></tr>';
     const rows=[];
-    gs.forEach(e=>{ const h=empSalaryHist(e); for(let i=1;i<h.length;i++) rows.push({e,prev:h[i-1],cur:h[i],idx:i}); });
+    employees.forEach(e=>{ const h=empSalaryHist(e); for(let i=1;i<h.length;i++) rows.push({e,prev:h[i-1],cur:h[i]}); });
     rows.sort((a,b)=>String(b.cur.from||'').localeCompare(String(a.cur.from||'')));
-    body.innerHTML=rows.map((r,i)=>`<tr><td class="mono">${i+1}</td><td><b>${escapeHtml(r.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(r.e.empcode||'')}</small></td><td>${escapeHtml(r.e.project||'—')}</td><td class="mono">${fmt(empSalaryTotal(r.prev))}</td><td class="mono" style="font-weight:700;color:var(--teal)">${fmt(empSalaryTotal(r.cur))}</td><td class="mono">${escapeHtml(fmtDMY(r.cur.from))}</td><td>${escapeHtml(r.cur.note||'')}</td><td>${fin?`<button type="button" class="btn btn-sm" data-promo-del="${escapeAttr(r.e.id)}" data-promo-from="${escapeAttr(r.cur.from)}">حذف</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد ترقيات مسجلة حالياً.</td></tr>';
+    body.innerHTML=rows.map((r,i)=>{ const p=empSalaryTotal(r.prev), c=empSalaryTotal(r.cur);
+      return `<tr><td class="mono">${i+1}</td><td><b>${escapeHtml(r.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(r.e.empcode||'')}</small></td><td>${escapeHtml(r.e.project||'—')}</td><td class="mono">${fmt(p)}</td><td class="mono" style="font-weight:700">${fmt(c)}</td><td>${promoDiffPill(c-p)}</td><td class="mono">${escapeHtml(fmtDMY(r.cur.from))}</td><td>${escapeHtml(r.cur.note||'')}</td><td>${fin?`<button type="button" class="btn btn-sm" data-promo-del="${escapeAttr(r.e.id)}" data-promo-from="${escapeAttr(r.cur.from)}">حذف</button>`:''}</td></tr>`; }).join('')
+      ||'<tr><td colspan="9" class="empty-note">لا توجد تعديلات رواتب مسجلة حالياً.</td></tr>';
+    renderProjectPromotions();
   }
   function promoApplyLatest(e,h){
     const last=h[h.length-1]; e.basicsalary=last.basic; e.housing=last.housing; e.transport=last.transport; e.otherallow=last.otherallow;
     e.lastwage=empSalaryTotal(last);
   }
-  function empPromoAdd(empId,total,from,note){
+  function empPromoAdd(empId,sal,from,note){
     if(!pdrCanFinance()) return 'تسجيل الترقيات يحتاج صلاحية المالية';
-    const e=employees.find(x=>String(x.id)===String(empId)); if(!e) return 'اختر الحارس';
-    if(!isGuardEmployee(e)) return 'الترقيات متاحة للحراس فقط';
-    if(!(total>0)) return 'اكتب إجمالي الراتب الجديد';
+    const e=employees.find(x=>String(x.id)===String(empId)); if(!e) return 'اختر الموظف';
+    if(!promoEligible(e)) return 'هذا الموظف ليس لديه عقد ومباشرة';
+    if(!(sal.basic>0)) return 'اكتب الراتب الأساسي الجديد';
     if(!/^\d{4}-\d{2}-\d{2}$/.test(String(from||''))) return 'اختر تاريخ بداية الراتب الجديد';
     let h=empSalaryHist(e);
-    if(!h.length) h=[{from:'',basic:Number(e.basicsalary)||0,housing:Number(e.housing)||0,transport:Number(e.transport)||0,otherallow:Number(e.otherallow)||0,at:''}];   // الراتب الأصلي قبل أول ترقية
-    if(h.some(x=>String(x.from||'')===from)) return 'يوجد راتب مسجل لهذا الحارس بنفس التاريخ';
-    const hp=Number(e.housingPct)||0, tp=Number(e.transportPct)||0, op=Number(e.otherallowPct)||0;
-    const b0=solveBasicForTotal(total,hp,tp,op), hh=allowanceAmount(b0,hp), tt=allowanceAmount(b0,tp), oo=allowanceAmount(b0,op);
-    const resid=Math.round(total*100)-Math.round((b0+hh+tt+oo)*100);
-    h=[...h,{from,basic:Math.round((b0+resid/100)*100)/100,housing:hh,transport:tt,otherallow:oo,at:new Date().toISOString(),note:String(note||'').trim()}].sort((a,b)=>String(a.from||'').localeCompare(String(b.from||'')));
+    if(!h.length) h=[{from:'',...promoSalaryNums(e),at:''}];   // الراتب الأصلي قبل أول تعديل
+    if(h.some(x=>String(x.from||'')===from)) return 'يوجد راتب مسجل لهذا الموظف بنفس التاريخ';
+    h=[...h,{from,basic:sal.basic,housing:sal.housing,transport:sal.transport,otherallow:sal.otherallow,at:new Date().toISOString(),note:String(note||'').trim()}].sort((a,b)=>String(a.from||'').localeCompare(String(b.from||'')));
     e.salaryHistory=h; promoApplyLatest(e,h);
     payDropSnaps(e.id,from.slice(0,7));
-    persistCloud(`تم تسجيل الراتب الجديد للحارس ${e.fullname||''} من ${fmtDMY(from)}`);
+    persistCloud(`تم تسجيل الراتب الجديد للموظف ${e.fullname||''} من ${fmtDMY(from)}`);
     try{ renderReports(); }catch(_){}
     try{ renderEmployeeTable(); }catch(_){}
     return '';
   }
+  /* ---- المشاريع: عدد الأفراد من تاريخ (capacityHistory) ---- */
+  function projCapHist(p,k){ return (Array.isArray(p?.capacityHistory)?p.capacityHistory:[]).filter(x=>x&&x.role===k).slice().sort((a,b)=>String(a.from||'').localeCompare(String(b.from||''))); }
+  function projQtyAt(p,k,iso){ const h=projCapHist(p,k); if(h.length<2) return null; let pick=null; h.forEach(x=>{ if(!x.from||x.from<=iso) pick=x; }); return Number((pick||h[0]).qty)||0; }
+  function projQtyFactor(p,k,cols){
+    const h=projCapHist(p,k); if(h.length<2||!cols||!cols.length) return {factor:1,avg:null};
+    const base=Number(h[0].qty)||0; let sum=0; cols.forEach(c=>{ sum+=projQtyAt(p,k,c.iso); });
+    const avg=sum/cols.length; return {factor:base>0?avg/base:1,avg:Math.round(avg*100)/100};
+  }
+  function renderProjectPromotions(){
+    const ps=document.getElementById('promoProj'), rs=document.getElementById('promoRole'), body=document.getElementById('promoProjBody'); if(!ps||!rs||!body) return;
+    const fin=pdrCanFinance(), oldP=ps.value, oldR=rs.value;
+    ps.innerHTML='<option value="">اختر المشروع</option>'+projects.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'ar')).map(p=>`<option value="${escapeAttr(p.id)}">${escapeHtml(p.name||'—')}</option>`).join('');
+    if(projects.some(p=>String(p.id)===oldP)) ps.value=oldP;
+    rs.innerHTML=Object.keys(roleCapacityLabels).map(k=>`<option value="${k}">${roleCapacityLabels[k]}</option>`).join('');
+    if(roleCapacityLabels[oldR]) rs.value=oldR;
+    promoShowCurrentQty();
+    const rows=[];
+    projects.forEach(p=>{ Object.keys(roleCapacityLabels).forEach(k=>{ const h=projCapHist(p,k); for(let i=1;i<h.length;i++) rows.push({p,k,prev:h[i-1],cur:h[i]}); }); });
+    rows.sort((a,b)=>String(b.cur.from||'').localeCompare(String(a.cur.from||'')));
+    body.innerHTML=rows.map((r,i)=>`<tr><td class="mono">${i+1}</td><td><b>${escapeHtml(r.p.name||'—')}</b></td><td>${roleCapacityLabels[r.k]}</td><td class="mono">${fmt(r.prev.qty)}</td><td class="mono" style="font-weight:700">${fmt(r.cur.qty)}</td><td>${promoDiffPill((Number(r.cur.qty)||0)-(Number(r.prev.qty)||0))}</td><td class="mono">${escapeHtml(fmtDMY(r.cur.from))}</td><td>${escapeHtml(r.cur.note||'')}</td><td>${fin?`<button type="button" class="btn btn-sm" data-projpromo-del="${escapeAttr(r.p.id)}" data-projpromo-role="${r.k}" data-projpromo-from="${escapeAttr(r.cur.from)}">حذف</button>`:''}</td></tr>`).join('')
+      ||'<tr><td colspan="9" class="empty-note">لا توجد تعديلات أعداد مسجلة حالياً.</td></tr>';
+  }
+  function promoShowCurrentQty(){
+    const p=projects.find(x=>String(x.id)===String(document.getElementById('promoProj')?.value)), k=document.getElementById('promoRole')?.value, el=document.getElementById('promoCur');
+    if(el) el.value=(p&&k)?fmt(projectRoleCapacity(p,k)):'';
+  }
+  function projPromoAdd(projId,role,qty,from,note){
+    if(!pdrCanFinance()) return 'تسجيل الترقيات يحتاج صلاحية المالية';
+    const p=projects.find(x=>String(x.id)===String(projId)); if(!p) return 'اختر المشروع';
+    if(!roleCapacityLabels[role]) return 'اختر الفئة';
+    if(!(qty>=0)||!Number.isFinite(qty)) return 'اكتب العدد الجديد';
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(from||''))) return 'اختر تاريخ بداية العدد الجديد';
+    let h=projCapHist(p,role);
+    if(!h.length) h=[{role,from:'',qty:projectRoleCapacity(p,role),at:''}];   // العدد الأصلي قبل أول تعديل
+    if(h.some(x=>String(x.from||'')===from)) return 'يوجد تعديل مسجل لهذه الفئة بنفس التاريخ';
+    h=[...h,{role,from,qty:Math.round(qty),at:new Date().toISOString(),note:String(note||'').trim()}].sort((a,b)=>String(a.from||'').localeCompare(String(b.from||'')));
+    p.capacityHistory=[...(Array.isArray(p.capacityHistory)?p.capacityHistory:[]).filter(x=>x&&x.role!==role),...h];
+    p[role]=h[h.length-1].qty;
+    persistCloud(`تم تسجيل العدد الجديد (${roleCapacityLabels[role]}) لمشروع ${p.name||''} من ${fmtDMY(from)}`);
+    try{ renderProjects(); renderProjectCapacity(); }catch(_){}
+    return '';
+  }
+  ['promoBasic','promoHousing','promoTransport','promoOther'].forEach(id=>document.getElementById(id)?.addEventListener('input',promoUpdateTotal));
+  document.getElementById('promoEmp')?.addEventListener('change',ev=>promoFillFromEmp(ev.target.value));
+  document.getElementById('promoSearch')?.addEventListener('input',()=>renderEmployeePromotions());
+  ['promoProj','promoRole'].forEach(id=>document.getElementById(id)?.addEventListener('change',promoShowCurrentQty));
+  document.getElementById('promoEmpBody')?.addEventListener('click',ev=>{
+    const b=ev.target.closest('[data-promo-pick]'); if(!b) return;
+    const sel=document.getElementById('promoEmp'); sel.value=b.dataset.promoPick; promoFillFromEmp(sel.value);
+    sel.scrollIntoView({behavior:'smooth',block:'center'}); document.getElementById('promoBasic')?.focus();
+  });
   document.getElementById('promoAddBtn')?.addEventListener('click',()=>{
-    const err=empPromoAdd(document.getElementById('promoEmp')?.value,Number(document.getElementById('promoTotal')?.value)||0,document.getElementById('promoDate')?.value||'',document.getElementById('promoNoteText')?.value||'');
+    const g=id=>Number(document.getElementById(id)?.value)||0;
+    const err=empPromoAdd(document.getElementById('promoEmp')?.value,{basic:g('promoBasic'),housing:g('promoHousing'),transport:g('promoTransport'),otherallow:g('promoOther')},document.getElementById('promoDate')?.value||'',document.getElementById('promoNoteText')?.value||'');
     if(err){ showToast(err); return; }
-    ['promoTotal','promoDate','promoNoteText'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    ['promoDate','promoNoteText'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
     renderEmployeePromotions();
   });
   document.getElementById('promoBody')?.addEventListener('click',ev=>{
     const b=ev.target.closest('[data-promo-del]'); if(!b) return;
     if(!pdrCanFinance()){ showToast('حذف الترقية يحتاج صلاحية المالية'); return; }
     const e=employees.find(x=>String(x.id)===String(b.dataset.promoDel)), from=b.dataset.promoFrom; if(!e) return;
-    if(!confirm(`حذف الراتب الجديد للحارس ${e.fullname||''} الذي يبدأ من ${fmtDMY(from)}؟ سيرجع الحساب للراتب السابق من هذا التاريخ.`)) return;
-    let h=empSalaryHist(e).filter(x=>String(x.from||'')!==from);
+    if(!confirm(`حذف الراتب الجديد للموظف ${e.fullname||''} الذي يبدأ من ${fmtDMY(from)}؟ سيرجع الحساب للراتب السابق من هذا التاريخ.`)) return;
+    const h=empSalaryHist(e).filter(x=>String(x.from||'')!==from);
     e.salaryHistory=h.length>=2?h:[]; if(h.length) promoApplyLatest(e,h);
     payDropSnaps(e.id,String(from).slice(0,7));
     persistCloud('تم حذف الترقية'); try{ renderReports(); }catch(_){} renderEmployeePromotions();
+  });
+  document.getElementById('promoProjAddBtn')?.addEventListener('click',()=>{
+    const qRaw=document.getElementById('promoQty')?.value;
+    const err=projPromoAdd(document.getElementById('promoProj')?.value,document.getElementById('promoRole')?.value,qRaw===''?NaN:Number(qRaw),document.getElementById('promoProjDate')?.value||'',document.getElementById('promoProjNote')?.value||'');
+    if(err){ showToast(err); return; }
+    ['promoQty','promoProjDate','promoProjNote'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    renderEmployeePromotions();
+  });
+  document.getElementById('promoProjBody')?.addEventListener('click',ev=>{
+    const b=ev.target.closest('[data-projpromo-del]'); if(!b) return;
+    if(!pdrCanFinance()){ showToast('حذف التعديل يحتاج صلاحية المالية'); return; }
+    const p=projects.find(x=>String(x.id)===String(b.dataset.projpromoDel)), role=b.dataset.projpromoRole, from=b.dataset.projpromoFrom; if(!p) return;
+    if(!confirm(`حذف تعديل ${roleCapacityLabels[role]||''} في مشروع ${p.name||''} الذي يبدأ من ${fmtDMY(from)}؟`)) return;
+    const h=projCapHist(p,role).filter(x=>String(x.from||'')!==from), others=(p.capacityHistory||[]).filter(x=>x&&x.role!==role);
+    if(h.length>=2){ p.capacityHistory=[...others,...h]; p[role]=h[h.length-1].qty; }
+    else { p.capacityHistory=others; if(h.length) p[role]=h[0].qty; }
+    persistCloud('تم حذف التعديل'); try{ renderProjects(); renderProjectCapacity(); }catch(_){} renderEmployeePromotions();
   });
   /* ===== export / import ===== */
   document.getElementById('exportBtn')?.addEventListener('click', ()=>{
