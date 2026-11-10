@@ -2903,3 +2903,8 @@ tr.att-cov-row td{background:rgba(212,160,23,.07);}
 .bank-table .bk-paid-tag{color:#15803d}
 tr.pay-paid td{background:rgba(34,160,90,.07)}
 tr.pay-paid input[disabled],tr.pay-paid select[disabled]{opacity:.65;cursor:not-allowed}
+
+/* المخزون */
+.inv-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+.inv-tab{border:1px solid var(--border);background:var(--border-soft);color:var(--ink);padding:8px 14px;border-radius:8px;font:inherit;font-weight:700;cursor:pointer}
+.inv-tab.active{background:var(--teal);border-color:var(--teal);color:#fff}

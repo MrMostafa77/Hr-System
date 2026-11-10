@@ -14,6 +14,7 @@
   const PROJECT_ACCOUNT_KEY = 'hr_project_accounts_v1';
   const PAYROLL_KEY = 'hr_payroll_v1';
   const INVOICE_KEY = 'hr_invoices_v1';
+  const INV_KEY = 'hr_inventory_v1';
   const ATT_CODES = ['','ح','-','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق','إجازة','مرضية'];   // (-) = لم يحضر: لا حضور ولا غياب، يُخصم يومه من الراتب بدون جزاء
   let paySelMode=false; const paySelected=new Set();   // وضع اختيار موظفين لترحيل كشف البنك
   // hold = الراتب الإجمالي لا يدخل إجمالي المسير ولا يُرحَّل على كشف البنك حتى تُلغى الحالة
@@ -42,6 +43,7 @@
   let projectAccounts = [];
   let payrollRecords = {};
   let invoices = [];
+  let inventory = {};
   let currentView = 'dashboard';
   let currentProfileId = null;
   let pendingDeleteId = null;
@@ -96,7 +98,8 @@
       contracts: readLocal(CONTRACT_KEY, []),
       commencements: readLocal(COMMENCEMENT_KEY, []),
       projectAccounts: readLocal(PROJECT_ACCOUNT_KEY, []), payrollRecords: readLocal(PAYROLL_KEY, {}),
-      invoices: readLocal(INVOICE_KEY, [])
+      invoices: readLocal(INVOICE_KEY, []),
+      inventory: readLocal(INV_KEY, {})
     };
   }
   function applyState(state){
@@ -113,6 +116,7 @@
     projectAccounts = Array.isArray(state?.projectAccounts) ? state.projectAccounts : [];
     payrollRecords = state?.payrollRecords && typeof state.payrollRecords==='object' ? state.payrollRecords : {};
     invoices = Array.isArray(state?.invoices) ? state.invoices : [];
+    inventory = state?.inventory && typeof state.inventory==='object' && !Array.isArray(state.inventory) ? state.inventory : {};
     syncEmployeeStartDates();
     normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
@@ -165,7 +169,7 @@
     }catch(_){}
   }
   function currentState(){
-    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords,invoices};
+    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords,invoices,inventory};
   }
   let cloudSaveTimer = null;
   let cloudApplying = false;
@@ -176,7 +180,7 @@
   function persistLocal(){
     writeLocal(STORAGE_KEY,employees); writeLocal(ATT_KEY,attendance);
     writeLocal(PEN_KEY,penalties); writeLocal(COV_KEY,coverage); writeLocal(SET_KEY,settings);
-    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords); writeLocal(INVOICE_KEY,invoices);
+    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords); writeLocal(INVOICE_KEY,invoices); writeLocal(INV_KEY,inventory);
   }
   function persistCloud(message='تم حفظ التغييرات بنجاح'){
     persistLocal();
@@ -209,7 +213,7 @@
   function loadAux(){
     const state=localState();
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
-    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{}; invoices=state.invoices||[];
+    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{}; invoices=state.invoices||[]; inventory=state.inventory||{};
     syncEmployeeStartDates();
     normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
@@ -794,7 +798,7 @@
   const exportableViews=['dashboard','regions','projects','allprojects','employees','departments','add','projectpromotions','employeepromotions','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports'];
   function currentViewElement(){ return currentView ? document.getElementById('view-'+currentView) : null; }
   function exportFileBase(){
-    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',reports:'التقارير'};
+    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',inventory:'المخزون',reports:'التقارير'};
     return titles[currentView]||'تصدير';
   }
   function exportCurrentExcel(){
@@ -899,7 +903,7 @@
     const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(view);
     st.textContent=`@media print { @page { size: A4 ${isLandscape?'landscape':'portrait'} !important; margin: ${isLandscape?'8mm':'10mm'} !important; } }`;
     document.head.appendChild(st);
-    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports','sales','salesorder','allinvoices','salesorderreport','invoicereport','users','projectpromotions','employeepromotions'].forEach(v=>{
+    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports','sales','salesorder','allinvoices','salesorderreport','invoicereport','users','projectpromotions','employeepromotions','inventory'].forEach(v=>{
       document.getElementById('view-'+v).style.display = (v===view)?'':'none';
     });
     document.querySelectorAll('.navlink[data-view]').forEach(a=>{
@@ -932,6 +936,7 @@
     if(view==='commencement-list') renderCommencementList();
     if(view==='projectaccounts') renderProjectAccount();
     if(view==='reports') renderReports();
+    if(view==='inventory') renderInventory();
     if(view==='sales') window.HRSales?.render();
     if(view==='salesorder') window.HRSales?.renderOrder();
     if(view==='allinvoices') window.HRSales?.renderAll();
@@ -952,7 +957,7 @@
   window.switchView = switchView;
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
-  const PJ_TITLES={users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',reports:'التقارير'};
+  const PJ_TITLES={inventory:'المخزون',users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',reports:'التقارير'};
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك'};
   const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn'],sales:['btn','saveInvoiceBtn'],salesorder:['btn','saveOrderBtn']};
   const pjTabs={open:[],dirty:new Set()};
@@ -2840,7 +2845,7 @@
      الشهر المنتهي: تُحفظ نسخة منه (داخل payrollRecords[الشهر][الموظف].snap) ولا تتغير
      حتى لو تغيّر راتب الموظف أو لائحة المشروع، إلا إذا تغيّر حضور الموظف في ذلك الشهر
      أو إجراءاته أو تعديلات المسير (مكافأة/خصومات...) — وعندها يُعاد الحساب بنفس الراتب المثبّت. */
-  const PAY_SNAP_KEYS=['day','basic','housing','transport','otherAllow','monthlyGross','overtime','appAdd','bonus','totalEarned','nonWorkDays','nonWorkDed','absenceDays','absence','penalty','withdrawal','gosi','uniform','newspaper','advance','other','deduction','net','insuranceBase','workDays'];
+  const PAY_SNAP_KEYS=['day','basic','housing','transport','otherAllow','monthlyGross','overtime','appAdd','bonus','totalEarned','nonWorkDays','nonWorkDed','absenceDays','absence','penalty','withdrawal','gosi','uniform','uniformInv','newspaper','advance','other','deduction','net','insuranceBase','workDays'];
   const PAY_SUM_ZERO={'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0,'إجازة':0,'مرضية':0};
   function payCanFreeze(){ return !(window.HRAuth&&typeof window.HRAuth.canFinance==='function') || !!window.HRAuth.canFinance(); }
   // الموظف يدخل مسير الشهر فقط إذا باشر في هذا الشهر أو قبله (أول حضور له لا يقع بعد نهاية الشهر)
@@ -2853,6 +2858,7 @@
     cols.forEach(c=>{ s+=(attCodeAt(c.ym,e.id,c.d)||'-')+','; });
     (penalties||[]).forEach(x=>{ if(String(x.empId)===String(e.id) && String(x.date||'').slice(0,7)===ym) s+='|'+JSON.stringify(x); });
     s+='#'+['bonus','uniform','newspaper','advance','other'].map(k=>Number(a[k])||0).join(':');
+    { const iv=invPayrollDeduction(e.id,ym); if(iv) s+='~'+iv; }
     { const stx=empStatusInfo(e,cols); if(stx.text) s+='@'+stx.text; }
     let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0;
     return (h>>>0).toString(36)+'.'+s.length.toString(36);
@@ -2972,10 +2978,10 @@
     const insuranceBase=basic+housing;
     // التأمينات الاجتماعية: حصة الموظف فقط من (الأساسي + السكن)، وتُخصم إذا كانت مفعّلة في المشروع
     const gosi=(project?.siEnabled && !notStarted) ? r2(insuranceBase*(Number(project.siGuardRate)||SI_GUARD_RATE)/100*paidDays/MD) : 0;
-    const uniform=Number(a.uniform)||0,newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0,other=Number(a.other)||0;
+    const uniformInv=invPayrollDeduction(e.id,ym), uniform=r2((Number(a.uniform)||0)+uniformInv),newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0,other=Number(a.other)||0;
     const deduction=r2(nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance+other);
     const stI=empStatusInfo(e,cols);
-    return {held:stI.held,statusText:stI.text,ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,appAdd,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
+    return {held:stI.held,statusText:stI.text,ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,appAdd,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,uniformInv,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
   }
   function payrollStatementFor(e){
     const ym=document.getElementById('payrollMonth')?.value||payrollAvailableMonths()[0]||currentMonthStr();
@@ -3170,7 +3176,7 @@
         ['الأجر اليومي',fmt(p.day)],['الأساسي',fmt(p.basic)],['بدل السكن',fmt(p.housing)],['بدل المواصلات',fmt(p.transport)],
         ['بدلات أخرى',fmt(p.otherAllow)],['إضافي',fmt(p.overtime)],['تطبيق',fmt(p.appAdd)],['مكافآت',fmt(a.bonus)],['إجمالي المستحقات',fmt(p.totalEarned)],
         ['خصم عدم المباشرة',fmt(p.nonWorkDed)],['التأمينات',fmt(p.gosi)],['خصم الغياب',fmt(p.absence)],['الجزاءات',fmt(p.penalty)],
-        ['الانسحاب',fmt(p.withdrawal)],['السلف',fmt(a.advance)],['خصومات أخرى',fmt((Number(a.uniform)||0)+(Number(a.newspaper)||0)+(Number(a.other)||0))],['إجمالي الخصومات',fmt(p.deduction)],
+        ['الانسحاب',fmt(p.withdrawal)],['السلف',fmt(a.advance)],['خصومات أخرى',fmt((Number(p.uniform)||0)+(Number(a.newspaper)||0)+(Number(a.other)||0))],['إجمالي الخصومات',fmt(p.deduction)],
         ['صافي الراتب',fmt(p.net)]
       ].map(x=>`<div><small>${escapeHtml(x[0])}</small><b class="mono">${escapeHtml(x[1])}</b></div>`).join('')}</div><div class="employee-payroll-note">${escapeHtml([p.statusText,a.internalAction||a.note].filter(Boolean).join(' — ')||'لا توجد ملاحظات على المسير')}</div></div>`;
       return `<tr class="employee-history-month" data-history-kind="payroll" data-history-month="${escapeAttr(ym)}"><td><span class="employee-row-chevron">▸</span><b>${escapeHtml(monthLabel(ym))}</b></td><td class="mono">${fmt(p.monthlyGross)}</td><td class="mono">${fmt(p.deduction)}</td><td class="mono"><b>${fmt(p.net)}</b></td></tr><tr class="employee-history-detail employee-payroll-history-detail" style="display:none"><td colspan="4">${detail}</td></tr>`;
@@ -3342,7 +3348,227 @@
     w.document.close(); setTimeout(()=>w.print(),400);
   });
 
-  /* ===== تقرير التفاويض (الحراس أصحاب التفويض البنكي) ===== */
+  /* ===== المخزون: بدل الأمن (وارد / منصرف / حساب المورد / حساب الحراس) + الخصم التلقائي في الرواتب ===== */
+  const INV_METHODS={payroll:'خصم من الراتب',cash:'كاش',transfer:'حوالة بنكية'};
+  const invUi={tab:'stock',supplier:'',outAmountDirty:false};
+  const invNum=n=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  function invData(){
+    if(!inventory||typeof inventory!=='object'||Array.isArray(inventory)) inventory={};
+    ['suppliers','receipts','issues','payments'].forEach(k=>{ if(!Array.isArray(inventory[k])) inventory[k]=[]; });
+    if(!inventory.settings||typeof inventory.settings!=='object') inventory.settings={};
+    return inventory;
+  }
+  function invAddMonth(ym,k){ const [y,m]=String(ym).split('-').map(Number); const t=y*12+(m-1)+k; return `${Math.floor(t/12)}-${String((t%12)+1).padStart(2,'0')}`; }
+  // أقساط الخصم من الراتب: [{ym,amount}] — آخر قسط يأخذ باقي القسمة
+  function invInstallments(x){
+    const n=Math.max(1,Math.floor(Number(x.inst)||1)), total=Number(x.amount)||0, each=r2(total/n), out=[];
+    for(let i=0;i<n;i++) out.push({ym:invAddMonth(x.month,i),amount:i===n-1?r2(total-each*(n-1)):each});
+    return out;
+  }
+  // مبلغ خصم المخزون على موظف في شهر مسير معيّن (يُضاف تلقائيًا إلى خانة «البدلة» في الرواتب)
+  function invPayrollDeduction(empId,ym){
+    const d=inventory; if(!d||!Array.isArray(d.issues)||!d.issues.length) return 0; let t=0;
+    d.issues.forEach(x=>{ if(x.method!=='payroll'||String(x.empId)!==String(empId)||!/^\d{4}-\d{2}$/.test(x.month||'')) return; invInstallments(x).forEach(i=>{ if(i.ym===ym) t+=i.amount; }); });
+    return r2(t);
+  }
+  function invStock(){
+    const d=invData(), m={}, get=k=>(m[k]=m[k]||{item:k,inQty:0,outQty:0,cost:0});
+    d.receipts.forEach(r=>{ const o=get(r.item); o.inQty+=Number(r.qty)||0; o.cost+=Number(r.sub)||0; });
+    d.issues.forEach(x=>{ get(x.item).outQty+=Number(x.qty)||0; });
+    return Object.values(m).map(o=>{ const avg=o.inQty?o.cost/o.inQty:0; return {...o,bal:o.inQty-o.outQty,avg:r2(avg),value:r2((o.inQty-o.outQty)*avg)}; });
+  }
+  function invBalance(item){ const s=invStock().find(x=>x.item===item); return s?s.bal:0; }
+  function invNextNo(prefix,list){ let mx=0; list.forEach(x=>{ const n=parseInt(String(x.no||'').replace(/\D/g,''),10); if(n>mx) mx=n; }); return prefix+String(mx+1).padStart(4,'0'); }
+  function invEmpLabel(e){ return `${e.fullname||''}${e.empcode?' — '+e.empcode:''}`; }
+  function invResolveEmp(txt){
+    const t=String(txt||'').trim(); if(!t) return null;
+    return employees.find(e=>invEmpLabel(e)===t)||employees.find(e=>String(e.fullname||'').trim()===t)||employees.find(e=>e.empcode&&String(e.empcode)===t)||null;
+  }
+  function invSupplierByName(name,create){
+    const d=invData(), n=String(name||'').trim(); if(!n) return null;
+    let s=d.suppliers.find(x=>x.name===n);
+    if(!s&&create){ s={id:'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),name:n}; d.suppliers.push(s); }
+    return s||null;
+  }
+  function invCanWrite(){ if(!pdrCanFinance()){ showToast('المخزون يحتاج صلاحية المالية'); return false; } return true; }
+  function invGuardAccounts(){
+    const d=invData(), cur=currentMonthStr(), m={};
+    d.issues.forEach(x=>{
+      const g=m[x.empId]=m[x.empId]||{empId:x.empId,name:x.empName||'',code:'',project:x.project||'',qty:0,due:0,cashed:0,deducted:0};
+      g.qty+=Number(x.qty)||0; g.due+=Number(x.amount)||0;
+      if(x.method==='payroll') invInstallments(x).forEach(i=>{ if(i.ym<=cur) g.deducted+=i.amount; }); else g.cashed+=Number(x.amount)||0;
+    });
+    return Object.values(m).map(g=>{ const e=employees.find(z=>String(z.id)===String(g.empId)); if(e){ g.name=e.fullname||g.name; g.code=e.empcode||''; g.project=e.project||g.project; } g.remain=r2(g.due-g.cashed-g.deducted); return g; });
+  }
+  function invSupplierBalance(sid){
+    const d=invData(); const inv=d.receipts.filter(r=>r.supplierId===sid).reduce((a,r)=>a+(Number(r.total)||0),0), paid=d.payments.filter(p=>p.supplierId===sid).reduce((a,p)=>a+(Number(p.amount)||0),0);
+    return {inv:r2(inv),paid:r2(paid),bal:r2(inv-paid)};
+  }
+  function invTabShow(tab){
+    invUi.tab=tab;
+    document.querySelectorAll('.inv-tab').forEach(b=>b.classList.toggle('active',b.dataset.invTab===tab));
+    ['stock','in','out','supplier','guards'].forEach(t=>{ const p=document.getElementById('invP-'+t); if(p) p.style.display=(t===tab)?'':'none'; });
+  }
+  function renderInventory(){
+    const d=invData();
+    document.getElementById('invSupplierList').innerHTML=d.suppliers.map(s=>`<option value="${escapeAttr(s.name)}">`).join('');
+    document.getElementById('invItemList').innerHTML=[...new Set(d.receipts.map(r=>r.item))].map(x=>`<option value="${escapeAttr(x)}">`).join('');
+    document.getElementById('invEmpList').innerHTML=employees.map(e=>`<option value="${escapeAttr(invEmpLabel(e))}">`).join('');
+    const dp=document.getElementById('invDefPrice'); if(dp&&document.activeElement!==dp) dp.value=Number(d.settings.defaultPrice)>=0&&d.settings.defaultPrice!=null?d.settings.defaultPrice:200;
+    ['invInDate','invOutDate','invPayDate'].forEach(id=>{ const el=document.getElementById(id); if(el&&!el.value) el.value=todayISO(); });
+    const om=document.getElementById('invOutMonth'); if(om&&!om.value) om.value=currentMonthStr();
+    invRenderStock(); invRenderIn(); invRenderOut(); invRenderSupplier(); invRenderGuards(); invTabShow(invUi.tab);
+  }
+  function invRenderStock(){
+    const d=invData(), st=invStock(), g=invGuardAccounts();
+    const bal=st.reduce((a,x)=>a+x.bal,0), val=st.reduce((a,x)=>a+x.value,0);
+    const purchases=d.receipts.reduce((a,r)=>a+(Number(r.total)||0),0), paid=d.payments.reduce((a,p)=>a+(Number(p.amount)||0),0);
+    const guardRemain=g.reduce((a,x)=>a+Math.max(0,x.remain),0);
+    document.getElementById('invCards').innerHTML=`<div class="main"><small>الرصيد الحالي (قطعة)</small><b>${bal}</b></div><div><small>قيمة المخزون (بدون ضريبة)</small><b>${invNum(val)}</b></div><div><small>إجمالي المشتريات (شامل الضريبة)</small><b>${invNum(purchases)}</b></div><div><small>المستحق للموردين</small><b>${invNum(purchases-paid)}</b></div><div><small>متبقي خصمه من الحراس</small><b>${invNum(guardRemain)}</b></div>`;
+    document.getElementById('invStockBody').innerHTML=st.length?st.map(x=>`<tr><td>${escapeHtml(x.item)}</td><td>${x.inQty}</td><td>${x.outQty}</td><td><b>${x.bal}</b></td><td dir="ltr">${invNum(x.avg)}</td><td dir="ltr">${invNum(x.value)}</td></tr>`).join(''):'<tr><td colspan="6" class="empty-note">لا يوجد مخزون بعد — سجّل أول فاتورة وارد من تبويب «الوارد».</td></tr>';
+  }
+  function invRenderIn(){
+    const d=invData();
+    const rows=[...d.receipts].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.no).localeCompare(String(a.no)));
+    document.getElementById('invInBody').innerHTML=rows.length?rows.map(r=>{ const s=d.suppliers.find(x=>x.id===r.supplierId); return `<tr><td>${escapeHtml(r.no)}</td><td>${escapeHtml(fmtDMY(r.date))}</td><td>${escapeHtml(s?s.name:'—')}</td><td>${escapeHtml(r.invoiceNo||'')}</td><td>${escapeHtml(r.item)}</td><td>${r.qty}</td><td dir="ltr">${invNum(r.unitPrice)}</td><td dir="ltr">${invNum(r.sub)}</td><td dir="ltr">${invNum(r.vat)}</td><td dir="ltr"><b>${invNum(r.total)}</b></td><td><button type="button" class="btn btn-sm" data-inv-del-in="${escapeAttr(r.id)}">حذف</button></td></tr>`; }).join(''):'<tr><td colspan="11" class="empty-note">لا يوجد وارد.</td></tr>';
+  }
+  function invOutDetails(x){
+    if(x.method==='payroll'){
+      const ins=invInstallments(x), paid=ins.filter(i=>payIsPaid(i.ym,x.empId)).length;
+      const first=monthLabel(ins[0].ym), txt=ins.length>1?`${ins.length} أقساط من ${first}`:`خصم ${first}`;
+      return `${escapeHtml(txt)}${paid?` · <b class="bk-paid-tag">🔒 ${paid}/${ins.length} مصروف</b>`:''}`;
+    }
+    return x.method==='transfer'&&x.ref?`مرجع: ${escapeHtml(x.ref)}`:'محصّل';
+  }
+  function invRenderOut(){
+    const d=invData(), q=(document.getElementById('invOutSearch')?.value||'').trim().toLowerCase();
+    const sel=document.getElementById('invOutItem'), prev=sel.value, st=invStock();
+    sel.innerHTML=st.length?st.map(x=>`<option value="${escapeAttr(x.item)}">${escapeHtml(x.item)} (المتاح ${x.bal})</option>`).join(''):'<option value="">لا يوجد صنف</option>';
+    if(st.some(x=>x.item===prev)) sel.value=prev;
+    invUpdateAvail();
+    const rows=[...d.issues].filter(x=>{ const e=employees.find(z=>String(z.id)===String(x.empId)); const nm=(e?e.fullname:x.empName)||''; return !q||[nm,e&&e.empcode,x.no].some(v=>String(v||'').toLowerCase().includes(q)); }).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.no).localeCompare(String(a.no)));
+    document.getElementById('invOutBody').innerHTML=rows.length?rows.map(x=>{ const e=employees.find(z=>String(z.id)===String(x.empId)); return `<tr><td>${escapeHtml(x.no)}</td><td>${escapeHtml(fmtDMY(x.date))}</td><td>${escapeHtml((e?e.fullname:x.empName)||'—')}<small class="pay-code">${escapeHtml(e&&e.empcode||'')}</small></td><td>${escapeHtml(x.item)}</td><td>${x.qty}</td><td dir="ltr"><b>${invNum(x.amount)}</b></td><td>${escapeHtml(INV_METHODS[x.method]||x.method)}</td><td>${invOutDetails(x)}</td><td><button type="button" class="btn btn-sm" data-inv-print="${escapeAttr(x.id)}">طباعة</button> <button type="button" class="btn btn-sm" data-inv-del-out="${escapeAttr(x.id)}">إلغاء الأمر</button></td></tr>`; }).join(''):'<tr><td colspan="9" class="empty-note">لا توجد أوامر صرف.</td></tr>';
+  }
+  function invUpdateAvail(){
+    const it=document.getElementById('invOutItem')?.value, el=document.getElementById('invOutAvail'); if(!el) return;
+    el.textContent=it?`المتاح في المخزون: ${invBalance(it)}`:'';
+  }
+  function invAutoAmount(){
+    if(invUi.outAmountDirty) return;
+    const p=Number(document.getElementById('invDefPrice').value)||0, q=Number(document.getElementById('invOutQty').value)||0;
+    document.getElementById('invOutAmount').value=r2(p*q);
+  }
+  function invRenderSupplier(){
+    const d=invData(), sel=document.getElementById('invSupSel');
+    sel.innerHTML=d.suppliers.length?d.suppliers.map(s=>`<option value="${escapeAttr(s.id)}">${escapeHtml(s.name)}</option>`).join(''):'<option value="">لا يوجد موردون</option>';
+    if(!d.suppliers.some(s=>s.id===invUi.supplier)) invUi.supplier=d.suppliers[0]?d.suppliers[0].id:'';
+    sel.value=invUi.supplier;
+    const b=invSupplierBalance(invUi.supplier);
+    document.getElementById('invSupCards').innerHTML=`<div><small>إجمالي الفواتير (شامل الضريبة)</small><b>${invNum(b.inv)}</b></div><div><small>المدفوع</small><b>${invNum(b.paid)}</b></div><div class="main"><small>الرصيد المستحق للمورد</small><b>${invNum(b.bal)}</b></div>`;
+    const lines=[];
+    d.receipts.filter(r=>r.supplierId===invUi.supplier).forEach(r=>lines.push({date:r.date,at:r.no,txt:`فاتورة وارد — ${r.qty} ${r.item}`,ref:r.invoiceNo||r.no,dr:Number(r.total)||0,cr:0}));
+    d.payments.filter(p=>p.supplierId===invUi.supplier).forEach(p=>lines.push({date:p.date,at:p.id,txt:`دفعة (${p.method||''})`,ref:p.ref||'',cr:Number(p.amount)||0,dr:0,payId:p.id}));
+    lines.sort((a,b)=>String(a.date).localeCompare(String(b.date))||String(a.at).localeCompare(String(b.at)));
+    let run=0;
+    document.getElementById('invSupBody').innerHTML=lines.length?lines.map(l=>{ run=r2(run+l.dr-l.cr); return `<tr><td>${escapeHtml(fmtDMY(l.date))}</td><td>${escapeHtml(l.txt)}</td><td>${escapeHtml(l.ref)}</td><td dir="ltr">${l.dr?invNum(l.dr):''}</td><td dir="ltr">${l.cr?invNum(l.cr):''}</td><td dir="ltr"><b>${invNum(run)}</b></td><td>${l.payId?`<button type="button" class="btn btn-sm" data-inv-del-pay="${escapeAttr(l.payId)}">حذف</button>`:''}</td></tr>`; }).join(''):'<tr><td colspan="7" class="empty-note">لا توجد حركات لهذا المورد.</td></tr>';
+  }
+  function invRenderGuards(){
+    const q=(document.getElementById('invGuardSearch')?.value||'').trim().toLowerCase();
+    const rows=invGuardAccounts().filter(g=>!q||[g.name,g.code].some(v=>String(v||'').toLowerCase().includes(q))).sort((a,b)=>b.remain-a.remain||String(a.name).localeCompare(String(b.name),'ar'));
+    document.getElementById('invGuardBody').innerHTML=rows.length?rows.map((g,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(g.name||'—')}</td><td>${escapeHtml(g.code)}</td><td>${escapeHtml(g.project||'—')}</td><td>${g.qty}</td><td dir="ltr">${invNum(g.due)}</td><td dir="ltr">${invNum(g.cashed)}</td><td dir="ltr">${invNum(g.deducted)}</td><td dir="ltr"><b>${invNum(g.remain)}</b></td></tr>`).join(''):'<tr><td colspan="9" class="empty-note">لا توجد أوامر صرف بعد.</td></tr>';
+  }
+  function invPrintOrder(id){
+    const x=invData().issues.find(z=>z.id===id); if(!x) return;
+    const e=employees.find(z=>String(z.id)===String(x.empId))||{}, w=window.open('','_blank'); if(!w){ showToast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
+    const detail=x.method==='payroll'?`${invInstallments(x).map(i=>`${monthLabel(i.ym)}: ${invNum(i.amount)} ر.س`).join(' — ')}`:(x.method==='transfer'&&x.ref?`مرجع الحوالة: ${x.ref}`:'');
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>أمر صرف ${escapeHtml(x.no)}</title><style>body{font-family:Tahoma,Arial,sans-serif;margin:24px;color:#111}h2,h3{text-align:center;margin:4px}table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}th,td{border:1px solid #888;padding:8px;text-align:right}th{background:#eef2f8;width:28%}.sig{display:flex;justify-content:space-between;margin-top:60px}.sig div{width:30%;text-align:center;border-top:1px solid #111;padding-top:6px}@page{size:A4;margin:12mm}</style></head><body><h2>${escapeHtml(settings.company||'')}</h2><h3>أمر صرف بدلة أمن — ${escapeHtml(x.no)}</h3><table><tr><th>التاريخ</th><td>${escapeHtml(fmtDMY(x.date))}</td></tr><tr><th>اسم الحارس</th><td>${escapeHtml(e.fullname||x.empName||'')}</td></tr><tr><th>الرقم الوظيفي</th><td>${escapeHtml(e.empcode||'')}</td></tr><tr><th>رقم الهوية</th><td>${escapeHtml(e.idnum||'')}</td></tr><tr><th>المشروع</th><td>${escapeHtml(e.project||x.project||'')}</td></tr><tr><th>الصنف / الكمية</th><td>${escapeHtml(x.item)} — ${x.qty}</td></tr><tr><th>المبلغ على الحارس</th><td>${invNum(x.amount)} ر.س</td></tr><tr><th>طريقة السداد</th><td>${escapeHtml(INV_METHODS[x.method]||'')}${detail?'<br>'+escapeHtml(detail):''}</td></tr>${x.notes?`<tr><th>ملاحظات</th><td>${escapeHtml(x.notes)}</td></tr>`:''}</table><p>أقر أنا الموقع أدناه باستلام الصنف المذكور، وأوافق على السداد حسب الطريقة الموضحة أعلاه.</p><div class="sig"><div>توقيع الحارس</div><div>أمين المخزن</div><div>المدير المالي</div></div></body></html>`);
+    w.document.close(); w.focus(); setTimeout(()=>{ try{w.print();}catch(_){} },300);
+  }
+  function invRecalcInForm(){
+    const q=Number(document.getElementById('invInQty').value)||0, p=Number(document.getElementById('invInPrice').value)||0, v=Number(document.getElementById('invInVatRate').value)||0;
+    const sub=r2(q*p), vat=r2(sub*v/100);
+    document.getElementById('invInSub').value=invNum(sub); document.getElementById('invInVat').value=invNum(vat); document.getElementById('invInTotal').value=invNum(sub+vat);
+  }
+  document.querySelectorAll('.inv-tab').forEach(b=>b.addEventListener('click',()=>{ invTabShow(b.dataset.invTab); }));
+  ['invInQty','invInPrice','invInVatRate'].forEach(id=>document.getElementById(id)?.addEventListener('input',invRecalcInForm));
+  document.getElementById('invInForm')?.addEventListener('submit',ev=>{
+    ev.preventDefault(); if(!invCanWrite()) return;
+    const d=invData(), g=id=>document.getElementById(id).value;
+    const supName=g('invInSupplier').trim(), item=g('invInItem').trim(), qty=Math.floor(Number(g('invInQty'))), price=Number(g('invInPrice')), rate=Number(g('invInVatRate'))||0;
+    if(!supName){ showToast('اكتب اسم المورد'); return; }
+    if(!item){ showToast('اكتب اسم الصنف'); return; }
+    if(!(qty>0)){ showToast('الكمية غير صحيحة'); return; }
+    if(!(price>=0)||g('invInPrice')===''){ showToast('اكتب سعر الوحدة'); return; }
+    const sub=r2(qty*price), vat=r2(sub*rate/100), s=invSupplierByName(supName,true);
+    d.receipts.push({id:'r'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),no:invNextNo('و-',d.receipts),date:g('invInDate'),supplierId:s.id,invoiceNo:g('invInNo').trim(),item,qty,unitPrice:price,vatRate:rate,sub,vat,total:r2(sub+vat),notes:g('invInNotes').trim()});
+    persistCloud('تم حفظ الوارد'); ev.target.reset(); document.getElementById('invInDate').value=todayISO(); document.getElementById('invInItem').value=item; document.getElementById('invInVatRate').value=rate; invRecalcInForm();
+    invUi.supplier=s.id; renderInventory();
+  });
+  document.getElementById('invInBody')?.addEventListener('click',e=>{
+    const b=e.target.closest('[data-inv-del-in]'); if(!b||!invCanWrite()) return;
+    const d=invData(), r=d.receipts.find(x=>x.id===b.dataset.invDelIn); if(!r) return;
+    const after=invBalance(r.item)-(Number(r.qty)||0);
+    if(after<0){ showToast('لا يمكن حذف هذا الوارد: الرصيد سيصبح بالسالب (يوجد أوامر صرف مرتبطة)'); return; }
+    if(!confirm(`حذف وارد ${r.no} (${r.qty} ${r.item})؟`)) return;
+    d.receipts=d.receipts.filter(x=>x.id!==r.id); persistCloud('تم حذف الوارد'); renderInventory();
+  });
+  document.getElementById('invDefPrice')?.addEventListener('input',()=>{ const d=invData(); d.settings.defaultPrice=Number(document.getElementById('invDefPrice').value)||0; invAutoAmount(); });
+  document.getElementById('invDefPrice')?.addEventListener('change',()=>{ if(pdrCanFinance()) persistCloud(''); });
+  document.getElementById('invOutQty')?.addEventListener('input',invAutoAmount);
+  document.getElementById('invOutAmount')?.addEventListener('input',()=>{ invUi.outAmountDirty=true; });
+  document.getElementById('invOutItem')?.addEventListener('change',invUpdateAvail);
+  document.getElementById('invOutSearch')?.addEventListener('input',()=>{ invRenderOut(); });
+  document.getElementById('invGuardSearch')?.addEventListener('input',()=>{ invRenderGuards(); });
+  document.getElementById('invOutMethod')?.addEventListener('change',()=>{
+    const m=document.getElementById('invOutMethod').value;
+    document.querySelectorAll('#invOutForm .inv-pay-only').forEach(el=>el.style.display=m==='payroll'?'':'none');
+    document.querySelectorAll('#invOutForm .inv-tr-only').forEach(el=>el.style.display=m==='transfer'?'':'none');
+  });
+  document.getElementById('invOutForm')?.addEventListener('submit',ev=>{
+    ev.preventDefault(); if(!invCanWrite()) return;
+    const d=invData(), g=id=>document.getElementById(id).value;
+    const emp=invResolveEmp(g('invOutEmp')); if(!emp){ showToast('اختر الحارس من القائمة (الاسم أو الكود)'); return; }
+    const item=g('invOutItem'), qty=Math.floor(Number(g('invOutQty'))), amount=r2(Number(g('invOutAmount'))), method=g('invOutMethod');
+    if(!item){ showToast('لا يوجد صنف في المخزون — سجّل وارد أولًا'); return; }
+    if(!(qty>0)){ showToast('الكمية غير صحيحة'); return; }
+    if(qty>invBalance(item)){ showToast(`الرصيد المتاح (${invBalance(item)}) أقل من الكمية المطلوبة`); return; }
+    if(!(amount>=0)||g('invOutAmount')===''){ showToast('اكتب المبلغ على الحارس'); return; }
+    const issue={id:'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),no:invNextNo('ص-',d.issues),date:g('invOutDate'),empId:emp.id,empName:emp.fullname||'',project:emp.project||'',item,qty,amount,method,notes:g('invOutNotes').trim()};
+    if(method==='payroll'){
+      issue.month=g('invOutMonth'); issue.inst=Math.max(1,Math.min(24,Math.floor(Number(g('invOutInst'))||1)));
+      if(!/^\d{4}-\d{2}$/.test(issue.month)){ showToast('اختر شهر بداية الخصم'); return; }
+      const locked=invInstallments(issue).find(i=>payIsPaid(i.ym,emp.id));
+      if(locked){ showToast(`تم صرف راتب ${emp.fullname||'الحارس'} عن ${monthLabel(locked.ym)} — اختر شهرًا آخر أو ألغِ الصرف من كشف البنك`); return; }
+    } else if(method==='transfer') issue.ref=g('invOutRef').trim();
+    d.issues.push(issue); persistCloud('تم حفظ أمر الصرف'+(method==='payroll'?' — سيظهر خصمه في مسير الرواتب':''));
+    ev.target.reset(); invUi.outAmountDirty=false; document.getElementById('invOutDate').value=todayISO(); document.getElementById('invOutMonth').value=currentMonthStr(); document.getElementById('invDefPrice').value=d.settings.defaultPrice!=null?d.settings.defaultPrice:200;
+    document.getElementById('invOutMethod').dispatchEvent(new Event('change')); invAutoAmount();
+    renderInventory(); try{ renderReports(); }catch(_){}
+  });
+  document.getElementById('invOutBody')?.addEventListener('click',e=>{
+    const p=e.target.closest('[data-inv-print]'); if(p){ invPrintOrder(p.dataset.invPrint); return; }
+    const b=e.target.closest('[data-inv-del-out]'); if(!b||!invCanWrite()) return;
+    const d=invData(), x=d.issues.find(z=>z.id===b.dataset.invDelOut); if(!x) return;
+    if(x.method==='payroll'){ const locked=invInstallments(x).find(i=>payIsPaid(i.ym,x.empId)); if(locked){ showToast(`تم صرف راتب هذا الحارس عن ${monthLabel(locked.ym)} — ألغِ الصرف من كشف البنك أولًا`); return; } }
+    if(!confirm(`إلغاء أمر الصرف ${x.no}؟ سيرجع الصنف للمخزون ويُلغى خصمه من الرواتب.`)) return;
+    d.issues=d.issues.filter(z=>z.id!==x.id); persistCloud('تم إلغاء أمر الصرف'); renderInventory(); try{ renderReports(); }catch(_){}
+  });
+  document.getElementById('invSupSel')?.addEventListener('change',e=>{ invUi.supplier=e.target.value; invRenderSupplier(); });
+  document.getElementById('invPayForm')?.addEventListener('submit',ev=>{
+    ev.preventDefault(); if(!invCanWrite()) return;
+    const d=invData(), g=id=>document.getElementById(id).value, amt=r2(Number(g('invPayAmount')));
+    if(!invUi.supplier){ showToast('لا يوجد مورد — سجّل وارد أولًا'); return; }
+    if(!(amt>0)){ showToast('اكتب مبلغ الدفعة'); return; }
+    d.payments.push({id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:g('invPayDate'),supplierId:invUi.supplier,amount:amt,method:g('invPayMethod'),ref:g('invPayRef').trim(),notes:g('invPayNotes').trim()});
+    persistCloud('تم حفظ الدفعة'); ev.target.reset(); document.getElementById('invPayDate').value=todayISO(); renderInventory();
+  });
+  document.getElementById('invSupBody')?.addEventListener('click',e=>{
+    const b=e.target.closest('[data-inv-del-pay]'); if(!b||!invCanWrite()) return;
+    if(!confirm('حذف هذه الدفعة؟')) return;
+    const d=invData(); d.payments=d.payments.filter(p=>p.id!==b.dataset.invDelPay); persistCloud('تم حذف الدفعة'); renderInventory();
+  });
+
+/* ===== تقرير التفاويض (الحراس أصحاب التفويض البنكي) ===== */
   const delRepState={q:'',project:''};
   function delegationRows(){
     const rows=[];
@@ -3421,7 +3647,7 @@
       <td class="mono g2">${fmt(p.overtime)}</td><td class="mono g2">${fmt(p.appAdd)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
       <td class="mono g3" ${red(p.nonWorkDed)}>${fmt(p.nonWorkDed)}${p.nonWorkDays?`<small class="pay-red-note">${p.nonWorkDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.gosi)}</td>
       <td class="mono g3" ${red(p.absence)}>${fmt(p.absence)}${p.absenceDays?`<small class="pay-red-note">${p.absenceDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.penalty)}</td><td class="mono g3">${fmt(p.withdrawal)}</td>
-      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="uniform" data-emp="${escapeAttr(e.id)}" value="${Number(a.uniform)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
+      <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="uniform" data-emp="${escapeAttr(e.id)}" value="${Number(a.uniform)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}>${Number(p.uniformInv)>0?`<small class="pay-status-note posted">+ ${fmt(p.uniformInv)} من المخزون</small>`:''}</td>
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="newspaper" data-emp="${escapeAttr(e.id)}" value="${Number(a.newspaper)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="advance" data-emp="${escapeAttr(e.id)}" value="${Number(a.advance)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="other" data-emp="${escapeAttr(e.id)}" value="${Number(a.other)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td>

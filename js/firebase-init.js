@@ -29,7 +29,7 @@ const stable = v => Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
   : JSON.stringify(v === undefined ? null : v);
 const stamp = o => ({ ...o, updatedAt: new Date().toISOString() });
 const stripStamp = o => { const { updatedAt, ...rest } = o || {}; return rest; };
-const emptyFinance = () => ({ schema: 2, employees: {}, projects: {}, coverage: {}, contracts: {}, payrollRecords: {}, projectAccounts: [], invoices: [] });
+const emptyFinance = () => ({ schema: 2, employees: {}, projects: {}, coverage: {}, contracts: {}, payrollRecords: {}, projectAccounts: [], invoices: [], inventory: {} });
 const sig = { general: null, finance: null, ctr: {} };   // آخر محتوى كُتب/قُرئ لتفادي الكتابة المكررة
 
 // ===== نصوص العقود: كل عقد في مستند مستقل hr_finance/ctr_<id> (القواعد تغطيه ضمن hr_finance/{docId} بصلاحية المالية) =====

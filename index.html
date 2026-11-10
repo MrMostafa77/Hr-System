@@ -89,6 +89,13 @@
         </div>
       </div>
 
+      <div class="nav-group" data-group="inventory">
+        <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l9-5 9 5v10l-9 5-9-5z"/><path d="M3 8l9 5 9-5M12 13v10"/></svg>المخزون</span><b>⌄</b></button>
+        <div class="nav-submenu">
+          <a class="navlink nav-child" data-view="inventory"><span>مخزون بدل الأمن</span></a>
+        </div>
+      </div>
+
       <div class="nav-group" data-group="sales">
         <button type="button" class="nav-group-toggle"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>المبيعات</span><b>⌄</b></button>
         <div class="nav-submenu">
@@ -914,6 +921,116 @@
     </section>
 
     <!-- ===== DOCUMENTS ===== -->
+    <!-- ===== INVENTORY (مخزون بدل الأمن) ===== -->
+    <section id="view-inventory" style="display:none">
+      <div class="topbar">
+        <div class="pagetitle">
+          <h1>المخزون</h1>
+          <p>مخزون بدل الأمن: الوارد والمنصرف وحساب المورد وحساب الحراس — والخصم من الرواتب تلقائيًا</p>
+        </div>
+        <div class="topbar-actions">
+          <button class="btn mobile-menu-btn icon-btn" data-menu>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="inv-tabs no-print">
+        <button type="button" class="inv-tab active" data-inv-tab="stock">رصيد المخزون</button>
+        <button type="button" class="inv-tab" data-inv-tab="in">الوارد (فواتير المورد)</button>
+        <button type="button" class="inv-tab" data-inv-tab="out">المنصرف (أوامر الصرف)</button>
+        <button type="button" class="inv-tab" data-inv-tab="supplier">حساب المورد</button>
+        <button type="button" class="inv-tab" data-inv-tab="guards">حساب الحراس</button>
+      </div>
+
+      <div id="invP-stock" class="inv-panel">
+        <div class="bank-summary" id="invCards"></div>
+        <div class="card section-card"><h3>رصيد الأصناف</h3>
+          <div class="table-wrap"><table class="payroll-table"><thead><tr><th>الصنف</th><th>الوارد</th><th>المنصرف</th><th>الرصيد</th><th>متوسط التكلفة (بدون ضريبة)</th><th>قيمة المخزون</th></tr></thead><tbody id="invStockBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <div id="invP-in" class="inv-panel" style="display:none">
+        <div class="card section-card" style="margin-bottom:16px">
+          <h3>إضافة وارد (فاتورة مورد)</h3>
+          <form id="invInForm" class="field-grid" autocomplete="off">
+            <div class="field"><label>التاريخ</label><input type="date" id="invInDate" required></div>
+            <div class="field"><label>المورد</label><input id="invInSupplier" list="invSupplierList" placeholder="مثال: درع الجزيرة لخياطة" required></div>
+            <div class="field"><label>رقم فاتورة المورد</label><input id="invInNo" placeholder="اختياري"></div>
+            <div class="field"><label>الصنف</label><input id="invInItem" list="invItemList" value="بدلة أمن" required></div>
+            <div class="field"><label>الكمية</label><input type="number" id="invInQty" min="1" step="1" required></div>
+            <div class="field"><label>سعر الوحدة (بدون ضريبة)</label><input type="number" id="invInPrice" min="0" step=".01" required></div>
+            <div class="field"><label>نسبة الضريبة %</label><input type="number" id="invInVatRate" min="0" step=".01" value="15"></div>
+            <div class="field"><label>الإجمالي قبل الضريبة</label><input id="invInSub" readonly></div>
+            <div class="field"><label>الضريبة</label><input id="invInVat" readonly></div>
+            <div class="field"><label>الإجمالي شامل الضريبة</label><input id="invInTotal" readonly></div>
+            <div class="field full"><label>ملاحظات</label><input id="invInNotes"></div>
+            <div class="field full"><button class="btn btn-primary" type="submit">حفظ الوارد</button></div>
+          </form>
+        </div>
+        <div class="card section-card"><h3>سجل الوارد</h3>
+          <div class="table-wrap"><table class="payroll-table"><thead><tr><th>رقم</th><th>التاريخ</th><th>المورد</th><th>فاتورة المورد</th><th>الصنف</th><th>الكمية</th><th>سعر الوحدة</th><th>قبل الضريبة</th><th>الضريبة</th><th>الإجمالي</th><th></th></tr></thead><tbody id="invInBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <div id="invP-out" class="inv-panel" style="display:none">
+        <div class="card section-card" style="margin-bottom:16px">
+          <h3>أمر صرف لحارس</h3>
+          <form id="invOutForm" class="field-grid" autocomplete="off">
+            <div class="field"><label>التاريخ</label><input type="date" id="invOutDate" required></div>
+            <div class="field"><label>الحارس</label><input id="invOutEmp" list="invEmpList" placeholder="اكتب الاسم أو الكود" required></div>
+            <div class="field"><label>الصنف</label><select id="invOutItem"></select><small class="field-note" id="invOutAvail"></small></div>
+            <div class="field"><label>الكمية</label><input type="number" id="invOutQty" min="1" step="1" value="1" required></div>
+            <div class="field"><label>سعر البدلة الافتراضي</label><input type="number" id="invDefPrice" min="0" step=".01" value="200"></div>
+            <div class="field"><label>المبلغ على الحارس (إجمالي الأمر)</label><input type="number" id="invOutAmount" min="0" step=".01" required></div>
+            <div class="field"><label>طريقة السداد</label>
+              <select id="invOutMethod"><option value="payroll">خصم من الراتب</option><option value="cash">كاش</option><option value="transfer">حوالة بنكية</option></select></div>
+            <div class="field inv-pay-only"><label>شهر بداية الخصم</label><input type="month" id="invOutMonth"></div>
+            <div class="field inv-pay-only"><label>عدد الأقساط (شهور)</label><input type="number" id="invOutInst" min="1" max="24" step="1" value="1"></div>
+            <div class="field inv-tr-only" style="display:none"><label>رقم / مرجع الحوالة</label><input id="invOutRef"></div>
+            <div class="field full"><label>ملاحظات</label><input id="invOutNotes"></div>
+            <div class="field full"><button class="btn btn-primary" type="submit">حفظ أمر الصرف</button></div>
+          </form>
+          <small class="field-note">«خصم من الراتب» يظهر تلقائيًا في خانة «البدلة» بمسير الرواتب لشهر الخصم. الكاش والحوالة تُسجَّل كمحصّلة ولا تدخل في الرواتب.</small>
+        </div>
+        <div class="card section-card"><h3>أوامر الصرف</h3>
+          <div class="att-toolbar payroll-toolbar" style="margin:0 0 10px"><div class="payroll-filter-group payroll-search-wide"><label>بحث بالحارس</label><input type="search" id="invOutSearch" placeholder="بحث"></div></div>
+          <div class="table-wrap"><table class="payroll-table"><thead><tr><th>رقم الأمر</th><th>التاريخ</th><th>الحارس</th><th>الصنف</th><th>الكمية</th><th>المبلغ</th><th>طريقة السداد</th><th>التفاصيل</th><th></th></tr></thead><tbody id="invOutBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <div id="invP-supplier" class="inv-panel" style="display:none">
+        <div class="card section-card" style="margin-bottom:16px">
+          <h3>حساب المورد</h3>
+          <div class="att-toolbar payroll-toolbar" style="margin:0 0 10px"><div class="payroll-filter-group"><label>المورد</label><select id="invSupSel"></select></div></div>
+          <div class="bank-summary" id="invSupCards"></div>
+          <div class="table-wrap"><table class="payroll-table"><thead><tr><th>التاريخ</th><th>البيان</th><th>المرجع</th><th>مدين (فواتير)</th><th>دائن (مدفوع)</th><th>الرصيد المستحق</th><th></th></tr></thead><tbody id="invSupBody"></tbody></table></div>
+        </div>
+        <div class="card section-card">
+          <h3>تسجيل دفعة للمورد</h3>
+          <form id="invPayForm" class="field-grid" autocomplete="off">
+            <div class="field"><label>التاريخ</label><input type="date" id="invPayDate" required></div>
+            <div class="field"><label>المبلغ</label><input type="number" id="invPayAmount" min="0.01" step=".01" required></div>
+            <div class="field"><label>طريقة الدفع</label><select id="invPayMethod"><option>تحويل بنكي</option><option>كاش</option><option>شيك</option></select></div>
+            <div class="field"><label>المرجع</label><input id="invPayRef" placeholder="رقم الحوالة / الشيك"></div>
+            <div class="field full"><label>ملاحظات</label><input id="invPayNotes"></div>
+            <div class="field full"><button class="btn btn-primary" type="submit">حفظ الدفعة</button></div>
+          </form>
+        </div>
+      </div>
+
+      <div id="invP-guards" class="inv-panel" style="display:none">
+        <div class="card section-card"><h3>حساب البدل للحراس</h3>
+          <div class="att-toolbar payroll-toolbar" style="margin:0 0 10px"><div class="payroll-filter-group payroll-search-wide"><label>بحث بالاسم أو الكود</label><input type="search" id="invGuardSearch" placeholder="بحث"></div></div>
+          <div class="table-wrap"><table class="payroll-table"><thead><tr><th>م</th><th>الحارس</th><th>الكود</th><th>المشروع</th><th>عدد البدل</th><th>إجمالي المستحق</th><th>كاش / حوالة</th><th>خصم رواتب (حتى الشهر الحالي)</th><th>المتبقي</th></tr></thead><tbody id="invGuardBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <datalist id="invSupplierList"></datalist>
+      <datalist id="invItemList"></datalist>
+      <datalist id="invEmpList"></datalist>
+    </section>
+
     <section id="view-documents" style="display:none">
       <div class="topbar">
         <div class="pagetitle">
