@@ -1095,6 +1095,14 @@
           <div class="doc-type-btn" data-doc="coverage">محضر تغطيات</div>
           <div class="doc-type-btn" data-doc="gosi">إقرار بعدم التسجيل في التأمينات</div>
           <div class="doc-type-btn" data-doc="settlement">مخالصة نهائية وإبراء ذمة</div>
+          <div class="doc-offer-fields no-print" id="docSettleFields" style="display:none">
+            <div class="field"><label>تاريخ المخالصة (آخر يوم عمل)</label><input type="date" id="ds_date"></div>
+            <div class="field"><label>بدل الإجازة</label><select id="ds_leave"><option value="yes">يستحق</option><option value="no">لا يستحق</option></select></div>
+            <div class="field"><label>مكافأة نهاية الخدمة</label><select id="ds_eosb"><option value="yes">تستحق</option><option value="no">لا تستحق</option></select></div>
+            <div class="field"><label>مستحقات أخرى (إدخال يدوي)</label><input type="number" id="ds_other" min="0" step="0.01"></div>
+            <div class="field"><label>سلف / عهد (إدخال يدوي)</label><input type="number" id="ds_adv" min="0" step="0.01"></div>
+            <div id="docSettleInfo" style="font-size:12px;line-height:1.8;opacity:.85"></div>
+          </div>
           <div class="doc-offer-fields no-print" id="docOfferFields" style="display:none">
             <div class="field"><label>الجهة (السادة)</label><input type="text" id="offer_client"></div>
             <div class="field"><label>اسم المشروع / الموقع</label><input type="text" id="offer_project"></div>

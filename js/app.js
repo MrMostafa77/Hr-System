@@ -6792,12 +6792,13 @@
       renderDocSheet();
     });
   });
-  document.getElementById('doc_emp').addEventListener('change', renderDocSheet);
+  document.getElementById('doc_emp').addEventListener('change', ()=>{ docSettleLoad(); renderDocSheet(); });
   document.getElementById('printDocBtn').addEventListener('click', ()=>window.print());
   function blank(v){ return v ? escapeHtml(v) : '<span class="blank">.......................</span>'; }
   function renderDocuments(){
     refreshEmpSelect(document.getElementById('doc_emp'), '— اختر الموظف —');
     loadSettingsIntoForm();
+    docSettleLoad();
     renderDocSheet();
   }
   /* ===== المستندات: ورق الشركة الرسمي (اللوجو + العلامة المائية) ===== */
@@ -6819,12 +6820,72 @@
     return h;
   }
   function docNum(n){ return (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  /* ===== المخالصة: حساب تلقائي من بيانات الموظف والمسير ===== */
+  const docSettle={};   // مدخلات المخالصة لكل موظف: {date, leave, eosb, other, adv}
+  function docSettleStatusDate(e){
+    const per=empStatusPeriods(e), pick=k=>per.filter(p=>p.k===k&&p.from).map(p=>p.from).sort()[0]||'';
+    return pick('settle')||pick('resign')||pick('stop')||'';
+  }
+  function docSettleLoad(){
+    const id=document.getElementById('doc_emp')?.value||'', e=employees.find(x=>x.id===id)||{}, st=docSettle[id]||{};
+    const set=(i,v)=>{ const el=document.getElementById(i); if(el) el.value=v; };
+    set('ds_date', st.date!=null?st.date:docSettleStatusDate(e));
+    set('ds_leave', st.leave===false?'no':'yes'); set('ds_eosb', st.eosb===false?'no':'yes');
+    set('ds_other', st.other||''); set('ds_adv', st.adv||'');
+  }
+  function docSettleRead(e){
+    const g=i=>document.getElementById(i)?.value||'';
+    const S={date:g('ds_date'), leave:g('ds_leave')!=='no', eosb:g('ds_eosb')!=='no', other:Number(g('ds_other'))||0, adv:Number(g('ds_adv'))||0};
+    if(e&&e.id) docSettle[e.id]=S;
+    return S;
+  }
+  function docSettleCalc(e,S){
+    const out={startISO:'',endISO:'',days:0,years:0,wage:0,unpaidMonths:[],unpaid:0,leaveDays:0,leaveAmt:0,eosbAmt:0,other:S.other,adv:S.adv,total:0,net:0};
+    if(!e||!e.id) return out;
+    const startISO=(attStartDateFor(e.id)||String(e.startdate||'').slice(0,10)), endISO=S.date||docSettleStatusDate(e);
+    out.startISO=startISO; out.endISO=endISO;
+    if(!startISO||!endISO||endISO<startISO) return out;
+    out.days=Math.round((new Date(endISO+'T00:00:00')-new Date(startISO+'T00:00:00'))/86400000)+1;
+    out.years=out.days/365;
+    // الأجر الأخير = أساسي + سكن + مواصلات + بدلات أخرى (آخر راتب ساري عند تاريخ المخالصة)
+    const sh=empSalaryAt(e,endISO);
+    out.wage=sh?empSalaryTotal(sh):r2((Number(e.basicsalary)||0)+(Number(e.housing)||0)+(Number(e.transport)||0)+(Number(e.otherallow)||0));
+    // 1) الرواتب المستحقة: كل شهر من المباشرة إلى المخالصة لم يُرحَّل/يُصرف في كشف البنك
+    let y=Number(startISO.slice(0,4)), m=Number(startISO.slice(5,7)), guard=0;
+    const lastYm=endISO.slice(0,7);
+    while(`${y}-${String(m).padStart(2,'0')}`<=lastYm && guard++<240){
+      const ym=`${y}-${String(m).padStart(2,'0')}`;
+      if(!payIsPosted(ym,e.id)){
+        let st=null; try{ st=payrollStatementForCols(e,monthCols(ym)); }catch(err){ st=null; }
+        if(st && !st.notStarted){ out.unpaidMonths.push({ym,net:r2(st.net)}); out.unpaid=r2(out.unpaid+st.net); }
+      }
+      m++; if(m>12){m=1;y++;}
+    }
+    // 2) بدل الإجازة: 21 يوم/سنة (30 يوم بعد 5 سنوات) بالتناسب من المباشرة إلى المخالصة × أجر اليوم (الأجر/30)
+    const Y5=5*365;
+    out.leaveDays=r2((Math.min(out.days,Y5)*21+Math.max(0,out.days-Y5)*30)/365);
+    out.leaveAmt=S.leave?r2(out.leaveDays*out.wage/30):0;
+    // 3) مكافأة نهاية الخدمة: نصف شهر عن كل سنة من أول 5 سنوات + شهر كامل عن كل سنة بعدها (بالتناسب)
+    out.eosbAmt=S.eosb?r2(out.wage*(0.5*Math.min(out.years,5)+Math.max(0,out.years-5))):0;
+    out.total=r2(out.unpaid+out.leaveAmt+out.eosbAmt+out.other);
+    out.net=r2(out.total-out.adv);
+    return out;
+  }
+  function docSettleInfo(e,C,S){
+    const box=document.getElementById('docSettleInfo'); if(!box) return;
+    if(!e||!e.id){ box.innerHTML='اختر الموظف أولاً'; return; }
+    if(!C.startISO){ box.innerHTML='<span style="color:#c0392b">لا يوجد تاريخ مباشرة لهذا الموظف</span>'; return; }
+    if(!C.endISO){ box.innerHTML='<span style="color:#c0392b">حدّد تاريخ المخالصة (أو أضف حالة «مخالصة» في ملف الموظف)</span>'; return; }
+    const mm=C.unpaidMonths.length?C.unpaidMonths.map(m=>`${escapeHtml(monthLabel(m.ym))}: ${docNum(m.net)}`).join('<br>'):'لا توجد رواتب غير مرحّلة';
+    box.innerHTML=`مدة الخدمة: <b>${C.days}</b> يوم (${docNum(C.years)} سنة)<br>الأجر الأخير: <b>${docNum(C.wage)}</b><br><u>رواتب غير مرحّلة:</u><br>${mm}`;
+  }
+  ['ds_date','ds_leave','ds_eosb','ds_other','ds_adv'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('input',renderDocSheet); el.addEventListener('change',renderDocSheet); } });
   function renderDocSheet(){
     const empId = document.getElementById('doc_emp').value;
     const e = employees.find(x=>x.id===empId) || {};
     const co = docCompany();
     const sheet = document.getElementById('docSheet');
-    const offerBox=document.getElementById('docOfferFields'); if(offerBox) offerBox.style.display=currentDocType==='offers'?'':'none';
+    const offerBox=document.getElementById('docOfferFields'); if(offerBox) offerBox.style.display=currentDocType==='offers'?'':'none'; const setBox=document.getElementById('docSettleFields'); if(setBox) setBox.style.display=currentDocType==='settlement'?'':'none';
     const T=currentDocType;
     let html='';
     if(T==='iban'){
@@ -6958,25 +7019,27 @@
         ${docSign(['اسم الموظف: '+escapeHtml(e.fullname||'.................'),'التوقيع','البصمة'])}
         ${docSign(['الموارد البشرية','المدير العام'])}`);
     }else if(T==='settlement'){
-      // تاريخ المخالصة / آخر يوم عمل: من حالة (مخالصة) ثم الاستقالة ثم الإيقاف إن وُجدت
-      const per=empStatusPeriods(e), pick=k=>per.filter(p=>p.k===k&&p.from).map(p=>p.from).sort()[0]||'';
-      const endD=pick('settle')||pick('resign')||pick('stop');
-      const endTxt=endD?fmtDMY(endD):'';
-      const startD=String(e.startdate||'').slice(0,10);
-      const lines=['الراتب المستحق عن آخر فترة عمل','بدل الإجازة السنوية المستحقة','مكافأة نهاية الخدمة','مستحقات أخرى'];
-      const rowsHtml=lines.map((t,i)=>`<tr><td>${i+1}</td><td style="text-align:right">${t}</td><td>&nbsp;</td></tr>`).join('');
+      const S=docSettleRead(e), C=docSettleCalc(e,S);
+      docSettleInfo(e,C,S);
+      const rowsHtml=[
+        ['الراتب المستحق عن آخر فترة عمل'+(C.unpaidMonths.length?` <small>(${C.unpaidMonths.map(m=>escapeHtml(monthLabel(m.ym))).join('، ')})</small>`:''), C.unpaid],
+        ['بدل الإجازة السنوية المستحقة'+(S.leave?` <small>(${docNum(C.leaveDays)} يوم)</small>`:' <small>(لا يستحق)</small>'), C.leaveAmt],
+        ['مكافأة نهاية الخدمة'+(S.eosb?'':' <small>(لا تستحق)</small>'), C.eosbAmt],
+        ['مستحقات أخرى', C.other]
+      ].map((r,i)=>`<tr><td>${i+1}</td><td style="text-align:right">${r[0]}</td><td>${docNum(r[1])}</td></tr>`).join('');
+      const words=C.net>0?`فقط ${arabicAmountWords(C.net)} لا غير`:'فقط صفر ريال لا غير';
       html=docPage('مخالصة نهائية وإبراء ذمة',`
         <p>السادة / ${blank(co)} المحترمين</p>
         <p>السلام عليكم ورحمة الله وبركاته،</p>
-        ${docEmpTable(e,[['تاريخ المباشرة',startD?fmtDMY(startD):''],['تاريخ المخالصة / آخر يوم عمل',endTxt]])}
+        ${docEmpTable(e,[['تاريخ المباشرة',C.startISO?fmtDMY(C.startISO):''],['تاريخ المخالصة / آخر يوم عمل',C.endISO?fmtDMY(C.endISO):'']])}
         <p>أقر أنا الموظف الموضحة بياناتي أعلاه بأنني استلمت من ${blank(co)} كامل مستحقاتي المالية المترتبة على عملي لديها حتى تاريخ انتهاء علاقتي بها، وفق البيان التالي:</p>
         <table class="doc-mini-table doc-grid-table"><thead><tr><th style="width:7%">م</th><th>البند</th><th style="width:30%">المبلغ (ريال)</th></tr></thead><tbody>
           ${rowsHtml}
-          <tr><th colspan="2">إجمالي المستحقات</th><td>&nbsp;</td></tr>
-          <tr><th colspan="2">يخصم: سلف / عهد / جزاءات</th><td>&nbsp;</td></tr>
-          <tr><th colspan="2">صافي المبلغ المستلم</th><td>&nbsp;</td></tr>
+          <tr><th colspan="2">إجمالي المستحقات</th><td>${docNum(C.total)}</td></tr>
+          <tr><th colspan="2">يخصم: سلف / عهد</th><td>${docNum(C.adv)}</td></tr>
+          <tr><th colspan="2">صافي المبلغ المستلم</th><td><b>${docNum(C.net)}</b></td></tr>
         </tbody></table>
-        <p>صافي المبلغ كتابةً: ..........................................................................................</p>
+        <p>صافي المبلغ كتابةً: ${escapeHtml(words)}</p>
         <p>طريقة الاستلام: ☐ تحويل بنكي &nbsp;&nbsp; ☐ نقداً &nbsp;&nbsp; ☐ شيك رقم: ......................</p>
         <p>كما أقر بأنني سلّمت الشركة جميع ما كان بعهدتي من (الزي الرسمي — بطاقة التعريف — الأجهزة والمعدات — أي مستندات أو ممتلكات تخص الشركة أو العميل)، وأن ذمتي بريئة تجاهها.</p>
         <p>وبموجب هذه المخالصة أبرئ ذمة ${blank(co)} إبراءً تاماً شاملاً من أي حقوق أو مطالبات مالية أو عمالية ناشئة عن عملي لديها، ولا أملك حق المطالبة بأي مبلغ أو تعويض بعد توقيعي على هذا الإقرار، وهذا إقرار مني بذلك،،،</p>
