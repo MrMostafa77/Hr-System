@@ -2930,3 +2930,14 @@ tr.pay-paid input[disabled],tr.pay-paid select[disabled]{opacity:.65;cursor:not-
 .pnl-cards{margin:12px 0}
 .pnl-cards>div.main.pnl-neg{background:#b42318;border-color:#b42318;color:#fff}
 .pnl-cards>div.main.pnl-pos{background:#146b54;border-color:#146b54;color:#fff}
+
+/* أعمار المديونيات */
+.dag-table{min-width:1000px}
+.dag-tag{display:block;font-size:10px;font-weight:700;margin-top:2px}
+.dag-tag.inv{color:#146b54}.dag-tag.ord{color:#a15c00}
+.dag-empty{color:var(--ink-soft)}
+.dag-det>td{background:var(--border-soft);text-align:right!important;white-space:normal!important}
+.dag-form{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.dag-form input{min-height:34px}
+.dag-pays{width:100%;max-width:640px;border-collapse:collapse}
+.dag-pays th,.dag-pays td{border:1px solid var(--border);padding:5px 8px;text-align:center;background:var(--surface)}

@@ -5,7 +5,7 @@
   const REPORTS = ['payroll','employees','projects','coverage','bank','delegations','pnl'];
   // شاشات ليس لها رابط في القائمة الجانبية وتتبع صلاحية شاشة أخرى
   // شاشات تعتمد كلياً على بيانات مالية: لا تُفتح إلا لمن لديه صلاحية المالية
-  const FIN_ONLY = ['projectaccounts','reports:payroll','reports:bank','reports:delegations','reports:pnl','inventory','sales','salesorder','allinvoices','salesorderreport','invoicereport'];
+  const FIN_ONLY = ['projectaccounts','reports:payroll','reports:bank','reports:delegations','reports:pnl','debtaging','inventory','sales','salesorder','allinvoices','salesorderreport','invoicereport'];
   const ALIASES = { employees:['add','all-employees'], allprojects:['projects'], 'commencement-list':['commencements'] };
 
   const HRAuth = {

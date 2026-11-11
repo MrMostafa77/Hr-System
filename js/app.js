@@ -16,6 +16,7 @@
   const INVOICE_KEY = 'hr_invoices_v1';
   const INV_KEY = 'hr_inventory_v1';
   const PNL_KEY = 'hr_pnl_v1';
+  const ARPAY_KEY = 'hr_arpay_v1';
   const ATT_CODES = ['','ح','-','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق','إجازة','مرضية'];   // (-) = لم يحضر: لا حضور ولا غياب، يُخصم يومه من الراتب بدون جزاء
   let paySelMode=false; const paySelected=new Set();   // وضع اختيار موظفين لترحيل كشف البنك
   // hold = الراتب الإجمالي لا يدخل إجمالي المسير ولا يُرحَّل على كشف البنك حتى تُلغى الحالة
@@ -45,6 +46,7 @@
   let payrollRecords = {};
   let invoices = [];
   let inventory = {};
+  let arPay = {};   // أعمار المديونيات: دفعات العملاء المسدّدة يدويًا {عميل:[{id,date,amount,note}]}
   let pnl = {};   // تقرير الأرباح والخسائر: إدخالات يدوية {شهر:{مشروع:{rev,ops}}}
   let currentView = 'dashboard';
   let currentProfileId = null;
@@ -102,7 +104,8 @@
       projectAccounts: readLocal(PROJECT_ACCOUNT_KEY, []), payrollRecords: readLocal(PAYROLL_KEY, {}),
       invoices: readLocal(INVOICE_KEY, []),
       inventory: readLocal(INV_KEY, {}),
-      pnl: readLocal(PNL_KEY, {})
+      pnl: readLocal(PNL_KEY, {}),
+      arPay: readLocal(ARPAY_KEY, {})
     };
   }
   function applyState(state){
@@ -121,6 +124,7 @@
     invoices = Array.isArray(state?.invoices) ? state.invoices : [];
     inventory = state?.inventory && typeof state.inventory==='object' && !Array.isArray(state.inventory) ? state.inventory : {};
     pnl = state?.pnl && typeof state.pnl==='object' && !Array.isArray(state.pnl) ? state.pnl : {};
+    arPay = state?.arPay && typeof state.arPay==='object' && !Array.isArray(state.arPay) ? state.arPay : {};
     syncEmployeeStartDates();
     normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
@@ -173,7 +177,7 @@
     }catch(_){}
   }
   function currentState(){
-    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords,invoices,inventory,pnl};
+    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords,invoices,inventory,pnl,arPay};
   }
   let cloudSaveTimer = null;
   let cloudApplying = false;
@@ -184,7 +188,7 @@
   function persistLocal(){
     writeLocal(STORAGE_KEY,employees); writeLocal(ATT_KEY,attendance);
     writeLocal(PEN_KEY,penalties); writeLocal(COV_KEY,coverage); writeLocal(SET_KEY,settings);
-    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords); writeLocal(INVOICE_KEY,invoices); writeLocal(INV_KEY,inventory); writeLocal(PNL_KEY,pnl);
+    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords); writeLocal(INVOICE_KEY,invoices); writeLocal(INV_KEY,inventory); writeLocal(PNL_KEY,pnl); writeLocal(ARPAY_KEY,arPay);
   }
   function persistCloud(message='تم حفظ التغييرات بنجاح'){
     persistLocal();
@@ -217,7 +221,7 @@
   function loadAux(){
     const state=localState();
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
-    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{}; invoices=state.invoices||[]; inventory=state.inventory||{}; pnl=state.pnl||{};
+    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{}; invoices=state.invoices||[]; inventory=state.inventory||{}; pnl=state.pnl||{}; arPay=state.arPay||{};
     syncEmployeeStartDates();
     normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
@@ -802,7 +806,7 @@
   const exportableViews=['dashboard','regions','projects','allprojects','employees','departments','add','projectpromotions','employeepromotions','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports'];
   function currentViewElement(){ return currentView ? document.getElementById('view-'+currentView) : null; }
   function exportFileBase(){
-    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',inventory:'المخزون',reports:'التقارير'};
+    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',debtaging:'أعمار المديونيات للعملاء',inventory:'المخزون',reports:'التقارير'};
     return titles[currentView]||'تصدير';
   }
   function exportCurrentExcel(){
@@ -907,7 +911,7 @@
     const isLandscape=['projects','allprojects','allcontracts','coverage'].includes(view);
     st.textContent=`@media print { @page { size: A4 ${isLandscape?'landscape':'portrait'} !important; margin: ${isLandscape?'8mm':'10mm'} !important; } }`;
     document.head.appendChild(st);
-    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports','sales','salesorder','allinvoices','salesorderreport','invoicereport','users','projectpromotions','employeepromotions','inventory'].forEach(v=>{
+    ['dashboard','regions','projects','allprojects','employees','all-employees','departments','add','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports','sales','salesorder','allinvoices','salesorderreport','invoicereport','debtaging','users','projectpromotions','employeepromotions','inventory'].forEach(v=>{
       document.getElementById('view-'+v).style.display = (v===view)?'':'none';
     });
     document.querySelectorAll('.navlink[data-view]').forEach(a=>{
@@ -946,6 +950,7 @@
     if(view==='allinvoices') window.HRSales?.renderAll();
     if(view==='salesorderreport') window.HRSales?.renderOrderReport();
     if(view==='invoicereport') window.HRSales?.renderInvoiceReport();
+    if(view==='debtaging'){ try{ renderDebtAging(); }catch(err){ console.error(err); } }
     if(view==='users') window.HRUsers?.render();
     if(view==='employeepromotions') renderEmployeePromotions();
     if(view==='projectpromotions') renderProjectPromotions();
@@ -961,7 +966,7 @@
   window.switchView = switchView;
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
-  const PJ_TITLES={inventory:'المخزون',users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',reports:'التقارير'};
+  const PJ_TITLES={inventory:'المخزون',users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',debtaging:'أعمار المديونيات للعملاء',reports:'التقارير'};
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك',pnl:'تقرير الأرباح والخسائر'};
   const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn'],sales:['btn','saveInvoiceBtn'],salesorder:['btn','saveOrderBtn']};
   const pjTabs={open:[],dirty:new Set()};
@@ -3735,6 +3740,92 @@
     const d=pnlCompute(); if(!d.rows.length){ showToast('لا توجد بيانات للطباعة'); return; }
     const w=window.open('','_blank'); if(!w){ showToast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
     w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تقرير الأرباح والخسائر</title><style>body{font-family:Tahoma,Arial,sans-serif;margin:14px;color:#111}h2{text-align:center;margin:0 0 4px}p{text-align:center;margin:0 0 10px;font-size:12px;color:#333}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #888;padding:6px 8px;text-align:center}th{background:#dce6f5}th small{display:block;font-weight:400;font-size:10px;color:#444}td.pnl-name,th.pnl-name{text-align:right}tfoot td{background:#eef2f7;font-weight:800}.pnl-neg{color:#b42318;font-weight:800}.pnl-pos{color:#146b54;font-weight:800}@page{size:A4 landscape;margin:8mm}</style></head><body><h2>تقرير الأرباح والخسائر</h2><p>${escapeHtml(pnlMsg(d.ym))} — تاريخ الطباعة: ${fmtDMY(todayISO())}</p>${pnlTableHtml(d,false)}</body></html>`);
+    w.document.close(); w.focus(); setTimeout(()=>{ try{w.print();}catch(_){} },300);
+  });
+
+  /* ===== أعمار المديونيات للعملاء =====
+     لكل عميل وكل شهر: إن وُجدت فاتورة مبيعات لنفس العميل في نفس الشهر تُحتسب الفاتورة فقط، وإلا يُحتسب أمر البيع.
+     (لا يوجد ربط مباشر بين الأمر والفاتورة، فالمطابقة بالعميل + شهر فترة التوريد.)
+     المسدد = دفعات تُدخل يدويًا | المتبقي = المستحق − المسدد | أقدم شهر متبقي: يُطبَّق المسدد على الأقدم أولًا. */
+  const dagState={q:'',hide:false}; const dagOpen=new Set(); const DAG_NODATE='nodate';
+  function dagMonthLabel(m){ return m===DAG_NODATE?'بدون تاريخ':monthLabel(m); }
+  function dagCompute(){
+    const calc=window.HRSales&&window.HRSales._calc, cust=new Map(), months=new Set();
+    const get=n=>{ if(!cust.has(n)) cust.set(n,{name:n,m:{}}); return cust.get(n); };
+    (invoices||[]).forEach(i=>{
+      const k=i.kind||'invoice'; if((k!=='invoice'&&k!=='order')||!calc) return;
+      const c=get(pnlInvProject(i)), ym=pnlInvMonth(i)||DAG_NODATE, cell=c.m[ym]||(c.m[ym]={inv:0,ord:0,nInv:0,nOrd:0}), net=calc(i).net;
+      if(k==='invoice'){ cell.inv+=net; cell.nInv++; } else { cell.ord+=net; cell.nOrd++; }
+      months.add(ym);
+    });
+    Object.keys(arPay||{}).forEach(n=>{ if((arPay[n]||[]).length) get(n); });
+    const cols=[...months].sort((a,b)=>a===DAG_NODATE?1:b===DAG_NODATE?-1:a.localeCompare(b));
+    const nowYm=currentMonthStr();
+    let rows=[...cust.values()].map(c=>{
+      const cells={}; let total=0;
+      cols.forEach(ym=>{ const x=c.m[ym]; if(!x){ cells[ym]=null; return; } const useInv=x.nInv>0, amt=r2(useInv?x.inv:x.ord); cells[ym]={amt,type:useInv?'inv':'ord'}; total+=amt; });
+      total=r2(total);
+      const pays=Array.isArray(arPay[c.name])?arPay[c.name]:[], paid=r2(pays.reduce((s,p)=>s+(Number(p.amount)||0),0)), rem=r2(total-paid);
+      // أقدم شهر متبقي (المسدد على الأقدم أولًا)
+      let left=paid, oldest='';
+      for(const ym of cols){ const cell=cells[ym]; if(!cell) continue; if(left>=cell.amt-0.005){ left=r2(left-cell.amt); continue; } oldest=ym; break; }
+      let age=''; if(oldest&&oldest!==DAG_NODATE&&rem>0.005){ const [y1,m1]=oldest.split('-').map(Number), [y2,m2]=nowYm.split('-').map(Number); age=Math.max(0,(y2-y1)*12+(m2-m1)); }
+      return {name:c.name,cells,total,paid,rem,pays,oldest:rem>0.005?oldest:'',age};
+    });
+    const q=dagState.q.trim().toLowerCase();
+    if(q) rows=rows.filter(r=>r.name.toLowerCase().includes(q));
+    if(dagState.hide) rows=rows.filter(r=>r.rem>0.005);
+    rows.sort((a,b)=>b.rem-a.rem||String(a.name).localeCompare(String(b.name),'ar'));
+    const tot={total:0,paid:0,rem:0,cols:{}}; cols.forEach(m=>{ tot.cols[m]=0; });
+    rows.forEach(r=>{ tot.total+=r.total; tot.paid+=r.paid; tot.rem+=r.rem; cols.forEach(m=>{ if(r.cells[m]) tot.cols[m]+=r.cells[m].amt; }); });
+    tot.total=r2(tot.total); tot.paid=r2(tot.paid); tot.rem=r2(tot.rem); cols.forEach(m=>{ tot.cols[m]=r2(tot.cols[m]); });
+    return {rows,cols,tot,debtors:rows.filter(r=>r.rem>0.005).length};
+  }
+  function dagTableHtml(d,edit){
+    const head=`<tr><th class="pnl-name">العميل</th>${d.cols.map(m=>`<th>${escapeHtml(dagMonthLabel(m))}</th>`).join('')}<th>إجمالي المستحق</th><th>المسدد</th><th>المتبقي</th><th>أقدم شهر متبقي</th><th>العمر (شهر)</th>${edit?'<th class="no-print">الدفعات</th>':''}</tr>`;
+    const span=d.cols.length+6+(edit?1:0), can=edit&&pdrCanFinance();
+    const body=d.rows.map(r=>{
+      const cells=d.cols.map(m=>{ const c=r.cells[m]; return c?`<td class="mono">${pnlNum(c.amt)}<small class="dag-tag ${c.type}">${c.type==='inv'?'فاتورة':'أمر بيع'}</small></td>`:'<td class="dag-empty">—</td>'; }).join('');
+      const main=`<tr><td class="pnl-name">${escapeHtml(r.name)}</td>${cells}<td class="mono pnl-tot">${pnlNum(r.total)}</td><td class="mono">${pnlNum(r.paid)}</td><td class="mono pnl-gross ${r.rem>0.005?'pnl-neg':(r.rem<-0.005?'pnl-pos':'')}">${pnlNum(r.rem)}</td><td>${r.oldest?escapeHtml(dagMonthLabel(r.oldest)):'—'}</td><td>${r.age===''?'—':r.age}</td>${edit?`<td class="no-print"><button type="button" class="btn btn-sm" data-dag-toggle="${escapeAttr(r.name)}">${dagOpen.has(r.name)?'إخفاء':'دفعات ('+r.pays.length+')'}</button></td>`:''}</tr>`;
+      if(!edit||!dagOpen.has(r.name)) return main;
+      const list=r.pays.length?r.pays.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).map(p=>`<tr><td class="mono">${escapeHtml(p.date?fmtDMY(p.date):'—')}</td><td class="mono">${pnlNum(p.amount)}</td><td>${escapeHtml(p.note||'')}</td><td>${can?`<button type="button" class="btn btn-sm" data-dag-del="${escapeAttr(r.name)}" data-pid="${escapeAttr(p.id)}">حذف</button>`:''}</td></tr>`).join(''):'<tr><td colspan="4" class="empty-note">لا توجد دفعات مسجلة</td></tr>';
+      const form=can?`<div class="dag-form"><input type="date" data-dag-date value="${todayISO()}"><input type="number" step="0.01" min="0" data-dag-amt placeholder="المبلغ المسدد"><input type="text" data-dag-note placeholder="ملاحظة (اختياري)"><button type="button" class="btn btn-sm btn-primary" data-dag-add="${escapeAttr(r.name)}">إضافة دفعة</button></div>`:'';
+      return main+`<tr class="dag-det"><td colspan="${span}">${form}<table class="dag-pays"><thead><tr><th>التاريخ</th><th>المبلغ</th><th>ملاحظة</th><th></th></tr></thead><tbody>${list}</tbody></table></td></tr>`;
+    }).join('')||`<tr><td colspan="${span}" class="empty-note">لا توجد مديونيات مطابقة.</td></tr>`;
+    const t=d.tot, foot=`<tr><td class="pnl-name">الإجمالي — ${d.rows.length} عميل</td>${d.cols.map(m=>`<td class="mono">${pnlNum(t.cols[m])}</td>`).join('')}<td class="mono">${pnlNum(t.total)}</td><td class="mono">${pnlNum(t.paid)}</td><td class="mono pnl-gross ${t.rem>0.005?'pnl-neg':''}">${pnlNum(t.rem)}</td><td></td><td></td>${edit?'<td class="no-print"></td>':''}</tr>`;
+    return `<table class="pnl-table dag-table"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`;
+  }
+  function renderDebtAging(){
+    const out=document.getElementById('dagOutput'); if(!out) return;
+    const d=dagCompute(), t=d.tot, c=(l,v,cls)=>`<div${cls?` class="${cls}"`:''}><small>${l}</small><b>${pnlNum(v)}</b></div>`;
+    document.getElementById('dagCount').textContent=`${d.rows.length} عميل — مدين ${d.debtors}`;
+    out.innerHTML=`<div class="bank-summary pnl-cards">${c('إجمالي المستحق (شامل الضريبة)',t.total)}${c('المسدد',t.paid)}<div class="main ${t.rem>0.005?'pnl-neg':'pnl-pos'}"><small>المتبقي على العملاء</small><b>${pnlNum(t.rem)}</b></div></div><div class="table-wrap">${dagTableHtml(d,true)}</div>
+      <div class="payroll-info-note">لكل عميل وشهر: إن وُجدت فاتورة مبيعات لنفس العميل في نفس الشهر تُحتسب الفاتورة فقط ولا يُحتسب أمر البيع. الشهر حسب «فترة التوريد» (وإلا تاريخ المستند). المبالغ شاملة الضريبة. «أقدم شهر متبقي» يُحسب بتطبيق المسدد على الأقدم أولًا.</div>`;
+  }
+  document.getElementById('dagSearch')?.addEventListener('input',e=>{ dagState.q=e.target.value; renderDebtAging(); });
+  document.getElementById('dagHide')?.addEventListener('change',e=>{ dagState.hide=e.target.checked; renderDebtAging(); });
+  document.getElementById('dagOutput')?.addEventListener('click',e=>{
+    const tg=e.target.closest('[data-dag-toggle]'), ad=e.target.closest('[data-dag-add]'), dl=e.target.closest('[data-dag-del]');
+    if(tg){ const n=tg.dataset.dagToggle; dagOpen.has(n)?dagOpen.delete(n):dagOpen.add(n); renderDebtAging(); return; }
+    if(ad){
+      if(!pdrCanFinance()){ showToast('تسجيل الدفعات يحتاج صلاحية المالية'); return; }
+      const n=ad.dataset.dagAdd, box=ad.closest('.dag-form'), amt=Number(box.querySelector('[data-dag-amt]').value)||0;
+      if(!(amt>0)){ showToast('اكتب مبلغًا صحيحًا'); return; }
+      if(!Array.isArray(arPay[n])) arPay[n]=[];
+      arPay[n].push({id:'pay'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),date:box.querySelector('[data-dag-date]').value||todayISO(),amount:amt,note:box.querySelector('[data-dag-note]').value.trim()});
+      persistCloud('تم تسجيل الدفعة'); renderDebtAging(); return;
+    }
+    if(dl){
+      if(!pdrCanFinance()){ showToast('حذف الدفعات يحتاج صلاحية المالية'); return; }
+      if(!confirm('حذف هذه الدفعة؟')) return;
+      const n=dl.dataset.dagDel; arPay[n]=(arPay[n]||[]).filter(p=>String(p.id)!==String(dl.dataset.pid)); if(!arPay[n].length) delete arPay[n];
+      persistCloud('تم حذف الدفعة'); renderDebtAging();
+    }
+  });
+  document.getElementById('dagPrintBtn')?.addEventListener('click',()=>{
+    const d=dagCompute(); if(!d.rows.length){ showToast('لا توجد بيانات للطباعة'); return; }
+    const w=window.open('','_blank'); if(!w){ showToast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>أعمار المديونيات للعملاء</title><style>body{font-family:Tahoma,Arial,sans-serif;margin:14px;color:#111}h2{text-align:center;margin:0 0 4px}p{text-align:center;margin:0 0 10px;font-size:12px;color:#333}table{width:100%;border-collapse:collapse;font-size:11px}th,td{border:1px solid #888;padding:5px 6px;text-align:center}th{background:#dce6f5}td.pnl-name,th.pnl-name{text-align:right}tfoot td{background:#eef2f7;font-weight:800}.dag-tag{display:block;font-size:9px;color:#555}.pnl-neg{color:#b42318;font-weight:800}.pnl-pos{color:#146b54;font-weight:800}@page{size:A4 landscape;margin:8mm}</style></head><body><h2>أعمار المديونيات للعملاء</h2><p>المستحق شامل الضريبة — تاريخ الطباعة: ${fmtDMY(todayISO())}</p>${dagTableHtml(d,false)}</body></html>`);
     w.document.close(); w.focus(); setTimeout(()=>{ try{w.print();}catch(_){} },300);
   });
 
