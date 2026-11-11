@@ -15,6 +15,7 @@
   const PAYROLL_KEY = 'hr_payroll_v1';
   const INVOICE_KEY = 'hr_invoices_v1';
   const INV_KEY = 'hr_inventory_v1';
+  const PNL_KEY = 'hr_pnl_v1';
   const ATT_CODES = ['','ح','-','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق','إجازة','مرضية'];   // (-) = لم يحضر: لا حضور ولا غياب، يُخصم يومه من الراتب بدون جزاء
   let paySelMode=false; const paySelected=new Set();   // وضع اختيار موظفين لترحيل كشف البنك
   // hold = الراتب الإجمالي لا يدخل إجمالي المسير ولا يُرحَّل على كشف البنك حتى تُلغى الحالة
@@ -44,6 +45,7 @@
   let payrollRecords = {};
   let invoices = [];
   let inventory = {};
+  let pnl = {};   // تقرير الأرباح والخسائر: إدخالات يدوية {شهر:{مشروع:{rev,ops}}}
   let currentView = 'dashboard';
   let currentProfileId = null;
   let pendingDeleteId = null;
@@ -99,7 +101,8 @@
       commencements: readLocal(COMMENCEMENT_KEY, []),
       projectAccounts: readLocal(PROJECT_ACCOUNT_KEY, []), payrollRecords: readLocal(PAYROLL_KEY, {}),
       invoices: readLocal(INVOICE_KEY, []),
-      inventory: readLocal(INV_KEY, {})
+      inventory: readLocal(INV_KEY, {}),
+      pnl: readLocal(PNL_KEY, {})
     };
   }
   function applyState(state){
@@ -117,6 +120,7 @@
     payrollRecords = state?.payrollRecords && typeof state.payrollRecords==='object' ? state.payrollRecords : {};
     invoices = Array.isArray(state?.invoices) ? state.invoices : [];
     inventory = state?.inventory && typeof state.inventory==='object' && !Array.isArray(state.inventory) ? state.inventory : {};
+    pnl = state?.pnl && typeof state.pnl==='object' && !Array.isArray(state.pnl) ? state.pnl : {};
     syncEmployeeStartDates();
     normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
@@ -169,7 +173,7 @@
     }catch(_){}
   }
   function currentState(){
-    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords,invoices,inventory};
+    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords,invoices,inventory,pnl};
   }
   let cloudSaveTimer = null;
   let cloudApplying = false;
@@ -180,7 +184,7 @@
   function persistLocal(){
     writeLocal(STORAGE_KEY,employees); writeLocal(ATT_KEY,attendance);
     writeLocal(PEN_KEY,penalties); writeLocal(COV_KEY,coverage); writeLocal(SET_KEY,settings);
-    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords); writeLocal(INVOICE_KEY,invoices); writeLocal(INV_KEY,inventory);
+    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords); writeLocal(INVOICE_KEY,invoices); writeLocal(INV_KEY,inventory); writeLocal(PNL_KEY,pnl);
   }
   function persistCloud(message='تم حفظ التغييرات بنجاح'){
     persistLocal();
@@ -213,7 +217,7 @@
   function loadAux(){
     const state=localState();
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
-    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{}; invoices=state.invoices||[]; inventory=state.inventory||{};
+    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{}; invoices=state.invoices||[]; inventory=state.inventory||{}; pnl=state.pnl||{};
     syncEmployeeStartDates();
     normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
@@ -947,7 +951,7 @@
     if(view==='projectpromotions') renderProjectPromotions();
     if(view==='reports'){
       const activeReport=document.querySelector('.nav-child[data-view="reports"].active');
-      const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك',delegations:'التفاويض'};
+      const titleMap={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك',delegations:'التفاويض',pnl:'تقرير الأرباح والخسائر'};
       const title=titleMap[activeReport?.dataset.report||'payroll']||'تقارير الرواتب';
       const h=document.querySelector('#view-reports .pagetitle h1');
       if(h) h.textContent=title;
@@ -958,7 +962,7 @@
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
   const PJ_TITLES={inventory:'المخزون',users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',reports:'التقارير'};
-  const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك'};
+  const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك',pnl:'تقرير الأرباح والخسائر'};
   const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn'],sales:['btn','saveInvoiceBtn'],salesorder:['btn','saveOrderBtn']};
   const pjTabs={open:[],dirty:new Set()};
   // عند فتح سجل تاريخي من التقارير، نعرض شاشة الإدخال نفسها لكن للقراءة فقط.
@@ -3607,15 +3611,143 @@
     w.document.close(); w.focus(); setTimeout(()=>{ try{w.print();}catch(_){} },300);
   });
 
+  /* ===== تقرير الأرباح والخسائر (لكل مشروع) =====
+     الإيرادات = فواتير المبيعات (أو أوامر البيع) حسب فترة التوريد + إدخال يدوي
+     الرواتب المنصرفة = المرحَّلة التي تم صرفها من كشف البنك
+     الرواتب المستحقة = غير المصروفة (غير مرحّلة أو مرحّلة لم تُصرف) ولا يوجد عليها إيقاف
+     المشغلون = إدخال يدوي | المجمل = الإيرادات − (المنصرفة + المستحقة + المشغلون) */
+  const pnlState={month:null,project:'',src:'invoice',vat:'ex',hide:false};
+  const pnlNum=n=>(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const PNL_NONE='— بدون مشروع —';
+  function pnlInvMonth(i){ const d=String((i&&(i.supply||i.date))||''); return /^\d{4}-\d{2}/.test(d)?d.slice(0,7):''; }
+  function pnlInvProject(i){
+    const p=i.projectId&&(projects||[]).find(x=>String(x.id)===String(i.projectId));
+    return (p&&p.name)||String((i.customer&&i.customer.name)||'').trim()||PNL_NONE;
+  }
+  function pnlMonths(){
+    const set=new Set(payrollAvailableMonths());
+    (invoices||[]).forEach(i=>{ const m=pnlInvMonth(i); if(m) set.add(m); });
+    Object.keys(pnl||{}).forEach(m=>{ if(/^\d{4}-\d{2}$/.test(m)) set.add(m); });
+    return [...set].sort().reverse();
+  }
+  function pnlCompute(){
+    const ym=pnlState.month||'', map=new Map();
+    const row=name=>{ name=String(name||'').trim()||PNL_NONE; if(!map.has(name)) map.set(name,{name,inv:0,man:0,paid:0,due:0,ops:0}); return map.get(name); };
+    (projects||[]).forEach(p=>{ if(p&&p.name) row(p.name); });
+    // الإيرادات من الفواتير / أوامر البيع
+    const calc=window.HRSales&&window.HRSales._calc;
+    (invoices||[]).forEach(i=>{
+      const k=i.kind||'invoice'; if(pnlState.src!=='both'&&k!==pnlState.src) return;
+      if(ym&&pnlInvMonth(i)!==ym) return;
+      if(!calc) return; const T=calc(i); row(pnlInvProject(i)).inv+=(pnlState.vat==='inc'?T.net:T.total);
+    });
+    // الرواتب
+    const months=ym?[ym]:payrollAvailableMonths();
+    months.forEach(m=>{
+      const rec=(payrollRecords&&payrollRecords[m])||{}, cols=monthCols(m);
+      Object.keys(rec).forEach(id=>{
+        const b=rec[id]&&rec[id].bank; if(!b||!b.paidAt) return;
+        const e=employees.find(x=>String(x.id)===String(id)); row(e&&e.project).paid+=Number(b.total)||0;
+      });
+      payrollEmployees().filter(e=>employeeInPayrollMonth(e,m)).forEach(e=>{
+        const r=rec[e.id]; if(r&&r.bank&&r.bank.paidAt) return;
+        const p=payrollStatementForCols(e,cols); if(!p||p.held||p.notStarted) return;
+        const net=Number(p.net)||0; if(net<=0) return;
+        row(e.project).due+=(r&&r.bank&&Number(r.bank.total))?Number(r.bank.total):net;
+      });
+    });
+    // الإدخال اليدوي (الإيراد اليدوي + المشغلون)
+    (ym?[ym]:Object.keys(pnl||{}).filter(m=>/^\d{4}-\d{2}$/.test(m))).forEach(m=>{
+      const mm=(pnl&&pnl[m])||{}; Object.keys(mm).forEach(nm=>{ const o=mm[nm]||{}, r=row(nm); r.man+=Number(o.rev)||0; r.ops+=Number(o.ops)||0; });
+    });
+    let rows=[...map.values()].map(r=>{ r.rev=r2(r.inv+r.man); r.cost=r2(r.paid+r.due+r.ops); r.gross=r2(r.rev-r.cost); return r; });
+    const projSel=pnlState.project;
+    if(projSel) rows=rows.filter(r=>r.name===projSel);
+    if(pnlState.hide) rows=rows.filter(r=>r.inv||r.man||r.paid||r.due||r.ops);
+    rows.sort((a,b)=>String(a.name).localeCompare(String(b.name),'ar'));
+    const tot={inv:0,man:0,rev:0,paid:0,due:0,ops:0,gross:0}; rows.forEach(r=>Object.keys(tot).forEach(k=>{ tot[k]+=r[k]; })); Object.keys(tot).forEach(k=>{ tot[k]=r2(tot[k]); });
+    return {rows,tot,ym};
+  }
+  function pnlMsg(ym){
+    const src={invoice:'فواتير المبيعات',order:'أوامر البيع',both:'الفواتير + أوامر البيع'}[pnlState.src], vat=pnlState.vat==='inc'?'شامل الضريبة':'قبل الضريبة';
+    return `${ym?'شهر '+monthLabel(ym):'كل الشهور'} — الإيرادات من: ${src} (${vat})`;
+  }
+  function pnlGrossCls(v){ return v<0?'pnl-neg':(v>0?'pnl-pos':''); }
+  function pnlFill(d){
+    const out=document.getElementById('pnlOutput'); if(!out) return;
+    d.rows.forEach(r=>{
+      const tr=out.querySelector(`tr[data-pnl-row="${CSS.escape(r.name)}"]`); if(!tr) return;
+      const set=(k,v)=>{ const c=tr.querySelector(`[data-pnl-c="${k}"]`); if(c) c.textContent=pnlNum(v); };
+      set('inv',r.inv); set('rev',r.rev); set('paid',r.paid); set('due',r.due); set('gross',r.gross);
+      const g=tr.querySelector('[data-pnl-c="gross"]'); if(g) g.className='mono pnl-gross '+pnlGrossCls(r.gross);
+    });
+    const T=out.querySelector('tfoot'); if(T){
+      ['inv','man','rev','paid','due','ops','gross'].forEach(k=>{ const c=T.querySelector(`[data-pnl-t="${k}"]`); if(c) c.textContent=pnlNum(d.tot[k]); });
+      const g=T.querySelector('[data-pnl-t="gross"]'); if(g) g.className='mono pnl-gross '+pnlGrossCls(d.tot.gross);
+    }
+    const cards=out.querySelector('.pnl-cards'); if(cards) cards.innerHTML=pnlCardsHtml(d);
+  }
+  function pnlCardsHtml(d){
+    const t=d.tot, c=(l,v,cls)=>`<div${cls?` class="${cls}"`:''}><small>${l}</small><b>${pnlNum(v)}</b></div>`;
+    return c('إجمالي الإيرادات',t.rev)+c('الرواتب المنصرفة',t.paid)+c('الرواتب المستحقة',t.due)+c('المشغلون',t.ops)+`<div class="main ${pnlGrossCls(t.gross)}"><small>المجمل (${t.gross<0?'خسارة':'ربح'})</small><b>${pnlNum(t.gross)}</b></div>`;
+  }
+  function pnlTableHtml(d,edit){
+    const ym=d.ym, ed=edit&&!!ym&&pdrCanFinance();
+    const mm=(ym&&pnl&&pnl[ym])||{};
+    const inp=(r,f)=>ed?`<input type="number" step="0.01" min="0" data-pnl-in="${f}" data-pnl-proj="${escapeAttr(r.name)}" value="${Number((mm[r.name]||{})[f])||''}" placeholder="0">`:pnlNum(f==='rev'?r.man:r.ops);
+    const body=d.rows.map(r=>`<tr data-pnl-row="${escapeAttr(r.name)}"><td class="pnl-name">${escapeHtml(r.name)}</td>
+      <td class="mono" data-pnl-c="inv">${pnlNum(r.inv)}</td><td class="pnl-in">${inp(r,'rev')}</td><td class="mono pnl-tot" data-pnl-c="rev">${pnlNum(r.rev)}</td>
+      <td class="mono" data-pnl-c="paid">${pnlNum(r.paid)}</td><td class="mono" data-pnl-c="due">${pnlNum(r.due)}</td><td class="pnl-in">${inp(r,'ops')}</td>
+      <td class="mono pnl-gross ${pnlGrossCls(r.gross)}" data-pnl-c="gross">${pnlNum(r.gross)}</td></tr>`).join('')||'<tr><td colspan="8" class="empty-note">لا توجد مشاريع مطابقة.</td></tr>';
+    const t=d.tot;
+    return `<table class="pnl-table"><thead><tr><th rowspan="2" class="pnl-name">اسم المشروع</th><th colspan="3">الإيرادات</th><th rowspan="2">الرواتب المنصرفة<small>مرحّلة + تم صرفها</small></th><th rowspan="2">الرواتب المستحقة<small>لم تُصرف بعد</small></th><th rowspan="2">المشغلون<small>إدخال يدوي</small></th><th rowspan="2">المجمل<small>الإيرادات − التكاليف</small></th></tr>
+      <tr><th>من الفواتير</th><th>إدخال يدوي</th><th>إجمالي الإيرادات</th></tr></thead><tbody>${body}</tbody>
+      <tfoot><tr><td class="pnl-name">الإجمالي — ${d.rows.length} مشروع</td><td class="mono" data-pnl-t="inv">${pnlNum(t.inv)}</td><td class="mono" data-pnl-t="man">${pnlNum(t.man)}</td><td class="mono" data-pnl-t="rev">${pnlNum(t.rev)}</td><td class="mono" data-pnl-t="paid">${pnlNum(t.paid)}</td><td class="mono" data-pnl-t="due">${pnlNum(t.due)}</td><td class="mono" data-pnl-t="ops">${pnlNum(t.ops)}</td><td class="mono pnl-gross ${pnlGrossCls(t.gross)}" data-pnl-t="gross">${pnlNum(t.gross)}</td></tr></tfoot></table>`;
+  }
+  function renderPnlReport(){
+    const out=document.getElementById('pnlOutput'); if(!out) return;
+    const months=pnlMonths();
+    if(pnlState.month===null) pnlState.month=payrollAvailableMonths()[0]||months[0]||'';
+    const msel=document.getElementById('pnlMonth'), psel=document.getElementById('pnlProject');
+    msel.innerHTML='<option value="">كل الشهور</option>'+months.map(m=>`<option value="${escapeAttr(m)}">${escapeHtml(monthLabel(m))}</option>`).join(''); msel.value=pnlState.month;
+    const names=[...new Set([...(projects||[]).map(p=>p&&p.name).filter(Boolean),...employees.map(e=>e.project).filter(Boolean),...(invoices||[]).map(pnlInvProject)])].sort((a,b)=>String(a).localeCompare(String(b),'ar'));
+    if(pnlState.project&&!names.includes(pnlState.project)) pnlState.project='';
+    psel.innerHTML='<option value="">كل المشاريع</option>'+names.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join(''); psel.value=pnlState.project;
+    document.getElementById('pnlSrc').value=pnlState.src; document.getElementById('pnlVat').value=pnlState.vat; document.getElementById('pnlHide').checked=!!pnlState.hide;
+    const d=pnlCompute();
+    document.getElementById('pnlCount').textContent=`${d.rows.length} مشروع`;
+    out.innerHTML=`<div class="bank-summary pnl-cards">${pnlCardsHtml(d)}</div><div class="table-wrap">${pnlTableHtml(d,true)}</div>
+      <div class="payroll-info-note">${escapeHtml(pnlMsg(d.ym))}. الإيرادات تُنسب للشهر حسب «فترة التوريد» في الفاتورة (وإن لم تُحدَّد فتاريخ الفاتورة). الرواتب المستحقة تشمل المرحَّلة التي لم تُصرف، ولا تشمل الموظفين الموقوفة رواتبهم.${d.ym?'':' الإدخال اليدوي متاح عند اختيار شهر واحد.'}</div>`;
+  }
+  ['pnlMonth','pnlProject','pnlSrc','pnlVat','pnlHide'].forEach(id=>{ document.getElementById(id)?.addEventListener('change',e=>{
+    const t=e.target; if(id==='pnlMonth') pnlState.month=t.value; else if(id==='pnlProject') pnlState.project=t.value; else if(id==='pnlSrc') pnlState.src=t.value; else if(id==='pnlVat') pnlState.vat=t.value; else pnlState.hide=t.checked;
+    renderPnlReport();
+  }); });
+  document.getElementById('pnlOutput')?.addEventListener('change',e=>{
+    const el=e.target.closest('[data-pnl-in]'); if(!el) return;
+    const ym=pnlState.month; if(!ym||!pdrCanFinance()) return;
+    const nm=el.dataset.pnlProj, f=el.dataset.pnlIn, v=Math.max(0,Number(el.value)||0);
+    if(!pnl[ym]) pnl[ym]={}; const o=pnl[ym][nm]=Object.assign({rev:0,ops:0},pnl[ym][nm]||{}); o[f]=v;
+    if(!o.rev&&!o.ops){ delete pnl[ym][nm]; if(!Object.keys(pnl[ym]).length) delete pnl[ym]; }
+    persistCloud('تم حفظ الإدخال اليدوي'); pnlFill(pnlCompute());
+  });
+  document.getElementById('pnlPrintBtn')?.addEventListener('click',()=>{
+    const d=pnlCompute(); if(!d.rows.length){ showToast('لا توجد بيانات للطباعة'); return; }
+    const w=window.open('','_blank'); if(!w){ showToast('اسمح بالنوافذ المنبثقة للطباعة'); return; }
+    w.document.write(`<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8"><title>تقرير الأرباح والخسائر</title><style>body{font-family:Tahoma,Arial,sans-serif;margin:14px;color:#111}h2{text-align:center;margin:0 0 4px}p{text-align:center;margin:0 0 10px;font-size:12px;color:#333}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #888;padding:6px 8px;text-align:center}th{background:#dce6f5}th small{display:block;font-weight:400;font-size:10px;color:#444}td.pnl-name,th.pnl-name{text-align:right}tfoot td{background:#eef2f7;font-weight:800}.pnl-neg{color:#b42318;font-weight:800}.pnl-pos{color:#146b54;font-weight:800}@page{size:A4 landscape;margin:8mm}</style></head><body><h2>تقرير الأرباح والخسائر</h2><p>${escapeHtml(pnlMsg(d.ym))} — تاريخ الطباعة: ${fmtDMY(todayISO())}</p>${pnlTableHtml(d,false)}</body></html>`);
+    w.document.close(); w.focus(); setTimeout(()=>{ try{w.print();}catch(_){} },300);
+  });
+
   function renderReports(){
-    const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel'), bankMode=window.currentReport==='bank', bankPanel=document.getElementById('bankReportsPanel'), delMode=window.currentReport==='delegations', delPanel=document.getElementById('delegationsReportPanel');
+    const projectMode=window.currentReport==='projects', employeeMode=window.currentReport==='employees', coverageMode=window.currentReport==='coverage', card=document.querySelector('#view-reports .full-page-data-card'), panel=document.getElementById('projectReportsPanel'), employeePanel=document.getElementById('employeeReportsPanel'), covPanel=document.getElementById('coverageReportsPanel'), bankMode=window.currentReport==='bank', bankPanel=document.getElementById('bankReportsPanel'), delMode=window.currentReport==='delegations', delPanel=document.getElementById('delegationsReportPanel'), pnlMode=window.currentReport==='pnl', pnlPanel=document.getElementById('pnlReportPanel');
     if(covPanel)covPanel.style.display=coverageMode?'':'none';
     if(delPanel)delPanel.style.display=delMode?'':'none';
+    if(pnlPanel)pnlPanel.style.display=pnlMode?'':'none';
     if(bankPanel)bankPanel.style.display=bankMode?'':'none';   // كل تقرير في تبويبه فقط: لا يبقى كشف البنك ظاهرًا في تقارير الموظفين/المشاريع
     // أزرار الشريط العلوي خاصة بمسير الرواتب فقط
-    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode||bankMode||delMode)?'none':''; });
-    if(card)card.style.display=(projectMode||employeeMode||coverageMode||bankMode||delMode)?'none':'';
-    { const sb=document.getElementById('paySelBar'); if(sb&&(projectMode||employeeMode||coverageMode||bankMode||delMode)) sb.style.display='none'; }
+    ['payrollRecalcBtn','payrollPreviewAllBtn','payrollBankAllBtn','payrollBankSelBtn','printReportBtn'].forEach(id=>{ const b=document.getElementById(id); if(b) b.style.display=(projectMode||employeeMode||coverageMode||bankMode||delMode||pnlMode)?'none':''; });
+    if(card)card.style.display=(projectMode||employeeMode||coverageMode||bankMode||delMode||pnlMode)?'none':'';
+    { const sb=document.getElementById('paySelBar'); if(sb&&(projectMode||employeeMode||coverageMode||bankMode||delMode||pnlMode)) sb.style.display='none'; }
     if(panel)panel.style.display=projectMode?'':'none';
     if(employeePanel)employeePanel.style.display=employeeMode?'':'none';
     if(projectMode){renderProjects();renderProjectCapacity();try{renderProjectDetailReport();}catch(err){console.error(err);}return;}
@@ -3624,6 +3756,7 @@
     if(coverageMode){renderCoverageReport();return;}
     if(bankMode){renderBankReport();return;}
     if(delMode){renderDelegationsReport();return;}
+    if(pnlMode){ try{ renderPnlReport(); }catch(err){ console.error(err); } return; }
     refreshPayrollMonthOptions();refreshPayrollFilters();
     try{
       const dg=document.getElementById('payrollDiag');

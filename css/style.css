@@ -2916,3 +2916,17 @@ tr.pay-paid input[disabled],tr.pay-paid select[disabled]{opacity:.65;cursor:not-
 .payroll-statement-table tfoot tr.pay-foot-held td{background-color:#fff4d6;color:#7a5200}
 .payroll-statement-table tfoot tr.pay-foot-net td{background-color:#0a3fcc;color:#fff}
 .pay-totals-bar{margin:0 0 12px}
+
+/* تقرير الأرباح والخسائر */
+.pnl-table{width:100%;border-collapse:collapse;min-width:900px}
+.pnl-table th,.pnl-table td{border:1px solid var(--border);padding:8px 10px;text-align:center;white-space:nowrap}
+.pnl-table thead th{background:var(--border-soft);font-weight:800;font-size:13px}
+.pnl-table thead th small{display:block;font-weight:400;font-size:10.5px;color:var(--ink-soft)}
+.pnl-table .pnl-name{text-align:right;font-weight:700}
+.pnl-table td.pnl-tot{background:var(--border-soft);font-weight:800}
+.pnl-table td.pnl-in input{width:110px;min-height:32px;text-align:center}
+.pnl-table tfoot td{background:var(--border-soft);font-weight:800;border-top:2px solid var(--border)}
+.pnl-gross{font-weight:800}.pnl-neg{color:#b42318}.pnl-pos{color:#146b54}
+.pnl-cards{margin:12px 0}
+.pnl-cards>div.main.pnl-neg{background:#b42318;border-color:#b42318;color:#fff}
+.pnl-cards>div.main.pnl-pos{background:#146b54;border-color:#146b54;color:#fff}

@@ -68,6 +68,7 @@
           <a class="navlink nav-child" data-view="reports" data-report="employees"><span>تقارير الموظفين</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="bank"><span>كشف البنك</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="delegations"><span>التفاويض</span></a>
+          <a class="navlink nav-child" data-view="reports" data-report="pnl"><span>تقرير الأرباح والخسائر</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="projects"><span>تقارير المشاريع</span></a>
           <a class="navlink nav-child" data-view="reports" data-report="coverage"><span>تقارير التغطيات</span></a>
         </div>
@@ -1311,6 +1312,18 @@
         </div>
         <div class="pay-sel-bar" id="bankSelBar" style="display:none"><span id="bankSelText"></span> — <b id="bankSelCount">0</b> محدد <button class="btn btn-sm" id="bankSelAllBtn">تحديد الكل</button><button class="btn btn-sm btn-primary" id="bankSelConfirmBtn">تأكيد</button><button class="btn btn-sm" id="bankSelCancelBtn">إلغاء</button></div>
         <div id="bankOutput"></div>
+      </div>
+
+      <div id="pnlReportPanel" class="card section-card" style="display:none">
+        <div class="employee-report-toolbar"><div><h2>تقرير الأرباح والخسائر</h2><p>لكل مشروع: الإيرادات (فواتير المبيعات + إدخال يدوي) مقابل الرواتب المنصرفة والمستحقة والمشغلين.</p></div><span class="pill pill-gray" id="pnlCount">0 مشروع</span><button class="btn" id="pnlPrintBtn" type="button">طباعة التقرير</button></div>
+        <div class="att-toolbar payroll-toolbar">
+          <div class="payroll-filter-group"><label>الشهر</label><select id="pnlMonth"></select></div>
+          <div class="payroll-filter-group"><label>المشروع</label><select id="pnlProject"></select></div>
+          <div class="payroll-filter-group"><label>مصدر الإيرادات</label><select id="pnlSrc"><option value="invoice">فواتير المبيعات</option><option value="order">أوامر البيع</option><option value="both">الفواتير + أوامر البيع</option></select></div>
+          <div class="payroll-filter-group"><label>قيمة الإيراد</label><select id="pnlVat"><option value="ex">قبل الضريبة</option><option value="inc">شامل الضريبة</option></select></div>
+          <label class="payroll-filter-group" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="pnlHide"> إخفاء المشاريع بدون حركة</label>
+        </div>
+        <div id="pnlOutput"></div>
       </div>
 
       <div id="delegationsReportPanel" class="card section-card" style="display:none">

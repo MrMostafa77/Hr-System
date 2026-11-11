@@ -84,7 +84,8 @@
     finance.projectAccounts = Array.isArray(state.projectAccounts) ? state.projectAccounts : [];
     finance.invoices = Array.isArray(state.invoices) ? state.invoices : [];
     finance.inventory = state.inventory && typeof state.inventory === 'object' && !Array.isArray(state.inventory) ? state.inventory : {};
-    delete general.payrollRecords; delete general.projectAccounts; delete general.invoices; delete general.inventory;
+    finance.pnl = state.pnl && typeof state.pnl === 'object' && !Array.isArray(state.pnl) ? state.pnl : {};
+    delete general.payrollRecords; delete general.projectAccounts; delete general.invoices; delete general.inventory; delete general.pnl;
 
     general.schema = 2;
     finance.schema = 2;
@@ -118,7 +119,7 @@
   function merge(general, finance){
     const state = { ...(general || {}) };
     delete state.schema;
-    if(!finance) return { ...state, payrollRecords: {}, projectAccounts: [], invoices: [], inventory: {} };
+    if(!finance) return { ...state, payrollRecords: {}, projectAccounts: [], invoices: [], inventory: {}, pnl: {} };
     state.employees = mergeList(state.employees, finance.employees);
     state.projects = (Array.isArray(state.projects) ? state.projects : []).map(p => mergeProject(p, finance.projects && finance.projects[p.id]));
     state.coverage = mergeList(state.coverage, finance.coverage);
@@ -127,6 +128,7 @@
     state.projectAccounts = finance.projectAccounts || [];
     state.invoices = finance.invoices || [];
     state.inventory = finance.inventory || {};
+    state.pnl = finance.pnl || {};
     return state;
   }
 
