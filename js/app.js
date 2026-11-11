@@ -17,6 +17,7 @@
   const INV_KEY = 'hr_inventory_v1';
   const PNL_KEY = 'hr_pnl_v1';
   const ARPAY_KEY = 'hr_arpay_v1';
+  const SETTLE_KEY = 'hr_settlements_v1';
   const ATT_CODES = ['','ح','-','غ','ش','ج','راحة','ط','ض','س','جمع','عيد','ق','إجازة','مرضية'];   // (-) = لم يحضر: لا حضور ولا غياب، يُخصم يومه من الراتب بدون جزاء
   let paySelMode=false; const paySelected=new Set();   // وضع اختيار موظفين لترحيل كشف البنك
   // hold = الراتب الإجمالي لا يدخل إجمالي المسير ولا يُرحَّل على كشف البنك حتى تُلغى الحالة
@@ -46,6 +47,7 @@
   let payrollRecords = {};
   let invoices = [];
   let inventory = {};
+  let settlements = [];   // المخالصات المحفوظة للموظفين
   let arPay = {};   // أعمار المديونيات: دفعات العملاء المسدّدة يدويًا {عميل:[{id,date,amount,note}]}
   let pnl = {};   // تقرير الأرباح والخسائر: إدخالات يدوية {شهر:{مشروع:{rev,ops}}}
   let currentView = 'dashboard';
@@ -105,7 +107,8 @@
       invoices: readLocal(INVOICE_KEY, []),
       inventory: readLocal(INV_KEY, {}),
       pnl: readLocal(PNL_KEY, {}),
-      arPay: readLocal(ARPAY_KEY, {})
+      arPay: readLocal(ARPAY_KEY, {}),
+      settlements: readLocal(SETTLE_KEY, [])
     };
   }
   function applyState(state){
@@ -125,6 +128,7 @@
     inventory = state?.inventory && typeof state.inventory==='object' && !Array.isArray(state.inventory) ? state.inventory : {};
     pnl = state?.pnl && typeof state.pnl==='object' && !Array.isArray(state.pnl) ? state.pnl : {};
     arPay = state?.arPay && typeof state.arPay==='object' && !Array.isArray(state.arPay) ? state.arPay : {};
+    settlements = Array.isArray(state?.settlements) ? state.settlements : [];
     syncEmployeeStartDates();
     normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
@@ -177,7 +181,7 @@
     }catch(_){}
   }
   function currentState(){
-    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords,invoices,inventory,pnl,arPay};
+    return {employees,attendance,penalties,coverage,settings,regions,projects,departments,contracts,commencements,projectAccounts,payrollRecords,invoices,inventory,pnl,arPay,settlements};
   }
   let cloudSaveTimer = null;
   let cloudApplying = false;
@@ -188,7 +192,7 @@
   function persistLocal(){
     writeLocal(STORAGE_KEY,employees); writeLocal(ATT_KEY,attendance);
     writeLocal(PEN_KEY,penalties); writeLocal(COV_KEY,coverage); writeLocal(SET_KEY,settings);
-    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords); writeLocal(INVOICE_KEY,invoices); writeLocal(INV_KEY,inventory); writeLocal(PNL_KEY,pnl); writeLocal(ARPAY_KEY,arPay);
+    writeLocal(REG_KEY,regions); writeLocal(PROJECT_KEY,projects); writeLocal(DEPT_KEY,departments); writeLocal(CONTRACT_KEY,contracts); writeLocal(COMMENCEMENT_KEY,commencements); writeLocal(PROJECT_ACCOUNT_KEY,projectAccounts); writeLocal(PAYROLL_KEY,payrollRecords); writeLocal(INVOICE_KEY,invoices); writeLocal(INV_KEY,inventory); writeLocal(PNL_KEY,pnl); writeLocal(ARPAY_KEY,arPay); writeLocal(SETTLE_KEY,settlements);
   }
   function persistCloud(message='تم حفظ التغييرات بنجاح'){
     persistLocal();
@@ -221,7 +225,7 @@
   function loadAux(){
     const state=localState();
     attendance=state.attendance; penalties=state.penalties; coverage=state.coverage;
-    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{}; invoices=state.invoices||[]; inventory=state.inventory||{}; pnl=state.pnl||{}; arPay=state.arPay||{};
+    settings=state.settings; regions=state.regions; projects=state.projects; departments=state.departments||[]; contracts=state.contracts||[]; commencements=state.commencements||[]; projectAccounts=state.projectAccounts||[]; payrollRecords=state.payrollRecords||{}; invoices=state.invoices||[]; inventory=state.inventory||{}; pnl=state.pnl||{}; arPay=state.arPay||{}; settlements=Array.isArray(state.settlements)?state.settlements:[];
     syncEmployeeStartDates();
     normalizeEmployeeAccounts();
     contracts.forEach(c=>{ if(c && c.customHtml && c.contractCode) c.customHtml=fixContractHtmlNumber(c.customHtml,c.contractCode); });
@@ -1156,6 +1160,7 @@
       contracts=[];
       commencements=[];
       projectAccounts=[];
+      settlements=[];
 
       // Keep these system/setup data intact: settings, regions, departments/jobs.
       persistLocal();
@@ -5969,6 +5974,8 @@
     else daysEl.value=(Math.max(0,Number(monthsEl.value)||0)*30).toFixed(0);
     calculateProjectAccount();
   }
+  // استحقاق الإجازة السنوية (مشترك بين الآلة الحاسبة والمخالصة): لا يستحق قبل إتمام 12 شهر
+  function hrLeaveAccrued(months, perYear){ return months>=12 ? (months/12)*(Number(perYear)||21) : 0; }
   function calcEOS(monthlyWage, years){
     if(years < 1) return 0;
     const first=Math.min(years,5)*0.5*monthlyWage;
@@ -6047,7 +6054,7 @@
     const gosiEnabled=!!document.getElementById('pa_gosi_enabled')?.checked, empGosiPct=paVal('pa_gosi_employee_pct'), companyGosiPct=paVal('pa_gosi_company_pct');
     let gosiTotal=0, employeeGosiTotal=0;
     roles.forEach(x=>{const base=x.data.basic+x.data.housing, emp=gosiEnabled?base*empGosiPct/100:0, comp=gosiEnabled?base*companyGosiPct/100:0, total=comp*x.data.count*months;gosiTotal+=total;employeeGosiTotal+=emp*x.data.count*months;const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=Number(v||0);};const text=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=paMoney(v);};set(`pa_${x.def.key}_housing`,x.data.housing);set(`pa_${x.def.key}_transport`,x.data.transport);set(`pa_${x.def.key}_finalwage`,x.data.wage);text(`pa_${x.def.key}_salary_emp_month`,x.data.wage);text(`pa_${x.def.key}_salary_all_month`,x.data.wage*x.data.count);text(`pa_${x.def.key}_salary_total`,x.data.wage*x.data.count*months);text(`pa_${x.def.key}_gosi_base_view`,base);text(`pa_${x.def.key}_gosi_emp_view`,emp);text(`pa_${x.def.key}_gosi_company_view`,comp);text(`pa_${x.def.key}_gosi_total_view`,total);});
-    const leaveEnabled=!!document.getElementById('pa_leave_enabled')?.checked, leaveDays=paVal('pa_leave_days')||21, eligibleAnnual=months>=12, accruedLeave=eligibleAnnual?(months/12)*leaveDays:0;
+    const leaveEnabled=!!document.getElementById('pa_leave_enabled')?.checked, leaveDays=paVal('pa_leave_days')||21, eligibleAnnual=months>=12, accruedLeave=hrLeaveAccrued(months,leaveDays);
     let leaveTotal=0;
     roles.forEach(x=>{const emp=leaveEnabled&&eligibleAnnual?x.data.wage/30*accruedLeave:0,total=emp*x.data.count;leaveTotal+=total;const text=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=paMoney(v);};text(`pa_${x.def.key}_leave_wage_view`,x.data.wage);text(`pa_${x.def.key}_leave_emp_view`,emp);text(`pa_${x.def.key}_leave_total_view`,total);});
     let restTotal=0, medicalTotal=0, eosTotal=0, years=months/12;
@@ -6792,7 +6799,7 @@
       renderDocSheet();
     });
   });
-  document.getElementById('doc_emp').addEventListener('change', ()=>{ docSettleLoad(); renderDocSheet(); });
+  document.getElementById('doc_emp').addEventListener('change', ()=>{ docSettleOpenId=null; docSettleFrozen=null; docSettleLoad(); renderDocSheet(); });
   document.getElementById('printDocBtn').addEventListener('click', ()=>window.print());
   function blank(v){ return v ? escapeHtml(v) : '<span class="blank">.......................</span>'; }
   function renderDocuments(){
@@ -6820,37 +6827,46 @@
     return h;
   }
   function docNum(n){ return (Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-  /* ===== المخالصة: حساب تلقائي من بيانات الموظف والمسير ===== */
-  const docSettle={};   // مدخلات المخالصة لكل موظف: {date, leave, eosb, other, adv}
+  /* ===== المخالصة: الحساب بنفس قواعد «الآلة الحاسبة» (حاسبة الإجازات + مكافأة نهاية الخدمة) + حفظ ===== */
+  const docSettle={};   // مسودة المدخلات لكل موظف: {date, leave, leaveDays, eosb, other, adv}
+  let docSettleOpenId=null, docSettleFrozen=null;   // المخالصة المحفوظة المفتوحة + أرقامها المثبّتة
   function docSettleStatusDate(e){
     const per=empStatusPeriods(e), pick=k=>per.filter(p=>p.k===k&&p.from).map(p=>p.from).sort()[0]||'';
     return pick('settle')||pick('resign')||pick('stop')||'';
   }
-  function docSettleLoad(){
-    const id=document.getElementById('doc_emp')?.value||'', e=employees.find(x=>x.id===id)||{}, st=docSettle[id]||{};
+  function docSettleSetFields(S){
     const set=(i,v)=>{ const el=document.getElementById(i); if(el) el.value=v; };
-    set('ds_date', st.date!=null?st.date:docSettleStatusDate(e));
-    set('ds_leave', st.leave===false?'no':'yes'); set('ds_eosb', st.eosb===false?'no':'yes');
-    set('ds_other', st.other||''); set('ds_adv', st.adv||'');
+    set('ds_date',S.date||''); set('ds_leave',S.leave===false?'no':'yes'); set('ds_eosb',S.eosb===false?'no':'yes');
+    set('ds_leavedays',String(S.leaveDays||21)); set('ds_other',S.other||''); set('ds_adv',S.adv||'');
+  }
+  function docSettleLoad(){
+    const id=document.getElementById('doc_emp')?.value||'', e=employees.find(x=>x.id===id)||{};
+    const draft=docSettle[id], saved=settlements.find(x=>x.empId===id);
+    if(!draft && saved){   // موظف له مخالصة محفوظة: تُفتح تلقائياً
+      docSettleSetFields(saved.S||{}); docSettleOpenId=saved.id; docSettleFrozen=saved.C?{...saved.C,empId:id}:null; return;
+    }
+    docSettleSetFields(draft||{date:docSettleStatusDate(e), leaveDays:Number(document.getElementById('pa_leave_days')?.value)||21});
   }
   function docSettleRead(e){
     const g=i=>document.getElementById(i)?.value||'';
-    const S={date:g('ds_date'), leave:g('ds_leave')!=='no', eosb:g('ds_eosb')!=='no', other:Number(g('ds_other'))||0, adv:Number(g('ds_adv'))||0};
+    const S={date:g('ds_date'), leave:g('ds_leave')!=='no', leaveDays:Number(g('ds_leavedays'))||21, eosb:g('ds_eosb')!=='no', other:Number(g('ds_other'))||0, adv:Number(g('ds_adv'))||0};
     if(e&&e.id) docSettle[e.id]=S;
     return S;
   }
   function docSettleCalc(e,S){
-    const out={startISO:'',endISO:'',days:0,years:0,wage:0,unpaidMonths:[],unpaid:0,leaveDays:0,leaveAmt:0,eosbAmt:0,other:S.other,adv:S.adv,total:0,net:0};
+    if(docSettleFrozen && e && docSettleFrozen.empId===e.id) return docSettleFrozen;   // مخالصة محفوظة: أرقامها ثابتة حتى «إعادة احتساب»
+    const out={empId:e&&e.id,startISO:'',endISO:'',days:0,months:0,years:0,wage:0,unpaidMonths:[],unpaid:0,leaveDays:0,leaveAmt:0,eosbAmt:0,eligible:false,other:S.other,adv:S.adv,total:0,net:0};
     if(!e||!e.id) return out;
     const startISO=(attStartDateFor(e.id)||String(e.startdate||'').slice(0,10)), endISO=S.date||docSettleStatusDate(e);
     out.startISO=startISO; out.endISO=endISO;
     if(!startISO||!endISO||endISO<startISO) return out;
     out.days=Math.round((new Date(endISO+'T00:00:00')-new Date(startISO+'T00:00:00'))/86400000)+1;
-    out.years=out.days/365;
-    // الأجر الأخير = أساسي + سكن + مواصلات + بدلات أخرى (آخر راتب ساري عند تاريخ المخالصة)
+    out.months=out.days/30; out.years=out.months/12;   // نفس الآلة الحاسبة: الشهر = 30 يوم
+    out.eligible=out.months>=12;
+    // الأجر الأخير = أساسي + سكن + مواصلات + بدلات أخرى (الراتب الساري عند تاريخ المخالصة)
     const sh=empSalaryAt(e,endISO);
     out.wage=sh?empSalaryTotal(sh):r2((Number(e.basicsalary)||0)+(Number(e.housing)||0)+(Number(e.transport)||0)+(Number(e.otherallow)||0));
-    // 1) الرواتب المستحقة: كل شهر من المباشرة إلى المخالصة لم يُرحَّل/يُصرف في كشف البنك
+    // 1) الرواتب المستحقة: كل شهر من المباشرة إلى المخالصة لم يُرحَّل في كشف البنك
     let y=Number(startISO.slice(0,4)), m=Number(startISO.slice(5,7)), guard=0;
     const lastYm=endISO.slice(0,7);
     while(`${y}-${String(m).padStart(2,'0')}`<=lastYm && guard++<240){
@@ -6861,12 +6877,11 @@
       }
       m++; if(m>12){m=1;y++;}
     }
-    // 2) بدل الإجازة: 21 يوم/سنة (30 يوم بعد 5 سنوات) بالتناسب من المباشرة إلى المخالصة × أجر اليوم (الأجر/30)
-    const Y5=5*365;
-    out.leaveDays=r2((Math.min(out.days,Y5)*21+Math.max(0,out.days-Y5)*30)/365);
-    out.leaveAmt=S.leave?r2(out.leaveDays*out.wage/30):0;
-    // 3) مكافأة نهاية الخدمة: نصف شهر عن كل سنة من أول 5 سنوات + شهر كامل عن كل سنة بعدها (بالتناسب)
-    out.eosbAmt=S.eosb?r2(out.wage*(0.5*Math.min(out.years,5)+Math.max(0,out.years-5))):0;
+    // 2) بدل الإجازة: نفس حاسبة الإجازات — (الأشهر/12 × أيام الإجازة السنوية) × (الأجر/30)، ولا يستحق قبل 12 شهر
+    out.leaveDays=r2(hrLeaveAccrued(out.months,S.leaveDays));
+    out.leaveAmt=S.leave?r2(out.wage/30*hrLeaveAccrued(out.months,S.leaveDays)):0;
+    // 3) مكافأة نهاية الخدمة: نفس حاسبة نهاية الخدمة — calcEOS (نصف شهر لأول 5 سنوات ثم شهر كامل) ولا تستحق قبل 12 شهر
+    out.eosbAmt=(S.eosb&&out.eligible)?r2(calcEOS(out.wage,out.years)):0;
     out.total=r2(out.unpaid+out.leaveAmt+out.eosbAmt+out.other);
     out.net=r2(out.total-out.adv);
     return out;
@@ -6877,9 +6892,43 @@
     if(!C.startISO){ box.innerHTML='<span style="color:#c0392b">لا يوجد تاريخ مباشرة لهذا الموظف</span>'; return; }
     if(!C.endISO){ box.innerHTML='<span style="color:#c0392b">حدّد تاريخ المخالصة (أو أضف حالة «مخالصة» في ملف الموظف)</span>'; return; }
     const mm=C.unpaidMonths.length?C.unpaidMonths.map(m=>`${escapeHtml(monthLabel(m.ym))}: ${docNum(m.net)}`).join('<br>'):'لا توجد رواتب غير مرحّلة';
-    box.innerHTML=`مدة الخدمة: <b>${C.days}</b> يوم (${docNum(C.years)} سنة)<br>الأجر الأخير: <b>${docNum(C.wage)}</b><br><u>رواتب غير مرحّلة:</u><br>${mm}`;
+    const saved=docSettleFrozen&&docSettleFrozen.empId===e.id;
+    box.innerHTML=`${saved?'<b style="color:#1e7e34">● مخالصة محفوظة — الأرقام مثبّتة</b><br>':''}مدة الخدمة: <b>${C.days}</b> يوم (${docNum(C.months)} شهر)${C.eligible?'':' — <span style="color:#c0392b">أقل من 12 شهر: لا إجازة ولا مكافأة</span>'}<br>الأجر الأخير: <b>${docNum(C.wage)}</b><br><u>رواتب غير مرحّلة:</u><br>${mm}`;
   }
-  ['ds_date','ds_leave','ds_eosb','ds_other','ds_adv'].forEach(id=>{ const el=document.getElementById(id); if(el){ el.addEventListener('input',renderDocSheet); el.addEventListener('change',renderDocSheet); } });
+  function docSettleListRender(){
+    const box=document.getElementById('docSettleSaved'); if(!box) return;
+    const list=(settlements||[]).slice().sort((a,b)=>String(b.savedAt||'').localeCompare(String(a.savedAt||'')));
+    box.innerHTML=list.length?list.map(r=>`<div class="ds-saved-row${r.id===docSettleOpenId?' active':''}" style="display:flex;gap:6px;align-items:center;justify-content:space-between;padding:4px 0;border-bottom:1px solid #8883"><span>${escapeHtml(r.empName||'')}<br><small>${r.endISO?fmtDMY(r.endISO):''} — ${docNum(r.C&&r.C.net)} ريال</small></span><span><button type="button" class="small-btn" data-ds-open="${r.id}">فتح</button> <button type="button" class="small-btn danger" data-ds-del="${r.id}">حذف</button></span></div>`).join(''):'<small>لا توجد مخالصات محفوظة</small>';
+  }
+  function docSettleSave(){
+    if(!payCanFreeze()){ showToast('حفظ المخالصة يحتاج صلاحية المالية'); return; }
+    const id=document.getElementById('doc_emp')?.value||'', e=employees.find(x=>x.id===id);
+    if(!e){ showToast('اختر الموظف أولاً'); return; }
+    const S=docSettleRead(e), C=JSON.parse(JSON.stringify(docSettleCalc(e,S)));
+    if(!C.startISO||!C.endISO||C.endISO<C.startISO){ showToast('حدّد تاريخ مخالصة صحيح بعد تاريخ المباشرة'); return; }
+    const data={empId:e.id,empName:e.fullname||'',empCode:e.empcode||'',project:e.project||'',endISO:C.endISO,savedAt:new Date().toISOString(),S,C};
+    let rec=docSettleOpenId?settlements.find(x=>x.id===docSettleOpenId&&x.empId===e.id):null;
+    if(rec) Object.assign(rec,data); else { rec={id:'st'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),...data}; settlements.unshift(rec); }
+    docSettleOpenId=rec.id; docSettleFrozen={...C,empId:e.id};
+    persistCloud('تم حفظ المخالصة'); renderDocSheet();
+  }
+  function docSettleOpen(id){
+    const r=settlements.find(x=>x.id===id); if(!r) return;
+    const sel=document.getElementById('doc_emp'); if(sel) sel.value=r.empId;
+    docSettleSetFields(r.S||{}); docSettle[r.empId]=r.S; docSettleOpenId=r.id; docSettleFrozen=r.C?{...r.C,empId:r.empId}:null;
+    renderDocSheet();
+  }
+  function docSettleDelete(id){
+    const r=settlements.find(x=>x.id===id); if(!r) return;
+    if(!confirm('حذف مخالصة '+(r.empName||'')+'؟')) return;
+    settlements=settlements.filter(x=>x.id!==id);
+    if(docSettleOpenId===id){ docSettleOpenId=null; docSettleFrozen=null; }
+    persistCloud('تم حذف المخالصة'); renderDocSheet();
+  }
+  ['ds_date','ds_leave','ds_leavedays','ds_eosb','ds_other','ds_adv'].forEach(id=>{ const el=document.getElementById(id); if(el){ const h=()=>{ docSettleFrozen=null; renderDocSheet(); }; el.addEventListener('input',h); el.addEventListener('change',h); } });
+  document.getElementById('ds_save')?.addEventListener('click',docSettleSave);
+  document.getElementById('ds_recalc')?.addEventListener('click',()=>{ docSettleFrozen=null; renderDocSheet(); });
+  document.getElementById('docSettleSaved')?.addEventListener('click',ev=>{ const b=ev.target.closest('button'); if(!b) return; if(b.dataset.dsOpen) docSettleOpen(b.dataset.dsOpen); else if(b.dataset.dsDel) docSettleDelete(b.dataset.dsDel); });
   function renderDocSheet(){
     const empId = document.getElementById('doc_emp').value;
     const e = employees.find(x=>x.id===empId) || {};
@@ -7020,11 +7069,11 @@
         ${docSign(['الموارد البشرية','المدير العام'])}`);
     }else if(T==='settlement'){
       const S=docSettleRead(e), C=docSettleCalc(e,S);
-      docSettleInfo(e,C,S);
+      docSettleInfo(e,C,S); docSettleListRender();
       const rowsHtml=[
         ['الراتب المستحق عن آخر فترة عمل'+(C.unpaidMonths.length?` <small>(${C.unpaidMonths.map(m=>escapeHtml(monthLabel(m.ym))).join('، ')})</small>`:''), C.unpaid],
-        ['بدل الإجازة السنوية المستحقة'+(S.leave?` <small>(${docNum(C.leaveDays)} يوم)</small>`:' <small>(لا يستحق)</small>'), C.leaveAmt],
-        ['مكافأة نهاية الخدمة'+(S.eosb?'':' <small>(لا تستحق)</small>'), C.eosbAmt],
+        ['بدل الإجازة السنوية المستحقة'+(S.leave?(C.eligible?` <small>(${docNum(C.leaveDays)} يوم)</small>`:' <small>(أقل من 12 شهر)</small>'):' <small>(لا يستحق)</small>'), C.leaveAmt],
+        ['مكافأة نهاية الخدمة'+(S.eosb?(C.eligible?'':' <small>(أقل من 12 شهر)</small>'):' <small>(لا تستحق)</small>'), C.eosbAmt],
         ['مستحقات أخرى', C.other]
       ].map((r,i)=>`<tr><td>${i+1}</td><td style="text-align:right">${r[0]}</td><td>${docNum(r[1])}</td></tr>`).join('');
       const words=C.net>0?`فقط ${arabicAmountWords(C.net)} لا غير`:'فقط صفر ريال لا غير';
