@@ -3638,8 +3638,9 @@
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(), pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
     const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf)&&payPostOk(e,ym));
     { const np=list.filter(e=>payIsPosted(ym,e.id)).length; document.getElementById('payrollCount').textContent=`${list.length} موظف — مرحّل ${np} | غير مرحّل ${list.length-np}`; }
+    const stmts=list.map(e=>payrollStatementForCols(e,monthCols(ym)));
     body.innerHTML=list.map((e,i)=>{
-      const p=payrollStatementForCols(e,monthCols(ym)),a=p.adjustment||{},action=a.internalAction||'';
+      const p=stmts[i],a=p.adjustment||{},action=a.internalAction||'';
       const red=v=>Number(v)>0?' style="color:#b42318;font-weight:700"':'';
       return `<tr data-pay-row="${escapeAttr(e.id)}"${p.held?' class="pay-held"':''}>
       <td class="mono g1 st1">${i+1}</td><td class="g1 st2"><label class="pay-sel"><input type="checkbox" data-pay-sel="${escapeAttr(e.id)}" ${paySelected.has(String(e.id))?'checked':''}></label><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td class="g1">${escapeHtml(e.project||e.region||'—')}</td><td class="g1">${escapeHtml(e.jobtitle||'—')}</td>
@@ -3658,7 +3659,20 @@
     { const ymL=document.getElementById('payrollMonth')?.value; body.querySelectorAll('tr[data-pay-row]').forEach(tr=>{ if(payPaidLock(ymL,tr.dataset.payRow)){ tr.classList.add('pay-paid'); tr.querySelectorAll('[data-pay-field]').forEach(el=>{ el.disabled=true; el.title='تم الصرف — ألغِ الصرف من كشف البنك للتعديل'; }); } }); }
     body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
     body.querySelectorAll('[data-pay-sel]').forEach(cb=>cb.addEventListener('change',()=>{ cb.checked?paySelected.add(cb.dataset.paySel):paySelected.delete(cb.dataset.paySel); paySelRefresh(); }));
+    try{ renderPayrollTotals(list,stmts); }catch(err){ console.error(err); }
     paySelRefresh();
+  }
+  /* إجماليات شاشة المسير: تتغير مع كل الفلاتر (الشهر/المشروع/المنطقة/البحث/حالة الترحيل) */
+  function renderPayrollTotals(list,stmts){
+    const foot=document.getElementById('reportTableFoot'), bar=document.getElementById('payTotalsBar');
+    if(!list.length){ if(foot) foot.innerHTML=''; if(bar) bar.innerHTML=''; return; }
+    const rows=list.map((e,i)=>({i:i+1,p:stmts[i]})), cg=ppColGroups();
+    const all=ppSumCols(rows,()=>true), held=ppSumCols(rows,r=>r.p.held), act=ppSumCols(rows,r=>!r.p.held), hc=rows.filter(r=>r.p.held).length;
+    const ix=h=>PP_COLS.findIndex(c=>c.h===h), IE=ix('إجمالي الراتب'), ID=ix('إجمالي الخصومات'), IN=ix('صافي الراتب');
+    const cells=arr=>PP_COLS.slice(5).map((c,i)=>`<td class="mono g${cg[i+5]}${c.tot?' tot':''}">${arr[i+5]==null?'':ppNf(arr[i+5])}</td>`).join('');
+    const tr=(label,arr,cls)=>`<tr class="pay-foot-row ${cls}"><td colspan="5" class="pay-foot-label">${label}</td>${cells(arr)}</tr>`;
+    if(foot) foot.innerHTML=tr(`الإجمالي — ${rows.length} موظف`,all,'pay-foot-all')+(hc?tr(`منهم موقوف (${hc})`,held,'pay-foot-held')+tr('الإجمالي بعد استبعاد الموقوفين',act,'pay-foot-net'):'');
+    if(bar) bar.innerHTML=`<div class="bank-summary pay-totals-bar"><div><small>عدد الموظفين</small><b>${rows.length}</b></div><div class="main"><small>إجمالي المستحقات (إجمالي الراتب)</small><b>${ppNf(all[IE])}</b></div><div><small>إجمالي الخصومات</small><b>${ppNf(all[ID])}</b></div><div><small>صافي الرواتب</small><b>${ppNf(all[IN])}</b></div>${hc?`<div><small>موقوف (${hc}) — إجمالي الراتب</small><b>${ppNf(held[IE])}</b></div><div><small>الصافي بعد استبعاد الموقوفين</small><b>${ppNf(act[IN])}</b></div>`:''}</div>`;
   }
   const payrollMonth=document.getElementById('payrollMonth'); if(payrollMonth)payrollMonth.addEventListener('change',renderReports);
   ['payrollSearch','payrollProjectFilter','payrollRegionFilter','payrollPostFilter'].forEach(id=>{document.getElementById(id)?.addEventListener('input',renderReports);document.getElementById(id)?.addEventListener('change',renderReports);});
@@ -4556,7 +4570,7 @@
   .ac-paper .ac-sign i{display:block;margin-top:44px;border-top:1px solid #444}`;
   const AS_CLS={'ح':'h','غ':'a','ج':'p','س':'w','راحة':'r','ط':'c','ض':'o','عيد':'e'};
   const AS_SUMS=[['الدوام',null],['حضور','ح'],['غياب','غ'],['تغطية','ط'],['جزاء','ج'],['راحات','راحة'],['إضافي','ض'],['انسحاب','س'],['جمع','جمع']];
-  const PP_GROUPS=[['بيانات الموظف',4],['المستحقات (ريال)',9],['الخصومات (ريال)',10],['الصافي',1],['الإجراء الداخلي',1]];
+  const PP_GROUPS=[['بيانات الموظف',4],['المستحقات (ريال)',10],['الخصومات (ريال)',10],['الصافي',1],['الإجراء الداخلي',1]];
   const PP_COLS=[
     {h:'م',k:r=>r.i,t:'i'},{h:'الاسم',k:r=>r.name,t:'s',w:25},{h:'المشروع',k:r=>r.location,t:'s',w:24},{h:'الوظيفة',k:r=>r.job,t:'s',w:16},
     {h:'اليوم',k:r=>r.p.day,t:'n'},{h:'الأساسي',k:r=>r.p.basic,t:'n',sum:1},{h:'بدل السكن',k:r=>r.p.housing,t:'n',sum:1},{h:'بدل المواصلات',k:r=>r.p.transport,t:'n',sum:1},{h:'بدلات أخرى',k:r=>r.p.otherAllow,t:'n',sum:1},
@@ -4567,14 +4581,16 @@
   ];
   function ppNf(n){return(Math.round((Number(n)||0)*100)/100).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:2});}
   function ppFmt(col,v){return col.t==='n'?ppNf(v):(col.t==='i'?String(Number(v)||0):String(v==null?'':v));}
+  // مجاميع أعمدة المسير حسب شرط: الكل / الموقوفين / غير الموقوفين
+  function ppSumCols(rows,pred){ return PP_COLS.map(c=>c.sum?r2(rows.reduce((a,r)=>a+(pred(r)?(Number(c.k(r))||0):0),0)):null); }
   function buildPayrollModel(list,cols,single){
     const first=cols[0],last=cols[cols.length-1],isMonth=first.d===1&&first.ym===last.ym&&cols.length===daysInMonth(first.ym),periodLabel=isMonth?`شهر ${monthLabel(first.ym)}`:`الفترة من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)}`;
     const projs=[...new Set(list.map(e=>e.project).filter(Boolean))],scope=single?`الموظف: ${list[0].fullname||''}`:(projs.length===1?`المشروع: ${projs[0]}`:'كل المشاريع');
     const rows=list.map((e,i)=>({i:i+1,name:e.fullname||'',location:e.project||e.region||'',job:e.jobtitle||'',p:payrollStatementForCols(e,cols)}));
-    const totals=PP_COLS.map(c=>c.sum?r2(rows.reduce((a,r)=>a+(r.p.held?0:(Number(c.k(r))||0)),0)):null), heldCount=rows.filter(r=>r.p.held).length;
+    const totals=ppSumCols(rows,()=>true), heldTotals=ppSumCols(rows,r=>r.p.held), activeTotals=ppSumCols(rows,r=>!r.p.held), heldCount=rows.filter(r=>r.p.held).length;
     const title=`${single?'مسير راتب':'مسير رواتب'} ${periodLabel}`,sub=`${scope} — من ${fmtDMY(first.iso)} إلى ${fmtDMY(last.iso)} — أساس الحساب ${payMonthDaysFor(cols)} يوم${single?'':` — عدد الموظفين: ${rows.length}`} — تاريخ الإعداد: ${fmtDMY(todayISO())}`;
     const fileBase=`مسير_${single?(list[0].fullname||'موظف'):(projs.length===1?projs[0]:'كل_المشاريع')}_${isMonth?monthLabel(first.ym):fmtDMY(first.iso)+'_'+fmtDMY(last.iso)}`.replace(/[\\/:*?"<>|]/g,'-').replace(/\s+/g,'_');
-    return {title,sub,rows,totals,heldCount,single,fileBase,cls:'pay-paper',monthDays:payMonthDaysFor(cols)};
+    return {title,sub,rows,totals,heldTotals,activeTotals,heldCount,single,fileBase,cls:'pay-paper',monthDays:payMonthDaysFor(cols)};
   }
   // رقم مجموعة اللون لكل عمود (تدرج لوني حسب أقسام الجدول)
   function ppColGroups(){ const g=[]; PP_GROUPS.forEach(([t,n],gi)=>{ for(let k=0;k<n;k++) g.push(gi+1); }); return g; }
@@ -4590,9 +4606,10 @@
     h+='</tr><tr>'+PP_COLS.map((c,i)=>`<th class="pg${cg[i]}${c.tot?' ptot':''}">${escapeHtml(c.h)}</th>`).join('')+'</tr></thead><tbody>';
     m.rows.forEach(r=>{ h+='<tr>'+PP_COLS.map((c,i)=>`<td class="pg${cg[i]} ${c.t==='s'?'s ':''}${c.b?'b ':''}${c.tot?'ptot ':''}${c.net?'net':''}">${escapeHtml(ppFmt(c,c.k(r)))}</td>`).join('')+'</tr>'; });
     if(!m.single){
-      h+='</tbody><tfoot><tr><td colspan="5">الإجمالي</td>'+PP_COLS.slice(5).map((c,i)=>`<td class="pg${cg[i+5]}${c.tot?' ptot':''}">${m.totals[i+5]==null?'':escapeHtml(ppFmt(c,m.totals[i+5]))}</td>`).join('')+'</tr></tfoot>';
+      const footRow=(label,arr)=>`<tr><td colspan="5">${escapeHtml(label)}</td>`+PP_COLS.slice(5).map((c,i)=>`<td class="pg${cg[i+5]}${c.tot?' ptot':''}">${arr[i+5]==null?'':escapeHtml(ppFmt(c,arr[i+5]))}</td>`).join('')+'</tr>';
+      h+='</tbody><tfoot>'+footRow(`الإجمالي — ${m.rows.length} موظف`,m.totals)+(m.heldCount?footRow(`منهم موقوف (${m.heldCount})`,m.heldTotals)+footRow('الإجمالي بعد استبعاد الموقوفين',m.activeTotals):'')+'</tfoot>';
     } else h+='</tbody>';
-    h+=`</table><div class="pay-footnote"><b>ملاحظات:</b> جميع المبالغ بالريال السعودي — أساس احتساب الشهر ${m.monthDays||''} يومًا (أيام الشهر الفعلية).${!m.single&&m.heldCount?`<br>الرواتب الموقوفة (${m.heldCount} موظف) تظهر في سطر الموظف ولا تدخل في الإجمالي.`:''}</div><div class="pay-signatures"><div>إعداد<i></i></div><div>مراجعة<i></i></div><div>اعتماد<i></i></div></div>`;
+    h+=`</table><div class="pay-footnote"><b>ملاحظات:</b> جميع المبالغ بالريال السعودي — أساس احتساب الشهر ${m.monthDays||''} يومًا (أيام الشهر الفعلية).${!m.single&&m.heldCount?`<br>الرواتب الموقوفة (${m.heldCount} موظف) تظهر في سطر الموظف وتدخل في «الإجمالي»، ولا تُرحَّل ولا تُصرف؛ والصف الأخير يبيّن الإجمالي بعد استبعادها.`:''}</div><div class="pay-signatures"><div>إعداد<i></i></div><div>مراجعة<i></i></div><div>اعتماد<i></i></div></div>`;
     return h;
   }
   function ppHTML(m){ return m.html ? m.html() : ppPaperHTML(m); }
@@ -4676,9 +4693,12 @@
       rowsXml.push(`<row r="${r}">${PP_COLS.map((c,i)=>{ const v=c.k(row); return c.t==='s'||c.t==='c' ? sc(r,i,v,5) : nc(r,i,v,c.t==='n'?7:6); }).join('')}</row>`); r++;
     });
     if(!m.single){
-      let t=sc(r,0,'الإجمالي',8); for(let k=1;k<5;k++) t+=blank(r,k,8); merges.push(`A${r}:E${r}`);
-      PP_COLS.forEach((c,i)=>{ if(i<5) return; t+= m.totals[i]==null ? blank(r,i,8) : nc(r,i,m.totals[i],c.t==='n'?10:9); });
-      rowsXml.push(`<row r="${r}">${t}</row>`);
+      const feet=[[`الإجمالي — ${m.rows.length} موظف`,m.totals]]; if(m.heldCount){ feet.push([`منهم موقوف (${m.heldCount})`,m.heldTotals]); feet.push(['الإجمالي بعد استبعاد الموقوفين',m.activeTotals]); }
+      feet.forEach(([lab,arr])=>{
+        let t=sc(r,0,lab,8); for(let k=1;k<5;k++) t+=blank(r,k,8); merges.push(`A${r}:E${r}`);
+        PP_COLS.forEach((c,i)=>{ if(i<5) return; t+= arr[i]==null ? blank(r,i,8) : nc(r,i,arr[i],c.t==='n'?10:9); });
+        rowsXml.push(`<row r="${r}">${t}</row>`); r++;
+      });
     }
     const colsXml=PP_COLS.map((c,i)=>`<col min="${i+1}" max="${i+1}" width="${c.w||(c.t==='n'?11:8)}" customWidth="1"/>`).join('');
     const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView rightToLeft="1" workbookViewId="0"><pane ySplit="4" topLeftCell="A5" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><cols>${colsXml}</cols><sheetData>${rowsXml.join('')}</sheetData><mergeCells count="${merges.length}">${merges.map(x=>`<mergeCell ref="${x}"/>`).join('')}</mergeCells><pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/><pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
