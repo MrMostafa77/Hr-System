@@ -810,7 +810,7 @@
   const exportableViews=['dashboard','regions','projects','allprojects','employees','departments','add','projectpromotions','employeepromotions','attendance','actions','coverage','documents','contracts','allcontracts','commencements','commencement-list','projectaccounts','reports'];
   function currentViewElement(){ return currentView ? document.getElementById('view-'+currentView) : null; }
   function exportFileBase(){
-    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',debtaging:'أعمار المديونيات للعملاء',inventory:'المخزون',reports:'التقارير'};
+    const titles={dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين',projectaccounts:'حاسبة نهاية الخدمة والإجازات',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',debtaging:'أعمار المديونيات للعملاء',inventory:'المخزون',reports:'التقارير'};
     return titles[currentView]||'تصدير';
   }
   function exportCurrentExcel(){
@@ -946,7 +946,7 @@
     if(view==='allcontracts') renderAllContracts();
     if(view==='commencements') renderCommencements();
     if(view==='commencement-list') renderCommencementList();
-    if(view==='projectaccounts') renderProjectAccount();
+    if(view==='projectaccounts'){ renderProjectAccount(); renderHrDues(); }
     if(view==='reports') renderReports();
     if(view==='inventory') renderInventory();
     if(view==='sales') window.HRSales?.render();
@@ -970,7 +970,7 @@
   window.switchView = switchView;
 
   /* ===== تابات التبويبات (تبويب منفصل لكل شاشة مع الحفاظ على بياناتها) ===== */
-  const PJ_TITLES={inventory:'المخزون',users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حسابات المشاريع',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',debtaging:'أعمار المديونيات للعملاء',reports:'التقارير'};
+  const PJ_TITLES={inventory:'المخزون',users:'المستخدمون والصلاحيات',dashboard:'الرئيسية',regions:'المناطق',projects:'المشاريع',allprojects:'كل المشاريع',employees:'الموظفين','all-employees':'كل الموظفين',departments:'الأقسام والوظائف',add:'إضافة موظف',projectpromotions:'ترقيات المشاريع',employeepromotions:'ترقيات الموظفين',attendance:'الحضور والانصراف',actions:'إجراءات الموظفين',coverage:'التغطيات',documents:'المستندات',contracts:'عقود الموظفين',allcontracts:'كل العقود',commencements:'مباشرات الموظفين','commencement-list':'كل المباشرات',projectaccounts:'حاسبة نهاية الخدمة والإجازات',sales:'فاتورة مبيعات',salesorder:'أمر بيع',allinvoices:'كل الفواتير',salesorderreport:'تقرير أوامر البيع',invoicereport:'تقرير الفواتير',debtaging:'أعمار المديونيات للعملاء',reports:'التقارير'};
   const PJ_REPORTS={payroll:'تقارير الرواتب',employees:'تقارير الموظفين',projects:'تقارير المشاريع',coverage:'تقارير التغطيات',bank:'كشف البنك',pnl:'تقرير الأرباح والخسائر'};
   const PJ_SAVE={add:['form','empForm'],projects:['form','projectForm'],regions:['form','regionForm'],departments:['form','departmentForm'],actions:['form','penaltyForm'],coverage:['form','coverageForm'],contracts:['btn','saveContractBtn'],commencements:['btn','saveCommencementBtn'],projectaccounts:['btn','saveProjectAccountBtn'],sales:['btn','saveInvoiceBtn'],salesorder:['btn','saveOrderBtn']};
   const pjTabs={open:[],dirty:new Set()};
@@ -5974,6 +5974,58 @@
     else daysEl.value=(Math.max(0,Number(monthsEl.value)||0)*30).toFixed(0);
     calculateProjectAccount();
   }
+  /* ===== حاسبة مكافأة نهاية الخدمة والإجازات السنوية: مشروع ← موظف ← إدخالات ← النتيجة ===== */
+  const hdState={project:'',empId:''};
+  const hdEl=id=>document.getElementById(id);
+  const hdMoney=n=>docNum(n)+' ريال';
+  function renderHrDues(){
+    const sel=hdEl('hd_project'); if(!sel) return;
+    const cur=hdState.project;
+    sel.innerHTML='<option value="">— اختر المشروع —</option>'+projects.map(p=>`<option value="${escapeHtml(p.name||'')}">${escapeHtml(p.name||'')}</option>`).join('');
+    sel.value=projects.some(p=>String(p.name||'')===cur)?cur:''; hdState.project=sel.value;
+    if(!employees.some(x=>x.id===hdState.empId)) hdState.empId='';
+    hdRenderEmps(); hdCompute();
+  }
+  function hdRenderEmps(){
+    const box=hdEl('hd_emps'); if(!box) return;
+    if(!hdState.project){ box.innerHTML='<small>اختر المشروع أولاً لتظهر أسماء موظفيه.</small>'; return; }
+    const q=String(hdEl('hd_search')?.value||'').trim().toLowerCase(), pn=String(hdState.project).trim();
+    const list=employees.filter(e=>String(e.project||'').trim()===pn && (!q || [e.fullname,e.empcode,e.idnum].some(v=>String(v||'').toLowerCase().includes(q))));
+    box.innerHTML=list.length?list.map(e=>`<button type="button" class="small-btn" data-hd-emp="${escapeHtml(e.id)}" style="display:block;width:100%;text-align:right;margin-bottom:4px;${e.id===hdState.empId?'outline:2px solid #2563eb;font-weight:700':''}">${escapeHtml(e.fullname||'')} <small>${escapeHtml([e.empcode,e.jobtitle].filter(Boolean).join(' — '))}</small></button>`).join(''):'<small>لا يوجد موظفون في هذا المشروع.</small>';
+  }
+  function hdPick(id){
+    const e=employees.find(x=>x.id===id); if(!e) return;
+    hdState.empId=id;
+    const end=docSettleStatusDate(e)||todayISO(), start=attStartDateFor(id)||String(e.startdate||'').slice(0,10), sh=empSalaryAt(e,end);
+    const set=(i,v)=>{ const el=hdEl(i); if(el) el.value=v; };
+    set('hd_start',start); set('hd_end',end);
+    set('hd_basic',sh?sh.basic:(e.basicsalary||0)); set('hd_housing',sh?sh.housing:(e.housing||0)); set('hd_transport',sh?sh.transport:(e.transport||0)); set('hd_other',sh?sh.otherallow:(e.otherallow||0));
+    hdRenderEmps(); hdCompute();
+  }
+  function hdCompute(){
+    const L=hdEl('hd_leave_res'), E=hdEl('hd_eos_res'), T=hdEl('hd_total_res'); if(!L||!E||!T) return;
+    const e=employees.find(x=>x.id===hdState.empId), title=hdEl('hd_emp_title');
+    const msg=t=>{ const h=`<small>${t}</small>`; L.innerHTML=h; E.innerHTML=h; T.innerHTML=h; };
+    if(!e){ if(title) title.textContent='اختر الموظف لتظهر بياناته هنا (كلها قابلة للتعديل).'; msg('اختر المشروع ثم الموظف.'); return; }
+    if(title) title.innerHTML=`الموظف: <b>${escapeHtml(e.fullname||'')}</b> — ${escapeHtml(e.project||'')}`;
+    const start=hdEl('hd_start').value, end=hdEl('hd_end').value;
+    if(!start||!end||end<start){ msg('<span style="color:#c0392b">أدخل تاريخ مباشرة وتاريخ نهاية خدمة صحيحين (النهاية بعد المباشرة).</span>'); return; }
+    const n=i=>Number(hdEl(i).value)||0, wage=r2(n('hd_basic')+n('hd_housing')+n('hd_transport')+n('hd_other'));
+    const days=Math.round((new Date(end+'T00:00:00')-new Date(start+'T00:00:00'))/86400000)+1, months=days/30, years=months/12, eligible=months>=12;
+    const perYear=Number(hdEl('hd_leavedays').value)||21, leaveOn=hdEl('hd_leave_on').checked, eosOn=hdEl('hd_eos_on').checked;
+    const daily=wage/30, accrued=hrLeaveAccrued(months,perYear), leaveAmt=leaveOn?r2(daily*accrued):0;
+    const first=r2(0.5*Math.min(years,5)*wage), later=r2(Math.max(years-5,0)*wage), eos=(eosOn&&eligible)?r2(calcEOS(wage,years)):0;
+    const cell=(a,b)=>`<div><span>${a}</span><b>${b}</b></div>`;
+    const warn=eligible?'':'<p class="pa-help" style="color:#c0392b">مدة الخدمة أقل من 12 شهر — لا يستحق إجازة ولا مكافأة.</p>';
+    const period=cell('مدة الخدمة (يوم)',days)+cell('الأشهر (الشهر = 30 يوم)',docNum(months))+cell('السنوات',docNum(years));
+    L.innerHTML=`${warn}<div class="pa-results three-results">${period}${cell('الأجر الشهري الأخير',hdMoney(wage))}${cell('أجر اليوم (÷30)',hdMoney(daily))}${cell('الإجازة المستحقة (يوم)',docNum(accrued))}</div><div class="pa-results three-results">${cell('بدل الإجازات',leaveOn?hdMoney(leaveAmt):'غير محتسب')}</div>`;
+    E.innerHTML=`${warn}<div class="pa-results three-results">${cell('مدة الخدمة (سنة)',docNum(years))}${cell('نصف شهر × أول 5 سنوات',hdMoney(eligible?first:0))}${cell('شهر كامل × ما بعد 5 سنوات',hdMoney(eligible?later:0))}</div><div class="pa-results three-results">${cell('مكافأة نهاية الخدمة',eosOn?hdMoney(eos):'غير محتسبة')}</div>`;
+    T.innerHTML=`<div class="pa-results three-results">${cell('بدل الإجازات',hdMoney(leaveAmt))}${cell('مكافأة نهاية الخدمة',hdMoney(eos))}${cell('الإجمالي',hdMoney(r2(leaveAmt+eos)))}</div>`;
+  }
+  hdEl('hd_project')?.addEventListener('change',ev=>{ hdState.project=ev.target.value; hdState.empId=''; hdRenderEmps(); hdCompute(); });
+  hdEl('hd_search')?.addEventListener('input',hdRenderEmps);
+  hdEl('hd_emps')?.addEventListener('click',ev=>{ const b=ev.target.closest('[data-hd-emp]'); if(b) hdPick(b.dataset.hdEmp); });
+  ['hd_start','hd_end','hd_basic','hd_housing','hd_transport','hd_other','hd_leavedays','hd_leave_on','hd_eos_on'].forEach(id=>{ const el=hdEl(id); if(el){ el.addEventListener('input',hdCompute); el.addEventListener('change',hdCompute); } });
   // استحقاق الإجازة السنوية (مشترك بين الآلة الحاسبة والمخالصة): لا يستحق قبل إتمام 12 شهر
   function hrLeaveAccrued(months, perYear){ return months>=12 ? (months/12)*(Number(perYear)||21) : 0; }
   function calcEOS(monthlyWage, years){
@@ -6104,7 +6156,7 @@
   ['pa_days','pa_months'].forEach(id=>document.getElementById(id)?.addEventListener('input',()=>syncProjectDuration(id==='pa_days'?'days':'months')));
   ['pa_name','pa_profit','pa_gosi_employee_pct','pa_gosi_company_pct','pa_leave_days','pa_cones_price','pa_patrol_price','pa_gosi_enabled','pa_leave_enabled','pa_eos_enabled'].forEach(id=>document.getElementById(id)?.addEventListener('input',calculateProjectAccount));
   ['pa_gosi_enabled','pa_leave_enabled','pa_eos_enabled','pa_leave_days'].forEach(id=>document.getElementById(id)?.addEventListener('change',calculateProjectAccount));
-  document.getElementById('view-projectaccounts')?.addEventListener('input',ev=>{if(ev.target.matches('input,select')) calculateProjectAccount();});
+  document.getElementById('view-projectaccounts')?.addEventListener('input',ev=>{if(ev.target.matches('input,select') && ev.target.closest('#paLegacy')) calculateProjectAccount();});
   function bindProjectTypeInputs(){
     document.querySelectorAll('#pa_security_types input, #pa_comms_types input').forEach(el=>{if(!el.dataset.paBound){el.addEventListener('input',calculateProjectAccount);el.dataset.paBound='1';}});
     document.querySelectorAll('.remove-type').forEach(btn=>{if(!btn.dataset.paBound){btn.addEventListener('click',()=>{const row=btn.closest('[data-type-row]');if(row?.parentElement?.querySelectorAll('[data-type-row]').length>1)row.remove();else row.querySelectorAll('input').forEach((i,idx)=>{i.value=idx===0?'':idx===1?'0':'0'});calculateProjectAccount();bindProjectTypeInputs();});btn.dataset.paBound='1';}});
