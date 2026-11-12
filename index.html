@@ -1346,7 +1346,7 @@
           </button>
           <button class="btn" id="payrollRecalcBtn" title="للشهور المنتهية فقط: يعيد الحساب بالرواتب الحالية ويثبّته من جديد">إعادة احتساب الشهر</button>
           <button class="btn" id="payrollPreviewAllBtn">معاينة المسير</button>
-          <button class="btn" id="payrollBankAllBtn" title="تصدير كشف البنك (Excel) لكل موظفي الشهر المعروضين">ترحيل الرواتب كلها</button>
+          <button class="btn" id="payrollBankAllBtn" title="ترحيل كل موظفي الشهر المعروضين على كشف البنك (بدون تنزيل Excel — التنزيل من صفحة كشف البنك)">ترحيل الرواتب كلها</button>
           <button class="btn" id="payrollBankSelBtn" title="اختيار موظفين بعينهم وترحيلهم على كشف البنك">ترحيل موظفين معينين</button>
           <button class="btn" id="payrollUnpostAllBtn" title="إلغاء ترحيل كل الموظفين المعروضين من كشف البنك">عدم ترحيل الكل</button>
           <button class="btn" id="payrollUnpostSelBtn" title="اختيار موظفين بعينهم وإلغاء ترحيلهم من كشف البنك">عدم ترحيل موظفين معينين</button>
@@ -1382,6 +1382,7 @@
           <div class="payroll-filter-group payroll-search-wide"><label>بحث بالاسم أو الآيبان أو الهوية أو الرقم الوظيفي</label><input type="search" id="bankSearch" placeholder="بحث"></div>
           <div class="payroll-filter-group"><label>المشروع</label><select id="bankProject"><option value="">كل المشاريع</option></select></div>
           <div class="payroll-filter-group"><label>المنطقة</label><select id="bankRegion"><option value="">كل المناطق</option></select></div>
+          <div class="payroll-filter-group"><label>حالة الصرف</label><select id="bankPaidFilter"><option value="">الكل</option><option value="paid">تم الصرف فقط</option><option value="unpaid">مرحّل ولم يُصرف فقط</option></select></div>
           <span class="pill pill-gray" id="bankCount">0 موظف</span>
           <button class="btn btn-primary" id="bankDownloadBtn" title="تنزيل الكشف المعروض بصيغة ملف دفع الرواتب لمصرف الراجحي">تنزيل Excel (الراجحي)</button>
           <button class="btn" id="bankPrintBtn">طباعة</button>

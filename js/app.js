@@ -4028,7 +4028,6 @@
     opts=opts||{};
     if(!pdrCanFinance()){ showToast('ترحيل الرواتب يحتاج صلاحية المالية'); return; }
     { const before=list.length; list=list.filter(e=>!payIsPaid(ym,e.id)); if(before!==list.length) showToast(`تم استبعاد ${before-list.length} موظف تم صرفهم`); if(!list.length) return; }
-    if(!window.JSZip){ showToast('مكتبة Excel غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
     const cols=monthCols(ym); let held=0, zero=0, noIban=0; const posted=[];
     list.forEach(e=>{
       const p=payrollStatementForCols(e,cols);
@@ -4044,15 +4043,13 @@
     if(!payrollRecords[ym]) payrollRecords[ym]={};
     posted.forEach(x=>{ payrollRecords[ym][x.id]={...payrollAdjustmentFor(ym,x.id),bank:{at,name:x.name,total:x.total,basic:x.basic,housing:x.housing,other:x.other,ded:x.ded}}; });
     persistCloud('');
-    const ids=new Set(posted.map(x=>String(x.id)));
-    const rows=bankPostedRows(ym).filter(x=>ids.has(String(x.id)));
-    await bankDownloadRows(rows,`ملف_دفع_الرواتب_الراجحي_${monthLabel(ym).replace(/\s+/g,'_')}${opts.selected?'_موظفين_محددين':''}.xlsx`);
+    // الترحيل يسجّل الموظفين في «كشف البنك» فقط — لا ينزّل Excel تلقائيًا؛ التنزيل من زر «تنزيل Excel» في صفحة كشف البنك
     const notes=[]; if(held) notes.push(`${held} راتب موقوف لم يُرحّل`); if(zero) notes.push(`${zero} بصافي صفر لم يُرحّل`); if(noIban) notes.push(`${noIban} بدون آيبان`);
-    showToast(`تم ترحيل ${posted.length} موظف — تجدهم في «كشف البنك»`+(notes.length?` — (${notes.join('، ')})`:''));
+    showToast(`تم ترحيل ${posted.length} موظف — تجدهم في «كشف البنك» (التنزيل من زر Excel هناك)`+(notes.length?` — (${notes.join('، ')})`:''));
     try{ renderReports(); }catch(_){}
   }
   /* ===== صفحة كشف البنك: المرحَّلون فقط + فلاتر + إجمالي متغير ===== */
-  const bankState={month:'',q:'',project:'',region:''};
+  const bankState={month:'',q:'',project:'',region:'',paid:''};   // paid: ''=الكل | 'paid'=تم الصرف | 'unpaid'=مرحّل ولم يُصرف
   const bankSel={mode:'',ids:new Set()};   // mode: ''|'pay'|'unpay'
   const bankNum=n=>'SAR '+(Number(n)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
   function bankMonths(){ return Object.keys(payrollRecords||{}).filter(ym=>/^\d{4}-\d{2}$/.test(ym)&&Object.values(payrollRecords[ym]||{}).some(r=>r&&r.bank)).sort().reverse(); }
@@ -4067,7 +4064,7 @@
   }
   function bankFilteredRows(){
     const q=bankState.q.trim().toLowerCase();
-    return bankPostedRows(bankState.month).filter(x=>(!bankState.project||x.project===bankState.project)&&(!bankState.region||x.region===bankState.region)&&(!q||[x.name,x.iban,x.idnum,x.empno].some(v=>String(v||'').toLowerCase().includes(q))));
+    return bankPostedRows(bankState.month).filter(x=>(!bankState.project||x.project===bankState.project)&&(!bankState.region||x.region===bankState.region)&&(!bankState.paid||(bankState.paid==='paid'?x.paid:!x.paid))&&(!q||[x.name,x.iban,x.idnum,x.empno].some(v=>String(v||'').toLowerCase().includes(q))));
   }
   function bankTotals(rows){ const t={total:0,basic:0,housing:0,other:0,ded:0}; rows.forEach(x=>{ Object.keys(t).forEach(k=>{ t[k]+=Number(x[k])||0; }); }); Object.keys(t).forEach(k=>{ t[k]=r2(t[k]); }); return t; }
   function bankSheetHtml(rows,forPrint){
@@ -4092,6 +4089,7 @@
     psel.innerHTML='<option value="">كل المشاريع</option>'+projs.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join(''); psel.value=bankState.project;
     rsel.innerHTML='<option value="">كل المناطق</option>'+regs.map(x=>`<option value="${escapeAttr(x)}">${escapeHtml(x)}</option>`).join(''); rsel.value=bankState.region;
     if(qin&&qin.value!==bankState.q) qin.value=bankState.q;
+    { const ps=document.getElementById('bankPaidFilter'); if(ps&&ps.value!==bankState.paid) ps.value=bankState.paid; }
     const rows=bankFilteredRows(), t=bankTotals(rows);
     { const vis=new Set(rows.map(x=>String(x.id))); [...bankSel.ids].forEach(id=>{ if(!vis.has(id)) bankSel.ids.delete(id); }); }
     const cnt=document.getElementById('bankCount'); if(cnt) cnt.textContent=`${rows.length} من ${all.length} موظف`;
@@ -4164,11 +4162,12 @@
   document.getElementById('bankMonth')?.addEventListener('change',e=>{ bankState.month=e.target.value; bankSel.ids.clear(); renderBankReport(); });
   document.getElementById('bankProject')?.addEventListener('change',e=>{ bankState.project=e.target.value; renderBankReport(); });
   document.getElementById('bankRegion')?.addEventListener('change',e=>{ bankState.region=e.target.value; renderBankReport(); });
+  document.getElementById('bankPaidFilter')?.addEventListener('change',e=>{ bankState.paid=e.target.value; renderBankReport(); });
   document.getElementById('bankSearch')?.addEventListener('input',e=>{ bankState.q=e.target.value; const pos=e.target.selectionStart; renderBankReport(); const el=document.getElementById('bankSearch'); if(el){ el.focus(); try{el.setSelectionRange(pos,pos);}catch(_){} } });
   document.getElementById('bankDownloadBtn')?.addEventListener('click',async()=>{
     if(!pdrCanFinance()){ showToast('تنزيل كشف البنك يحتاج صلاحية المالية'); return; }
     const rows=bankFilteredRows(); if(!rows.length){ showToast('لا توجد بيانات لتنزيلها'); return; }
-    const filtered=bankState.project||bankState.region||bankState.q.trim();
+    const filtered=bankState.project||bankState.region||bankState.paid||bankState.q.trim();
     await bankDownloadRows(rows,`ملف_دفع_الرواتب_الراجحي_${monthLabel(bankState.month).replace(/\s+/g,'_')}${filtered?'_مفلتر':''}.xlsx`);
     showToast(`تم تنزيل ${rows.length} موظف`);
   });
