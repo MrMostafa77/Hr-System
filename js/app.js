@@ -2777,6 +2777,16 @@
     out.overtime=r2(out.overtime); out.app=r2(out.app);
     return out;
   }
+  // التغطيات ↔ الرواتب: (1) مستحق الحارس المغطّي يُضاف لراتبه إن كان السداد «في الرواتب»، (2) الغائب يُخصم يومه حسب المخالفة المختارة من لائحة المشروع
+  function covPayrollAdd(e,cols){
+    const isoSet=new Set((cols||[]).map(c=>c.iso)); let s=0;
+    (coverage||[]).forEach(c=>{ if(c.guardType!=='manual' && c.paystatus==='payroll' && String(c.guardId||'')===String(e.id) && isoSet.has(String(c.date||'').slice(0,10))) s+=Number(c.amount)||0; });
+    return r2(s);
+  }
+  function covPenaltyNameFor(empId,iso,code){
+    const c=(coverage||[]).find(x=>String(x.absentId||'')===String(empId) && String(x.date||'').slice(0,10)===iso && x.penaltyType && covStatusCode(x.status)===code);
+    return c?c.penaltyType:'';
+  }
   function attDeductionsFor(e, cols, dayRate){
     const list=policyFor(e), out={absence:0,withdrawal:0,penalty:0,absenceCount:0,items:[]};
     const DED=['غ','س','ج'];
@@ -2794,7 +2804,7 @@
       }
       // لا يوجد إجراء مسجل لكن الحضور مسجل غ/س/ج: الخصم الافتراضي من اللائحة
       const code=attCodeAt(c.ym, e.id, c.d);
-      if(DED.includes(code)) add(code, recordPolicyAmount(e, null, code, dayRate, list), c.iso);
+      if(DED.includes(code)){ const cn=covPenaltyNameFor(e.id,c.iso,code); add(code, recordPolicyAmount(e, cn?{type:cn}:null, code, dayRate, list), c.iso); }
     });
     return out;
   }
@@ -2859,7 +2869,7 @@
      الشهر المنتهي: تُحفظ نسخة منه (داخل payrollRecords[الشهر][الموظف].snap) ولا تتغير
      حتى لو تغيّر راتب الموظف أو لائحة المشروع، إلا إذا تغيّر حضور الموظف في ذلك الشهر
      أو إجراءاته أو تعديلات المسير (مكافأة/خصومات...) — وعندها يُعاد الحساب بنفس الراتب المثبّت. */
-  const PAY_SNAP_KEYS=['day','basic','housing','transport','otherAllow','monthlyGross','overtime','appAdd','bonus','totalEarned','nonWorkDays','nonWorkDed','absenceDays','absence','penalty','withdrawal','gosi','uniform','uniformInv','newspaper','advance','other','deduction','net','insuranceBase','workDays'];
+  const PAY_SNAP_KEYS=['day','basic','housing','transport','otherAllow','monthlyGross','overtime','appAdd','covAdd','bonus','totalEarned','nonWorkDays','nonWorkDed','absenceDays','absence','penalty','withdrawal','gosi','uniform','uniformInv','newspaper','advance','other','deduction','net','insuranceBase','workDays'];
   const PAY_SUM_ZERO={'ح':0,'-':0,'غ':0,'ش':0,'ج':0,'راحة':0,'ط':0,'ض':0,'س':0,'جمع':0,'عيد':0,'ق':0,'إجازة':0,'مرضية':0};
   function payCanFreeze(){ return !(window.HRAuth&&typeof window.HRAuth.canFinance==='function') || !!window.HRAuth.canFinance(); }
   // الموظف يدخل مسير الشهر فقط إذا باشر في هذا الشهر أو قبله (أول حضور له لا يقع بعد نهاية الشهر)
@@ -2872,6 +2882,7 @@
     cols.forEach(c=>{ s+=(attCodeAt(c.ym,e.id,c.d)||'-')+','; });
     (penalties||[]).forEach(x=>{ if(String(x.empId)===String(e.id) && String(x.date||'').slice(0,7)===ym) s+='|'+JSON.stringify(x); });
     s+='#'+['bonus','uniform','newspaper','advance','other'].map(k=>Number(a[k])||0).join(':');
+    (coverage||[]).forEach(x=>{ if(String(x.date||'').slice(0,7)===ym && (String(x.guardId||'')===String(e.id)||String(x.absentId||'')===String(e.id))) s+='^'+[x.id,x.amount,x.paystatus,x.penaltyType,x.status].join(':'); });
     { const iv=invPayrollDeduction(e.id,ym); if(iv) s+='~'+iv; }
     { const stx=empStatusInfo(e,cols); if(stx.text) s+='@'+stx.text; }
     let h=5381; for(let i=0;i<s.length;i++) h=((h<<5)+h+s.charCodeAt(i))|0;
@@ -2976,7 +2987,7 @@
     const ym=cols.length?cols[0].ym:currentMonthStr(), sum=sumIn||attSummaryForCols(cols,e.id), a=payrollAdjustmentFor(ym,e.id);
     const basic=Number(e.basicsalary)||0,housing=Number(e.housing)||0,transport=Number(e.transport)||0,otherAllow=Number(e.otherallow)||0;
     const MD=payMonthDaysFor(cols), monthlyGross=basic+housing+transport+otherAllow, day=empDayRate(e,MD);
-    const addn=attAdditionsFor(e,cols,day), overtime=addn.overtime, appAdd=addn.app, bonus=Number(a.bonus)||0, totalEarned=r2(monthlyGross+overtime+appAdd+bonus);
+    const addn=attAdditionsFor(e,cols,day), overtime=addn.overtime, appAdd=addn.app, covAdd=covPayrollAdd(e,cols), bonus=Number(a.bonus)||0, totalEarned=r2(monthlyGross+overtime+appAdd+covAdd+bonus);
     const notStarted=employeeNotStartedFor(e,cols);
     // فترة لم تنتهِ بعد (الشهر الجاري): يُستحق الراتب بعدد الأيام المنقضية فقط (من المباشرة حتى اليوم) ويزيد يوميًا تلقائيًا حتى اكتمال الشهر
     const periodOpen=cols.length>0 && cols[cols.length-1].iso>todayISO();
@@ -2995,7 +3006,7 @@
     const uniformInv=invPayrollDeduction(e.id,ym), uniform=r2((Number(a.uniform)||0)+uniformInv),newspaper=Number(a.newspaper)||0,advance=Number(a.advance)||0,other=Number(a.other)||0;
     const deduction=r2(nonWorkDed+gosi+absence+penalty+withdrawal+uniform+newspaper+advance+other);
     const stI=empStatusInfo(e,cols);
-    return {held:stI.held,statusText:stI.text,ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,appAdd,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,uniformInv,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
+    return {held:stI.held,statusText:stI.text,ym,day,basic,housing,transport,otherAllow,monthlyGross,overtime,appAdd,covAdd,bonus,totalEarned,nonWorkDays,nonWorkDed,absenceDays,absence,penalty,withdrawal,gosi,uniform,uniformInv,newspaper,advance,other,deduction,net:r2(totalEarned-deduction),notStarted,insuranceBase,sum,workDays:attWorkDays(cols,e.id),adjustment:a,dedItems:ded.items};
   }
   function payrollStatementFor(e){
     const ym=document.getElementById('payrollMonth')?.value||payrollAvailableMonths()[0]||currentMonthStr();
@@ -3188,7 +3199,7 @@
       const a=p.adjustment||{};
       const detail=`<div class="employee-payroll-detail"><div class="employee-payroll-detail-grid">${[
         ['الأجر اليومي',fmt(p.day)],['الأساسي',fmt(p.basic)],['بدل السكن',fmt(p.housing)],['بدل المواصلات',fmt(p.transport)],
-        ['بدلات أخرى',fmt(p.otherAllow)],['إضافي',fmt(p.overtime)],['تطبيق',fmt(p.appAdd)],['مكافآت',fmt(a.bonus)],['إجمالي المستحقات',fmt(p.totalEarned)],
+        ['بدلات أخرى',fmt(p.otherAllow)],['إضافي',fmt(p.overtime)],['تطبيق',fmt(p.appAdd)],['تغطيات',fmt(p.covAdd)],['مكافآت',fmt(a.bonus)],['إجمالي المستحقات',fmt(p.totalEarned)],
         ['خصم عدم المباشرة',fmt(p.nonWorkDed)],['التأمينات',fmt(p.gosi)],['خصم الغياب',fmt(p.absence)],['الجزاءات',fmt(p.penalty)],
         ['الانسحاب',fmt(p.withdrawal)],['السلف',fmt(a.advance)],['خصومات أخرى',fmt((Number(p.uniform)||0)+(Number(a.newspaper)||0)+(Number(a.other)||0))],['إجمالي الخصومات',fmt(p.deduction)],
         ['صافي الراتب',fmt(p.net)]
@@ -3325,7 +3336,7 @@
       const rows=[]; roleKeys.forEach(k=>d.roles[k].emps.forEach(x=>rows.push({role:d.roles[k].label,...x})));
       h+=`<div class="pj-bd-title" style="font-size:13px">تفصيل رواتب الأفراد</div><div class="table-wrap"><table class="payroll-table pj-bd pdr-table"><thead>${th('م','الاسم','الوظيفة','الراتب الشهري','أيام العمل','إضافي + تطبيق + مكافأة','إجمالي المستحق','الخصومات','الصافي')}</thead><tbody>${
         rows.map((x,i)=>{const st=x.st; return st
-          ?`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td class="mono">${money(st.monthlyGross)}</td><td class="mono">${fmt(x.worked)}</td><td class="mono">${money(st.overtime+(st.appAdd||0)+st.bonus)}</td><td class="mono">${money(st.totalEarned)}</td><td class="mono">${money(st.deduction)}</td><td class="mono"><b>${money(st.net)}</b></td></tr>`
+          ?`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td class="mono">${money(st.monthlyGross)}</td><td class="mono">${fmt(x.worked)}</td><td class="mono">${money(st.overtime+(st.appAdd||0)+(st.covAdd||0)+st.bonus)}</td><td class="mono">${money(st.totalEarned)}</td><td class="mono">${money(st.deduction)}</td><td class="mono"><b>${money(st.net)}</b></td></tr>`
           :`<tr><td>${i+1}</td><td><b>${escapeHtml(x.e.fullname||'—')}</b><small class="pay-code">${escapeHtml(x.e.empcode||'')}</small></td><td>${escapeHtml(x.e.jobtitle||x.role)}</td><td colspan="6" class="empty-note">لا يدخل في رواتب هذا الشهر (لا يوجد عقد أو مباشرة، أو لم يباشر بعد)</td></tr>`;}).join('')||'<tr><td colspan="9" class="empty-note">لا يوجد موظفون على هذا المشروع.</td></tr>'
       }</tbody></table></div>`;
     }
@@ -3863,7 +3874,7 @@
       }
     }catch(err){ console.error(err); }
     const ym=document.getElementById('payrollMonth')?.value,body=document.getElementById('reportTableBody'); if(!body)return;
-    if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="26" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
+    if(!ym){document.getElementById('payrollCount').textContent='0 موظف';body.innerHTML='<tr><td colspan="27" class="empty-note">لا يوجد شهر حضور وانصراف متاح لإعداد مسير رواتب.</td></tr>';return;}
     const q=(document.getElementById('payrollSearch')?.value||'').trim().toLowerCase(), pf=document.getElementById('payrollProjectFilter')?.value||'',rf=document.getElementById('payrollRegionFilter')?.value||'';
     const list=payrollEmployees().filter(e=>employeeInPayrollMonth(e,ym)&&(!q||[e.fullname,e.empcode].some(v=>String(v||'').toLowerCase().includes(q)))&&(!pf||String(e.project||'')===pf)&&(!rf||String(e.region||'')===rf)&&payPostOk(e,ym));
     { const np=list.filter(e=>payIsPosted(ym,e.id)).length; document.getElementById('payrollCount').textContent=`${list.length} موظف — مرحّل ${np} | غير مرحّل ${list.length-np}`; }
@@ -3874,7 +3885,7 @@
       return `<tr data-pay-row="${escapeAttr(e.id)}"${p.held?' class="pay-held"':''}>
       <td class="mono g1 st1">${i+1}</td><td class="g1 st2"><label class="pay-sel"><input type="checkbox" data-pay-sel="${escapeAttr(e.id)}" ${paySelected.has(String(e.id))?'checked':''}></label><b>${escapeHtml(e.fullname||'—')}</b><small class="pay-code">${escapeHtml(e.empcode||'')}</small></td><td class="g1">${escapeHtml(e.project||e.region||'—')}</td><td class="g1">${escapeHtml(e.jobtitle||'—')}</td>
       <td class="mono g2">${fmt(p.day)}</td><td class="mono g2">${fmt(p.basic)}</td><td class="mono g2">${fmt(p.housing)}</td><td class="mono g2">${fmt(p.transport)}</td><td class="mono g2">${fmt(p.otherAllow)}</td><td class="mono g2 tot">${fmt(p.monthlyGross)}</td>
-      <td class="mono g2">${fmt(p.overtime)}</td><td class="mono g2">${fmt(p.appAdd)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
+      <td class="mono g2">${fmt(p.overtime)}</td><td class="mono g2">${fmt(p.appAdd)}</td><td class="mono g2">${fmt(p.covAdd)}</td><td class="pay-input-cell g2"><input type="number" min="0" step=".01" data-pay-field="bonus" data-emp="${escapeAttr(e.id)}" value="${Number(a.bonus)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}></td><td class="mono g2 tot">${fmt(p.totalEarned)}</td>
       <td class="mono g3" ${red(p.nonWorkDed)}>${fmt(p.nonWorkDed)}${p.nonWorkDays?`<small class="pay-red-note">${p.nonWorkDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.gosi)}</td>
       <td class="mono g3" ${red(p.absence)}>${fmt(p.absence)}${p.absenceDays?`<small class="pay-red-note">${p.absenceDays} يوم</small>`:''}</td><td class="mono g3">${fmt(p.penalty)}</td><td class="mono g3">${fmt(p.withdrawal)}</td>
       <td class="pay-input-cell g3"><input type="number" min="0" step=".01" data-pay-field="uniform" data-emp="${escapeAttr(e.id)}" value="${Number(a.uniform)||0}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}>${Number(p.uniformInv)>0?`<small class="pay-status-note posted">+ ${fmt(p.uniformInv)} من المخزون</small>`:''}</td>
@@ -3884,7 +3895,7 @@
       <td class="mono g3 tot" ${red(p.deduction)}>${fmt(p.deduction)}</td><td class="mono g4 tot" style="font-weight:700;color:var(--teal)">${fmt(p.net)}</td>
       <td class="g5">${payrollRecords[p.ym]?.[e.id]?.bank?(payIsPaid(p.ym,e.id)?'<small class="pay-status-note posted">🔒 تم الصرف</small>':'<small class="pay-status-note posted">✓ مرحّل للبنك</small>'):'<small class="pay-status-note unposted">○ غير مرحّل</small>'}${p.statusText?`<small class="pay-status-note${p.held?' held':''}">${escapeHtml(p.statusText)}</small>`:''}<select class="pay-action-select" data-pay-field="internalAction" data-emp="${escapeAttr(e.id)}" ${hrSourceReadOnly&&String(hrSourceEmployeeId)===String(e.id)?'disabled':''}><option value="">—</option><option ${action==='إيقاف راتب الموظف'?'selected':''}>إيقاف راتب الموظف</option><option ${action==='إيقاف المدير العام'?'selected':''}>إيقاف المدير العام</option><option ${action==='ملاحظات'?'selected':''}>ملاحظات</option></select>${action==='ملاحظات'?`<input class="pay-note-input" data-pay-field="note" data-emp="${escapeAttr(e.id)}" value="${escapeAttr(a.note||'')}" placeholder="الملاحظة">`:''}</td>
       </tr>`;
-    }).join('')||'<tr><td colspan="26" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
+    }).join('')||'<tr><td colspan="27" class="empty-note">لا يوجد موظفون مطابقون.</td></tr>';
     { const ymL=document.getElementById('payrollMonth')?.value; body.querySelectorAll('tr[data-pay-row]').forEach(tr=>{ if(payPaidLock(ymL,tr.dataset.payRow)){ tr.classList.add('pay-paid'); tr.querySelectorAll('[data-pay-field]').forEach(el=>{ el.disabled=true; el.title='تم الصرف — ألغِ الصرف من كشف البنك للتعديل'; }); } }); }
     body.querySelectorAll('[data-pay-field]').forEach(el=>el.addEventListener('change',()=>updatePayrollField(el.dataset.emp,el.dataset.payField,el.value)));
     body.querySelectorAll('[data-pay-sel]').forEach(cb=>cb.addEventListener('change',()=>{ cb.checked?paySelected.add(cb.dataset.paySel):paySelected.delete(cb.dataset.paySel); paySelRefresh(); }));
@@ -4798,11 +4809,11 @@
   .ac-paper .ac-sign i{display:block;margin-top:44px;border-top:1px solid #444}`;
   const AS_CLS={'ح':'h','غ':'a','ج':'p','س':'w','راحة':'r','ط':'c','ض':'o','عيد':'e'};
   const AS_SUMS=[['الدوام',null],['حضور','ح'],['غياب','غ'],['تغطية','ط'],['جزاء','ج'],['راحات','راحة'],['إضافي','ض'],['انسحاب','س'],['جمع','جمع']];
-  const PP_GROUPS=[['بيانات الموظف',4],['المستحقات (ريال)',10],['الخصومات (ريال)',10],['الصافي',1],['الإجراء الداخلي',1]];
+  const PP_GROUPS=[['بيانات الموظف',4],['المستحقات (ريال)',11],['الخصومات (ريال)',10],['الصافي',1],['الإجراء الداخلي',1]];
   const PP_COLS=[
     {h:'م',k:r=>r.i,t:'i'},{h:'الاسم',k:r=>r.name,t:'s',w:25},{h:'المشروع',k:r=>r.location,t:'s',w:24},{h:'الوظيفة',k:r=>r.job,t:'s',w:16},
     {h:'اليوم',k:r=>r.p.day,t:'n'},{h:'الأساسي',k:r=>r.p.basic,t:'n',sum:1},{h:'بدل السكن',k:r=>r.p.housing,t:'n',sum:1},{h:'بدل المواصلات',k:r=>r.p.transport,t:'n',sum:1},{h:'بدلات أخرى',k:r=>r.p.otherAllow,t:'n',sum:1},
-    {h:'الأجر الأخير',k:r=>r.p.monthlyGross,t:'n',sum:1,b:1,tot:1},{h:'إضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'تطبيق',k:r=>r.p.appAdd,t:'n',sum:1},{h:'مكافآت',k:r=>r.p.bonus,t:'n',sum:1},{h:'إجمالي الراتب',k:r=>r.p.totalEarned,t:'n',sum:1,b:1,tot:1},
+    {h:'الأجر الأخير',k:r=>r.p.monthlyGross,t:'n',sum:1,b:1,tot:1},{h:'إضافي',k:r=>r.p.overtime,t:'n',sum:1},{h:'تطبيق',k:r=>r.p.appAdd,t:'n',sum:1},{h:'تغطيات',k:r=>r.p.covAdd,t:'n',sum:1},{h:'مكافآت',k:r=>r.p.bonus,t:'n',sum:1},{h:'إجمالي الراتب',k:r=>r.p.totalEarned,t:'n',sum:1,b:1,tot:1},
     {h:'خصم عدم دوام',k:r=>r.p.nonWorkDed,t:'n',sum:1},{h:'تأمينات اجتماعية',k:r=>r.p.gosi,t:'n',sum:1},{h:'غيابات',k:r=>r.p.absence,t:'n',sum:1},{h:'جزاءات',k:r=>r.p.penalty,t:'n',sum:1},{h:'انسحاب',k:r=>r.p.withdrawal,t:'n',sum:1},
     {h:'البدلة',k:r=>r.p.uniform,t:'n',sum:1},{h:'الصحيفة',k:r=>r.p.newspaper,t:'n',sum:1},{h:'سلف',k:r=>r.p.advance,t:'n',sum:1},{h:'أخرى',k:r=>r.p.other,t:'n',sum:1},{h:'إجمالي الخصومات',k:r=>r.p.deduction,t:'n',sum:1,b:1,tot:1},{h:'صافي الراتب',k:r=>r.p.net,t:'n',sum:1,b:1,net:1,tot:1},
     {h:'إجراء داخلي',k:r=>[r.p.statusText,r.p.adjustment?.internalAction].filter(Boolean).join(' — '),t:'s',w:22}
@@ -5644,6 +5655,48 @@
     document.getElementById('c_bank').value=SA_BANKS[bankCode]||'';
     document.getElementById('c_account').value=v.length===24?v.slice(-18):'';
   }
+  /* ===== المخالفة (من لائحة المشروع) والسداد في التغطيات ===== */
+  const COV_DED_CODES=['غ','س','ج'];
+  function covPayLabel(c){ return c&&c.paystatus==='payroll'?'في الرواتب':(c&&c.paystatus==='cash'?'كاش':'—'); }
+  // بند اللائحة المطبّق على الغائب + قيمة الخصم (القيمة تظهر لمن لديه صلاحية المالية فقط)
+  function covPenaltyInfo(c){
+    const code=covStatusCode(c.status);
+    if(!COV_DED_CODES.includes(code)) return {text:'—',sub:'بدون خصم'};
+    const nm=c.penaltyType||policyDefaultNameForCode(code), item=nm?policyItemByName(policyForProjectName(c.location),nm):null;
+    if(!item) return {text:nm||'يوم واحد (افتراضي)',sub:''};
+    const emp=employees.find(x=>String(x.id)===String(c.absentId)), rate=emp?empDayRateOn(emp,c.date):0;
+    return {text:item.name, sub:policyDaysText(item)+((payCanFreeze()&&rate>0)?` = ${fmt(policyAmount(item,rate))} ريال`:'')};
+  }
+  function renderCoveragePenaltyOptions(selected='',useDefault=false){
+    const el=document.getElementById('c_penalty'); if(!el)return;
+    const loc=String(document.getElementById('c_location')?.value||'').trim(), code=covStatusCode(document.getElementById('c_status')?.value);
+    if(!loc){ el.innerHTML='<option value="">اختر المشروع أولاً</option>'; el.disabled=true; updateCoveragePenaltyHint(); return; }
+    const list=policyForProjectName(loc);
+    el.innerHTML='<option value="">— بدون تحديد —</option>'+list.map(x=>`<option value="${escapeAttr(x.name)}">${escapeHtml(x.name)} — ${escapeHtml(policyDaysText(x))}</option>`).join('');
+    let v=selected||'';
+    if(!v && useDefault){ const dn=policyDefaultNameForCode(code); if(dn && policyItemByName(list,dn)) v=policyItemByName(list,dn).name; }
+    if(v && ![...el.options].some(o=>o.value===v)){ const o=document.createElement('option'); o.value=v; o.textContent=v+' (غير موجودة في اللائحة الحالية)'; el.appendChild(o); }
+    el.disabled=!COV_DED_CODES.includes(code);
+    el.value=el.disabled?'':v;
+    updateCoveragePenaltyHint();
+  }
+  function updateCoveragePenaltyHint(){
+    const h=document.getElementById('covPenaltyHint'); if(!h)return;
+    const loc=String(document.getElementById('c_location')?.value||'').trim(), code=covStatusCode(document.getElementById('c_status')?.value), name=document.getElementById('c_penalty')?.value||'';
+    if(!loc){ h.textContent='اختر المشروع لعرض لائحة الجزاءات والخصومات الخاصة به.'; return; }
+    if(!COV_DED_CODES.includes(code)){ h.textContent='هذه الحالة لا يترتب عليها خصم على الحارس الغائب.'; return; }
+    const item=name?policyItemByName(policyForProjectName(loc),name):null;
+    if(!item){ h.textContent='لم تُحدد مخالفة: يُطبّق الخصم الافتراضي حسب الحالة.'; return; }
+    const emp=employees.find(x=>String(x.id)===String(document.getElementById('c_absent')?.value)), rate=emp?empDayRateOn(emp,document.getElementById('c_date')?.value):0;
+    h.textContent='الخصم على الغائب من راتبه: '+policyDaysText(item)+((payCanFreeze()&&rate>0)?` × ${rate.toFixed(2)} = ${fmt(policyAmount(item,rate))} ريال`:'');
+  }
+  function updateCoveragePayHint(){
+    const h=document.getElementById('covPayHint'); if(!h)return;
+    const pay=document.getElementById('c_pay')?.value, gid=document.getElementById('c_guard')?.value, emp=employees.find(x=>String(x.id)===String(gid)), d=document.getElementById('c_date')?.value||'';
+    if(pay==='cash'){ h.textContent='كاش: لا تنزل في رواتب الحارس المغطّي، وتُسجَّل في الحضور والانصراف («ط») فقط، ويُخصم يوم الغائب من راتبه.'; return; }
+    if(gid && (!emp || !employeeEligibleForHR(emp))){ h.textContent='⚠ الحارس المغطّي غير مضاف على مسير الرواتب (غير موظف أو بلا عقد/مباشرة) — اختر «كاش».'; return; }
+    h.textContent='في الرواتب: تُضاف للحارس المغطّي مع رواتب '+(d?monthLabel(d.slice(0,7)):'آخر الشهر')+'، ويُخصم يوم الغائب من راتبه.';
+  }
   function resetCoverageForm(){
     const f=document.getElementById('coverageForm'); if(!f)return;
     f.reset(); document.getElementById('c_id').value='';
@@ -5653,6 +5706,7 @@
     renderCoverageGuardOptions(''); renderCoverageAbsentOptions(''); renderCoverageShiftOptions(''); renderCoverageLocationOptions('');
     document.getElementById('c_date').value=new Date().toISOString().slice(0,10);
     updateCoverageAmount(true); updateCoverageBank();
+    document.getElementById('c_pay').value='payroll'; renderCoveragePenaltyOptions('',true); updateCoveragePayHint();
   }
   function openCoverageManualGuard(){
     const name=prompt('اكتب اسم الحارس رباعي الاسم'); if(!name)return;
@@ -5680,7 +5734,7 @@
     let list=[...coverage].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     if(fs)list=list.filter(c=>covStatusCode(c.status)===fs);
     const body=document.getElementById('covTableBody');
-    body.innerHTML=list.map(c=>`<tr><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.shift||'')}</td><td>${escapeHtml(c.location||'')}</td><td class="mono">${escapeHtml(c.date||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusText(c.status))}</td><td class="mono">${fmt(c.amount)}</td><td>${escapeHtml(c.holder||'')}</td><td>${escapeHtml(c.bank||'')}</td><td class="mono">${escapeHtml(c.accountno||'')}</td><td><button class="btn btn-sm" data-cov-minute="${c.id}" title="محضر تغطية جاهز للطباعة">محضر</button> <button class="btn btn-sm" data-cov-edit="${c.id}">تعديل</button> <button class="btn icon-btn btn-ghost btn-danger" data-del="${c.id}" title="حذف">✕</button></td></tr>`).join('')||'<tr><td colspan="11" class="empty-note">لا توجد تغطيات مسجلة.</td></tr>';
+    body.innerHTML=list.map(c=>`<tr><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.shift||'')}</td><td>${escapeHtml(c.location||'')}</td><td class="mono">${escapeHtml(c.date||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusText(c.status))}</td>${(()=>{const pi=covPenaltyInfo(c);return `<td>${escapeHtml(pi.text)}${pi.sub?`<small class="cov-sub">${escapeHtml(pi.sub)}</small>`:''}</td>`;})()}<td class="mono">${fmt(c.amount)}</td><td><span class="pill ${c.paystatus==='payroll'?'pill-gray':'pill-amber'}">${covPayLabel(c)}</span></td><td>${escapeHtml(c.holder||'')}</td><td>${escapeHtml(c.bank||'')}</td><td class="mono">${escapeHtml(c.accountno||'')}</td><td class="no-print"><div class="cov-actions"><button class="btn btn-sm" data-cov-minute="${c.id}" title="محضر تغطية جاهز للطباعة">محضر</button> <button class="btn btn-sm" data-cov-edit="${c.id}">تعديل</button> <button class="btn icon-btn btn-ghost btn-danger" data-del="${c.id}" title="حذف">✕</button></div></td></tr>`).join('')||'<tr><td colspan="13" class="empty-note">لا توجد تغطيات مسجلة.</td></tr>';
     document.getElementById('covTotal').textContent=fmt(list.reduce((sum,c)=>sum+(Number(c.amount)||0),0));
     body.querySelectorAll('[data-del]').forEach(btn=>btn.onclick=()=>{if(confirm('هل تريد حذف سجل التغطية هذا؟')){const old=coverage.find(c=>c.id===btn.dataset.del); if(old) covClearAttendance(old); coverage=coverage.filter(c=>c.id!==btn.dataset.del);saveCoverage();renderCoverage();}});
     body.querySelectorAll('[data-cov-edit]').forEach(btn=>btn.onclick=()=>loadCoverageForEdit(btn.dataset.covEdit));
@@ -5693,6 +5747,7 @@
     if(c.guardType==='manual')document.getElementById('c_guard').dataset.manualName=c.guardName||'';
     renderCoverageShiftOptions(c.shift||''); renderCoverageLocationOptions(c.location||''); renderCoverageAbsentOptions(c.absentId||'');
     document.getElementById('c_date').value=c.date||''; { const st=document.getElementById('c_status'), k=covStatusCode(c.status); if(!k && c.status && ![...st.options].some(o=>o.value===c.status)){ const o=document.createElement('option'); o.value=c.status; o.textContent=c.status; st.appendChild(o); } st.value=k||c.status||'غ'; }
+    document.getElementById('c_pay').value=c.paystatus||'cash'; renderCoveragePenaltyOptions(c.penaltyType||'',false); updateCoveragePayHint();
     document.getElementById('c_amount').value=c.amount??''; document.getElementById('c_amount').dataset.manual=c.amountManual?'1':'';
     document.getElementById('c_holder').value=c.guardName||''; document.getElementById('c_delegate').checked=!!c.delegated;
     document.getElementById('c_delegate_holder').value=c.delegateHolder||''; document.getElementById('c_delegate_holder').style.display=c.delegated?'block':'none';
@@ -5700,6 +5755,13 @@
     updateCoverageAmount(false); window.scrollTo({top:0,behavior:'smooth'}); showToast('تم فتح التغطية للتعديل');
   }
   document.getElementById('covFilterStatus').addEventListener('change',renderCoverage);
+  document.getElementById('c_location').addEventListener('change',()=>{renderCoveragePenaltyOptions('',true);});
+  document.getElementById('c_status').addEventListener('change',()=>renderCoveragePenaltyOptions('',true));
+  document.getElementById('c_penalty').addEventListener('change',updateCoveragePenaltyHint);
+  document.getElementById('c_absent').addEventListener('change',updateCoveragePenaltyHint);
+  document.getElementById('c_date').addEventListener('change',()=>{updateCoveragePenaltyHint();updateCoveragePayHint();});
+  document.getElementById('c_pay').addEventListener('change',updateCoveragePayHint);
+  document.getElementById('c_guard').addEventListener('change',updateCoveragePayHint);
   document.getElementById('c_location').addEventListener('change',()=>{document.getElementById('c_amount').dataset.manual='';updateCoverageAmount(true);renderCoverageAbsentOptions('');});
   document.getElementById('c_amount').addEventListener('input',()=>document.getElementById('c_amount').dataset.manual='1');
   document.getElementById('c_iban').addEventListener('input',updateCoverageBank);
@@ -5720,9 +5782,14 @@
     const location=document.getElementById('c_location').value, salary=projectGuardSalary(location);
     const amount=Number(document.getElementById('c_amount').value)||0;
     if(!amount){showToast('يرجى إدخال المستحق أو اختيار المشروع لاحتسابه تلقائيًا');return;}
+    const paystatus=document.getElementById('c_pay').value||'payroll', penaltyType=document.getElementById('c_penalty').value||'';
+    if(paystatus==='payroll'){
+      if(!employee||!employeeEligibleForHR(employee)){showToast('⚠ الحارس المغطّي غير مضاف على مسير الرواتب — اختر السداد «كاش»');return;}
+      if(payPaidLock(String(document.getElementById('c_date').value||'').slice(0,7),employee.id)){showToast('⚠ تم صرف راتب الحارس المغطّي عن هذا الشهر — اختر «كاش» أو ألغِ الصرف من كشف البنك أولاً');return;}
+    }
     const delegated=document.getElementById('c_delegate').checked, delegateHolder=document.getElementById('c_delegate_holder').value.trim();
     if(delegated&&!delegateHolder){showToast('اكتب اسم صاحب الحساب عند تفعيل التفويض');return;}
-    const data={id:document.getElementById('c_id').value||'c'+Date.now(),guardId:employee?.id||guardId,guardName:employee?.fullname||manualName,guardType:employee?'employee':'manual',shift:document.getElementById('c_shift').value,location,date:document.getElementById('c_date').value,absentId,absentName:absent.fullname,status:document.getElementById('c_status').value,amount,amountManual:document.getElementById('c_amount').dataset.manual==='1',projectGuardSalary:salary,holder:delegated?delegateHolder:(employee?.fullname||manualName),delegated,delegateHolder,iban:document.getElementById('c_iban').value.toUpperCase(),bank:document.getElementById('c_bank').value,accountno:document.getElementById('c_account').value,notes:document.getElementById('c_notes').value};
+    const data={id:document.getElementById('c_id').value||'c'+Date.now(),guardId:employee?.id||guardId,guardName:employee?.fullname||manualName,guardType:employee?'employee':'manual',shift:document.getElementById('c_shift').value,location,date:document.getElementById('c_date').value,absentId,absentName:absent.fullname,status:document.getElementById('c_status').value,penaltyType,paystatus,amount,amountManual:document.getElementById('c_amount').dataset.manual==='1',projectGuardSalary:salary,holder:delegated?delegateHolder:(employee?.fullname||manualName),delegated,delegateHolder,iban:document.getElementById('c_iban').value.toUpperCase(),bank:document.getElementById('c_bank').value,accountno:document.getElementById('c_account').value,notes:document.getElementById('c_notes').value};
     const idx=coverage.findIndex(x=>x.id===data.id);
     if(idx>=0) covClearAttendance(coverage[idx]);          // إزالة تسميع السجل القديم لو تغيّر اليوم/الحارس/الحالة
     if(idx>=0 && coverage[idx].minuteNo) data.minuteNo=coverage[idx].minuteNo;   // رقم المحضر ثابت عند التعديل
@@ -5731,8 +5798,8 @@
     saveCoverage(); renderCoverage(); const makeNew=document.getElementById('coverageForm').dataset.saveNew==='1'; delete document.getElementById('coverageForm').dataset.saveNew; showToast((idx>=0?'تم تحديث التغطية':'تم حفظ التغطية')+' — وسُجّل في الحضور والانصراف بتاريخ '+fmtDMY(data.date)+': «'+covStatusText(data.status)+'» للغائب و«ط» للمغطّي'); if(makeNew)resetCoverageForm();
   });
   document.getElementById('covExportBtn').addEventListener('click',()=>{
-    const headers=['اسم الحارس القائم بالتغطية','الوردية','الموقع','التاريخ','الحارس الغائب','الحالة','المستحق','اسم صاحب الحساب','الآيبان','البنك','رقم الحساب','ملاحظات'];
-    const rows=coverage.map(c=>[c.guardName,c.shift,c.location,c.date,c.absentName,covStatusText(c.status),c.amount,c.holder,c.iban,c.bank,c.accountno,c.notes]); downloadCsv('coverage_export.csv',headers,rows);
+    const headers=['اسم الحارس القائم بالتغطية','الوردية','الموقع','التاريخ','الحارس الغائب','الحالة','المخالفة / الخصم على الغائب','المستحق','السداد','اسم صاحب الحساب','الآيبان','البنك','رقم الحساب','ملاحظات'];
+    const rows=coverage.map(c=>[c.guardName,c.shift,c.location,c.date,c.absentName,covStatusText(c.status),(()=>{const pi=covPenaltyInfo(c);return pi.text+(pi.sub?' — '+pi.sub:'');})(),c.amount,covPayLabel(c),c.holder,c.iban,c.bank,c.accountno,c.notes]); downloadCsv('coverage_export.csv',headers,rows);
   });
   resetCoverageForm();
 
@@ -5807,7 +5874,7 @@
       const chunk=list.slice(p*per,(p+1)*per), last=p===pages-1;
       const rows=chunk.map((c,i)=>{
         const d=String(c.date||'').slice(0,10);
-        return `<tr><td>${p*per+i+1}</td><td class="mono">${escapeHtml(d?fmtDMY(d):'')}</td><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusName(c.status))}</td><td>${escapeHtml(c.location||'')}</td><td>${escapeHtml(c.shift||'')}</td>${fin?`<td class="mono">${c.amount?docNum(c.amount):''}</td>`:''}<td>${escapeHtml(c.notes||'')}</td></tr>`;
+        return `<tr><td>${p*per+i+1}</td><td class="mono">${escapeHtml(d?fmtDMY(d):'')}</td><td>${escapeHtml(c.guardName||'')}</td><td>${escapeHtml(c.absentName||c.absent||'')}</td><td>${escapeHtml(covStatusName(c.status))}${c.penaltyType&&COV_DED_CODES.includes(covStatusCode(c.status))?`<br><small>${escapeHtml(c.penaltyType)}</small>`:''}</td><td>${escapeHtml(c.location||'')}</td><td>${escapeHtml(c.shift||'')}</td>${fin?`<td class="mono">${c.amount?docNum(c.amount):''}${c.paystatus?`<br><small>${covPayLabel(c)}</small>`:''}</td>`:''}<td>${escapeHtml(c.notes||'')}</td></tr>`;
       }).join('');
       const total=fin?`<tr><th colspan="7">إجمالي المستحقات</th><td class="mono"><b>${docNum(list.reduce((t,c)=>t+(Number(c.amount)||0),0))}</b></td><td></td></tr>`:'';
       const dates=list.map(c=>String(c.date||'').slice(0,10)).filter(Boolean).sort();
