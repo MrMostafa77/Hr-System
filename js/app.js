@@ -3472,7 +3472,7 @@
     if(st.some(x=>x.item===prev)) sel.value=prev;
     invUpdateAvail();
     const rows=[...d.issues].filter(x=>{ const e=employees.find(z=>String(z.id)===String(x.empId)); const nm=(e?e.fullname:x.empName)||''; return !q||[nm,e&&e.empcode,x.no].some(v=>String(v||'').toLowerCase().includes(q)); }).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.no).localeCompare(String(a.no)));
-    document.getElementById('invOutBody').innerHTML=rows.length?rows.map(x=>{ const e=employees.find(z=>String(z.id)===String(x.empId)); return `<tr><td>${escapeHtml(x.no)}</td><td>${escapeHtml(fmtDMY(x.date))}</td><td>${escapeHtml((e?e.fullname:x.empName)||'—')}<small class="pay-code">${escapeHtml(e&&e.empcode||'')}</small></td><td>${escapeHtml(x.item)}</td><td>${x.qty}</td><td dir="ltr"><b>${invNum(x.amount)}</b></td><td>${escapeHtml(INV_METHODS[x.method]||x.method)}</td><td>${invOutDetails(x)}</td><td><button type="button" class="btn btn-sm" data-inv-print="${escapeAttr(x.id)}">طباعة</button> <button type="button" class="btn btn-sm" data-inv-rcv="${escapeAttr(x.id)}">نموذج استلام</button> <button type="button" class="btn btn-sm" data-inv-del-out="${escapeAttr(x.id)}">إلغاء الأمر</button></td></tr>`; }).join(''):'<tr><td colspan="9" class="empty-note">لا توجد أوامر صرف.</td></tr>';
+    document.getElementById('invOutBody').innerHTML=rows.length?rows.map(x=>{ const e=employees.find(z=>String(z.id)===String(x.empId)); return `<tr><td>${escapeHtml(x.no)}</td><td>${escapeHtml(fmtDMY(x.date))}</td><td>${escapeHtml((e?e.fullname:x.empName)||'—')}<small class="pay-code">${escapeHtml(e&&e.empcode||'')}</small></td><td>${escapeHtml(x.item)}</td><td>${x.qty}</td><td dir="ltr"><b>${invNum(x.amount)}</b></td><td>${escapeHtml(INV_METHODS[x.method]||x.method)}</td><td>${invOutDetails(x)}</td><td><button type="button" class="btn btn-sm" data-inv-print="${escapeAttr(x.id)}">طباعة</button> <button type="button" class="btn btn-sm" data-inv-rcv="${escapeAttr(x.id)}">أمر استلام</button> <button type="button" class="btn btn-sm" data-inv-del-out="${escapeAttr(x.id)}">إلغاء الأمر</button></td></tr>`; }).join(''):'<tr><td colspan="9" class="empty-note">لا توجد أوامر صرف.</td></tr>';
   }
   function invUpdateAvail(){
     const it=document.getElementById('invOutItem')?.value, el=document.getElementById('invOutAvail'); if(!el) return;
@@ -5970,37 +5970,36 @@
     finally{ if(btn){ btn.disabled=false; btn.textContent='تنزيل PDF'; } }
   }
   /* ===== نموذج استلام بدلة أمن: ورق الشركة (كليشة + لوجو) · طباعة · Word حقيقي (.docx) · PDF · قابل للتعديل ===== */
-  function invRcvPage(x,e){
+  function invRcvPage(x,e,sup){
     e=e||{}; const v=t=>escapeHtml(String(t==null?'':t)), dots='....................';
     const nm=e.fullname||(x&&x.empName)||'', proj=e.project||(x&&x.project)||'';
     const items=x?[[x.item,x.qty]]:[]; while(items.length<4) items.push(['','']);
     const rows=items.map((r,i)=>`<tr><td>${i+1}</td><td>${v(r[0])}</td><td>${v(r[1])}</td><td></td><td></td></tr>`).join('');
-    const m=x?x.method:'', ck=k=>m===k?'☒':'☐';
-    let inst=''; if(x&&m==='payroll'){ const ins=invInstallments(x); inst=`${ins.length} (بدءًا من ${monthLabel(ins[0].ym)})`; }
     const td=t=>`<td style="height:8mm">${v(t)}</td>`;
     const info=`<table class="doc-mini-table"><tbody>
-      <tr><th style="width:17%">اسم المستلم</th>${td(nm)}<th style="width:17%">الرقم الوظيفي</th>${td(e.empcode)}</tr>
+      <tr><th style="width:17%">اسم الحارس</th>${td(nm)}<th style="width:17%">الرقم الوظيفي</th>${td(e.empcode)}</tr>
       <tr><th>رقم الهوية / الإقامة</th>${td(e.idnum)}<th>الوظيفة</th>${td(e.jobtitle)}</tr>
-      <tr><th>المشروع / الموقع</th>${td(proj)}<th>تاريخ الاستلام</th>${td(fmtDMY(x?x.date:todayISO()))}</tr></tbody></table>`;
-    const box=(t,n)=>`<div class="cov-sign"><b>${t}</b><span>الاسم: ${n?`<u>${v(n)}</u>`:'..............................'}</span><span>التوقيع: ..............................</span><span>التاريخ: ..............................</span></div>`;
-    const body=`<p>رقم أمر الصرف المرتبط: <b>${x?v(x.no):dots}</b></p>
-      <h3 class="cov-h">بيانات المستلم</h3>${info}
-      <h3 class="cov-h">الأصناف المستلمة</h3>
-      <table class="doc-mini-table doc-grid-table"><thead><tr><th style="width:6%">م</th><th>الصنف</th><th style="width:12%">الكمية</th><th style="width:16%">المقاس</th><th style="width:26%">الحالة / ملاحظات</th></tr></thead><tbody>${rows}</tbody></table>
-      <h3 class="cov-h">طريقة السداد</h3>
-      <p>${ck('payroll')} خصم من الراتب &nbsp;&nbsp; ${ck('cash')} كاش &nbsp;&nbsp; ${ck('transfer')} حوالة بنكية</p>
-      <p><b>المبلغ المستحق على المستلم:</b> ${x?invNum(x.amount):dots} ريال سعودي &nbsp;&nbsp; <b>عدد الأقساط:</b> ${inst||dots}</p>
-      <h3 class="cov-h">إقرار</h3>
-      <p>أقر أنا الموقع أدناه باستلام الأصناف الموضحة أعلاه بحالة سليمة وكاملة، وأتعهد بالمحافظة عليها واستخدامها في العمل فقط، وأوافق على سداد قيمتها وفق طريقة السداد الموضحة أعلاه.</p>
-      <div class="cov-sign-row">${box('المستلم (الحارس)',nm)}${box('أمين المخزن','')}${box('الموارد البشرية / الإدارة','')}</div>`;
-    return covPageShell('نموذج استلام بدلة أمن',body);
+      <tr><th>المشروع / الموقع</th>${td(proj)}<th>صلاحية الأمر</th>${td('')}</tr></tbody></table>`;
+    const box=(t,n,l3)=>`<div class="cov-sign"><b>${t}</b><span>الاسم: ${n?`<u>${v(n)}</u>`:'..............................'}</span><span>التوقيع: ..............................</span><span>${l3||'التاريخ'}: ..............................</span></div>`;
+    const body=`<p>رقم الأمر: <b>${x?v(x.no):dots}</b> &nbsp;&nbsp;&nbsp; التاريخ: <b>${v(fmtDMY(x?x.date:todayISO()))}</b></p>
+      <p><b>السادة / ${v(sup||'درع الجزيرة للخياطة')}</b> &nbsp; المحترمين</p>
+      <p>تحية طيبة وبعد،</p>
+      <p>نفيدكم بأن الحارس الموضحة بياناته أدناه مخوّل باستلام الأصناف الموضحة في هذا الأمر من مقركم، لذا نأمل التكرم بتسليمها له.</p>
+      <h3 class="cov-h">بيانات الحارس</h3>${info}
+      <h3 class="cov-h">الأصناف المطلوب تسليمها</h3>
+      <table class="doc-mini-table doc-grid-table"><thead><tr><th style="width:6%">م</th><th>الصنف</th><th style="width:12%">الكمية</th><th style="width:16%">المقاس</th><th style="width:26%">ملاحظات</th></tr></thead><tbody>${rows}</tbody></table>
+      <p>يرجى أخذ توقيع الحارس بالاستلام أدناه، والاحتفاظ بنسخة من هذا الأمر كمستند للتسليم.</p>
+      <h3 class="cov-h">إقرار الحارس بالاستلام</h3>
+      <p>أقر أنا الموقع أدناه باستلام الأصناف الموضحة أعلاه من المورد بحالة سليمة وكاملة.</p>
+      <div class="cov-sign-row">${box('المستلم (الحارس)',nm)}${box('المورد (المُسلِّم)','','الختم')}${box('اعتماد الشركة','')}</div>`;
+    return covPageShell('أمر استلام بدلة أمن',body);
   }
   function invRcvOpen(id,empTxt){
     let x=null,e=null;
     if(id){ x=invData().issues.find(z=>z.id===id); if(!x) return; e=employees.find(z=>String(z.id)===String(x.empId))||null; }
     else if(empTxt){ e=invResolveEmp(empTxt); if(!e){ showToast('اختر الحارس من القائمة (الاسم أو الكود)'); return; } }
-    covMinFile='نموذج_استلام_بدلة'+(x?'_'+x.no:(e&&e.empcode?'_'+e.empcode:''));
-    covMinOpen(invRcvPage(x,e),1,'نموذج استلام بدلة — اضغط على أي نص لتعديله');
+    covMinFile='أمر_استلام_بدلة'+(x?'_'+x.no:(e&&e.empcode?'_'+e.empcode:''));
+    covMinOpen(invRcvPage(x,e),1,'أمر استلام بدلة — اضغط على أي نص لتعديله');
     const m=document.getElementById('covMinutesModal');
     m.querySelectorAll('.fj-doc-content').forEach(c=>{ c.contentEditable='true'; c.spellcheck=false; });
     m.querySelector('#covMinWord').onclick=invRcvWord;
