@@ -2982,3 +2982,6 @@ tr.pay-paid input[disabled],tr.pay-paid select[disabled]{opacity:.65;cursor:not-
   body.print-landscape-coverage #view-coverage .pill{background:none!important;border:none!important;padding:0!important;color:#000!important;}
   body.print-landscape-coverage #view-coverage .filters{display:block!important;margin:6px 0!important;}
 }
+
+/* نموذج استلام البدلة: عناوين الجداول واضحة */
+.cov-page .doc-mini-table th{color:#111!important}

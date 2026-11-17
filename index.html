@@ -967,6 +967,7 @@
         <button type="button" class="inv-tab" data-inv-tab="out">المنصرف (أوامر الصرف)</button>
         <button type="button" class="inv-tab" data-inv-tab="supplier">حساب المورد</button>
         <button type="button" class="inv-tab" data-inv-tab="guards">حساب الحراس</button>
+        <button type="button" class="inv-tab" data-inv-tab="receive">نموذج استلام بدلة</button>
       </div>
 
       <div id="invP-stock" class="inv-panel">
@@ -1049,6 +1050,20 @@
         <div class="card section-card"><h3>حساب البدل للحراس</h3>
           <div class="att-toolbar payroll-toolbar" style="margin:0 0 10px"><div class="payroll-filter-group payroll-search-wide"><label>بحث بالاسم أو الكود</label><input type="search" id="invGuardSearch" placeholder="بحث"></div></div>
           <div class="table-wrap"><table class="payroll-table"><thead><tr><th>م</th><th>الحارس</th><th>الكود</th><th>المشروع</th><th>عدد البدل</th><th>إجمالي المستحق</th><th>كاش / حوالة</th><th>خصم رواتب (حتى الشهر الحالي)</th><th>المتبقي</th></tr></thead><tbody id="invGuardBody"></tbody></table></div>
+        </div>
+      </div>
+
+      <div id="invP-receive" class="inv-panel" style="display:none">
+        <div class="card section-card">
+          <h3>نموذج استلام بدلة أمن</h3>
+          <p style="margin:0 0 12px;opacity:.8">نموذج رسمي على ورق الشركة (الكليشة واللوجو) جاهز للطباعة، وقابل للتعديل قبل الطباعة، ويُنزَّل Word (.docx) أو PDF. اختر أمر صرف لتعبئته تلقائيًا، أو الحارس فقط، أو افتح نموذجًا فارغًا للتعبئة بخط اليد.</p>
+          <div class="field-grid">
+            <div class="field"><label>من أمر صرف</label><select id="invRcvOrder"></select></div>
+            <div class="field"><label>&nbsp;</label><button type="button" class="btn btn-primary" id="invRcvOpenOrder">فتح النموذج</button></div>
+            <div class="field"><label>أو حسب الحارس (بدون أمر صرف)</label><input id="invRcvEmp" list="invEmpList" placeholder="اكتب الاسم أو الكود"></div>
+            <div class="field"><label>&nbsp;</label><button type="button" class="btn" id="invRcvOpenEmp">فتح النموذج للحارس</button></div>
+            <div class="field full"><button type="button" class="btn" id="invRcvOpenBlank">نموذج فارغ</button></div>
+          </div>
         </div>
       </div>
 

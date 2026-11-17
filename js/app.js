@@ -3432,7 +3432,7 @@
   function invTabShow(tab){
     invUi.tab=tab;
     document.querySelectorAll('.inv-tab').forEach(b=>b.classList.toggle('active',b.dataset.invTab===tab));
-    ['stock','in','out','supplier','guards'].forEach(t=>{ const p=document.getElementById('invP-'+t); if(p) p.style.display=(t===tab)?'':'none'; });
+    ['stock','in','out','supplier','guards','receive'].forEach(t=>{ const p=document.getElementById('invP-'+t); if(p) p.style.display=(t===tab)?'':'none'; });
   }
   function renderInventory(){
     const d=invData();
@@ -3442,7 +3442,7 @@
     const dp=document.getElementById('invDefPrice'); if(dp&&document.activeElement!==dp) dp.value=Number(d.settings.defaultPrice)>=0&&d.settings.defaultPrice!=null?d.settings.defaultPrice:200;
     ['invInDate','invOutDate','invPayDate'].forEach(id=>{ const el=document.getElementById(id); if(el&&!el.value) el.value=todayISO(); });
     const om=document.getElementById('invOutMonth'); if(om&&!om.value) om.value=currentMonthStr();
-    invRenderStock(); invRenderIn(); invRenderOut(); invRenderSupplier(); invRenderGuards(); invTabShow(invUi.tab);
+    invRenderStock(); invRenderIn(); invRenderOut(); invRenderSupplier(); invRenderGuards(); invRenderRcv(); invTabShow(invUi.tab);
   }
   function invRenderStock(){
     const d=invData(), st=invStock(), g=invGuardAccounts();
@@ -3472,7 +3472,7 @@
     if(st.some(x=>x.item===prev)) sel.value=prev;
     invUpdateAvail();
     const rows=[...d.issues].filter(x=>{ const e=employees.find(z=>String(z.id)===String(x.empId)); const nm=(e?e.fullname:x.empName)||''; return !q||[nm,e&&e.empcode,x.no].some(v=>String(v||'').toLowerCase().includes(q)); }).sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.no).localeCompare(String(a.no)));
-    document.getElementById('invOutBody').innerHTML=rows.length?rows.map(x=>{ const e=employees.find(z=>String(z.id)===String(x.empId)); return `<tr><td>${escapeHtml(x.no)}</td><td>${escapeHtml(fmtDMY(x.date))}</td><td>${escapeHtml((e?e.fullname:x.empName)||'—')}<small class="pay-code">${escapeHtml(e&&e.empcode||'')}</small></td><td>${escapeHtml(x.item)}</td><td>${x.qty}</td><td dir="ltr"><b>${invNum(x.amount)}</b></td><td>${escapeHtml(INV_METHODS[x.method]||x.method)}</td><td>${invOutDetails(x)}</td><td><button type="button" class="btn btn-sm" data-inv-print="${escapeAttr(x.id)}">طباعة</button> <button type="button" class="btn btn-sm" data-inv-del-out="${escapeAttr(x.id)}">إلغاء الأمر</button></td></tr>`; }).join(''):'<tr><td colspan="9" class="empty-note">لا توجد أوامر صرف.</td></tr>';
+    document.getElementById('invOutBody').innerHTML=rows.length?rows.map(x=>{ const e=employees.find(z=>String(z.id)===String(x.empId)); return `<tr><td>${escapeHtml(x.no)}</td><td>${escapeHtml(fmtDMY(x.date))}</td><td>${escapeHtml((e?e.fullname:x.empName)||'—')}<small class="pay-code">${escapeHtml(e&&e.empcode||'')}</small></td><td>${escapeHtml(x.item)}</td><td>${x.qty}</td><td dir="ltr"><b>${invNum(x.amount)}</b></td><td>${escapeHtml(INV_METHODS[x.method]||x.method)}</td><td>${invOutDetails(x)}</td><td><button type="button" class="btn btn-sm" data-inv-print="${escapeAttr(x.id)}">طباعة</button> <button type="button" class="btn btn-sm" data-inv-rcv="${escapeAttr(x.id)}">نموذج استلام</button> <button type="button" class="btn btn-sm" data-inv-del-out="${escapeAttr(x.id)}">إلغاء الأمر</button></td></tr>`; }).join(''):'<tr><td colspan="9" class="empty-note">لا توجد أوامر صرف.</td></tr>';
   }
   function invUpdateAvail(){
     const it=document.getElementById('invOutItem')?.value, el=document.getElementById('invOutAvail'); if(!el) return;
@@ -3543,6 +3543,9 @@
   document.getElementById('invOutAmount')?.addEventListener('input',()=>{ invUi.outAmountDirty=true; });
   document.getElementById('invOutItem')?.addEventListener('change',invUpdateAvail);
   document.getElementById('invOutSearch')?.addEventListener('input',()=>{ invRenderOut(); });
+  document.getElementById('invRcvOpenOrder')?.addEventListener('click',()=>{ const v=document.getElementById('invRcvOrder').value; if(!v){ showToast('اختر أمر صرف أولًا'); return; } invRcvOpen(v); });
+  document.getElementById('invRcvOpenEmp')?.addEventListener('click',()=>{ const v=document.getElementById('invRcvEmp').value.trim(); if(!v){ showToast('اكتب اسم الحارس أو كوده'); return; } invRcvOpen('',v); });
+  document.getElementById('invRcvOpenBlank')?.addEventListener('click',()=>invRcvOpen('',''));
   document.getElementById('invGuardSearch')?.addEventListener('input',()=>{ invRenderGuards(); });
   document.getElementById('invOutMethod')?.addEventListener('change',()=>{
     const m=document.getElementById('invOutMethod').value;
@@ -3571,6 +3574,7 @@
     renderInventory(); try{ renderReports(); }catch(_){}
   });
   document.getElementById('invOutBody')?.addEventListener('click',e=>{
+    const rc=e.target.closest('[data-inv-rcv]'); if(rc){ invRcvOpen(rc.dataset.invRcv); return; }
     const p=e.target.closest('[data-inv-print]'); if(p){ invPrintOrder(p.dataset.invPrint); return; }
     const b=e.target.closest('[data-inv-del-out]'); if(!b||!invCanWrite()) return;
     const d=invData(), x=d.issues.find(z=>z.id===b.dataset.invDelOut); if(!x) return;
@@ -5964,6 +5968,87 @@
       pdf.save(covMinFile+'.pdf'); showToast('تم تنزيل ملف PDF');
     }catch(err){ console.error(err); showToast('تعذر إنشاء ملف PDF'); }
     finally{ if(btn){ btn.disabled=false; btn.textContent='تنزيل PDF'; } }
+  }
+  /* ===== نموذج استلام بدلة أمن: ورق الشركة (كليشة + لوجو) · طباعة · Word حقيقي (.docx) · PDF · قابل للتعديل ===== */
+  function invRcvPage(x,e){
+    e=e||{}; const v=t=>escapeHtml(String(t==null?'':t)), dots='....................';
+    const nm=e.fullname||(x&&x.empName)||'', proj=e.project||(x&&x.project)||'';
+    const items=x?[[x.item,x.qty]]:[]; while(items.length<4) items.push(['','']);
+    const rows=items.map((r,i)=>`<tr><td>${i+1}</td><td>${v(r[0])}</td><td>${v(r[1])}</td><td></td><td></td></tr>`).join('');
+    const m=x?x.method:'', ck=k=>m===k?'☒':'☐';
+    let inst=''; if(x&&m==='payroll'){ const ins=invInstallments(x); inst=`${ins.length} (بدءًا من ${monthLabel(ins[0].ym)})`; }
+    const td=t=>`<td style="height:8mm">${v(t)}</td>`;
+    const info=`<table class="doc-mini-table"><tbody>
+      <tr><th style="width:17%">اسم المستلم</th>${td(nm)}<th style="width:17%">الرقم الوظيفي</th>${td(e.empcode)}</tr>
+      <tr><th>رقم الهوية / الإقامة</th>${td(e.idnum)}<th>الوظيفة</th>${td(e.jobtitle)}</tr>
+      <tr><th>المشروع / الموقع</th>${td(proj)}<th>تاريخ الاستلام</th>${td(fmtDMY(x?x.date:todayISO()))}</tr></tbody></table>`;
+    const box=(t,n)=>`<div class="cov-sign"><b>${t}</b><span>الاسم: ${n?`<u>${v(n)}</u>`:'..............................'}</span><span>التوقيع: ..............................</span><span>التاريخ: ..............................</span></div>`;
+    const body=`<p>رقم أمر الصرف المرتبط: <b>${x?v(x.no):dots}</b></p>
+      <h3 class="cov-h">بيانات المستلم</h3>${info}
+      <h3 class="cov-h">الأصناف المستلمة</h3>
+      <table class="doc-mini-table doc-grid-table"><thead><tr><th style="width:6%">م</th><th>الصنف</th><th style="width:12%">الكمية</th><th style="width:16%">المقاس</th><th style="width:26%">الحالة / ملاحظات</th></tr></thead><tbody>${rows}</tbody></table>
+      <h3 class="cov-h">طريقة السداد</h3>
+      <p>${ck('payroll')} خصم من الراتب &nbsp;&nbsp; ${ck('cash')} كاش &nbsp;&nbsp; ${ck('transfer')} حوالة بنكية</p>
+      <p><b>المبلغ المستحق على المستلم:</b> ${x?invNum(x.amount):dots} ريال سعودي &nbsp;&nbsp; <b>عدد الأقساط:</b> ${inst||dots}</p>
+      <h3 class="cov-h">إقرار</h3>
+      <p>أقر أنا الموقع أدناه باستلام الأصناف الموضحة أعلاه بحالة سليمة وكاملة، وأتعهد بالمحافظة عليها واستخدامها في العمل فقط، وأوافق على سداد قيمتها وفق طريقة السداد الموضحة أعلاه.</p>
+      <div class="cov-sign-row">${box('المستلم (الحارس)',nm)}${box('أمين المخزن','')}${box('الموارد البشرية / الإدارة','')}</div>`;
+    return covPageShell('نموذج استلام بدلة أمن',body);
+  }
+  function invRcvOpen(id,empTxt){
+    let x=null,e=null;
+    if(id){ x=invData().issues.find(z=>z.id===id); if(!x) return; e=employees.find(z=>String(z.id)===String(x.empId))||null; }
+    else if(empTxt){ e=invResolveEmp(empTxt); if(!e){ showToast('اختر الحارس من القائمة (الاسم أو الكود)'); return; } }
+    covMinFile='نموذج_استلام_بدلة'+(x?'_'+x.no:(e&&e.empcode?'_'+e.empcode:''));
+    covMinOpen(invRcvPage(x,e),1,'نموذج استلام بدلة — اضغط على أي نص لتعديله');
+    const m=document.getElementById('covMinutesModal');
+    m.querySelectorAll('.fj-doc-content').forEach(c=>{ c.contentEditable='true'; c.spellcheck=false; });
+    m.querySelector('#covMinWord').onclick=invRcvWord;
+  }
+  // Word حقيقي: الكليشة واللوجو كصورة خلف النص في ترويسة المستند، والمحتوى (بعد تعديلك) فقرات وجداول قابلة للتحرير
+  async function invRcvWord(){
+    if(!window.JSZip){ showToast('مكتبة Word غير محمّلة — تحقق من الاتصال بالإنترنت'); return; }
+    const root=document.querySelector('#covMinutesModal .fj-doc-content'); if(!root) return;
+    const X=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const rn=(t,o)=>{ o=o||{}; const z=o.sz||24; return `<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>${o.b?'<w:b/><w:bCs/>':''}${o.u?'<w:u w:val="single"/>':''}<w:sz w:val="${z}"/><w:szCs w:val="${z}"/><w:rtl/></w:rPr><w:t xml:space="preserve">${X(t)}</w:t></w:r>`; };
+    const sp=()=>'<w:p><w:pPr><w:bidi/><w:spacing w:before="0" w:after="0" w:line="120" w:lineRule="exact"/></w:pPr></w:p>';
+    const par=(runs,o)=>{ o=o||{}; return `<w:p><w:pPr><w:bidi/><w:spacing w:before="${o.bf||0}" w:after="${o.af==null?100:o.af}" w:line="276" w:lineRule="auto"/><w:jc w:val="${o.jc||'left'}"/></w:pPr>${runs}</w:p>`; };
+    const inl=(n,o)=>{ let r=''; n.childNodes.forEach(c=>{ if(c.nodeType===3){ if(c.nodeValue.trim()||/\S/.test(c.nodeValue)) r+=rn(c.nodeValue.replace(/\u00a0/g,' '),o); } else if(c.nodeType===1){ if(c.tagName==='BR') r+='<w:r><w:br/></w:r>'; else r+=inl(c,Object.assign({},o,/^(B|STRONG)$/.test(c.tagName)?{b:1}:{},c.tagName==='U'?{u:1}:{})); } }); return r; };
+    const tc=(inner,w,shade)=>`<w:tc><w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${shade?'<w:shd w:val="clear" w:color="auto" w:fill="DDE3EE"/>':''}<w:vAlign w:val="center"/></w:tcPr>${inner||par('')}</w:tc>`;
+    const tbl=(rowsXml,grid)=>`<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:bidiVisual/><w:tblBorders>${['top','left','bottom','right','insideH','insideV'].map(b=>`<w:${b} w:val="single" w:sz="6" w:space="0" w:color="333333"/>`).join('')}</w:tblBorders><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="60" w:type="dxa"/><w:left w:w="100" w:type="dxa"/><w:bottom w:w="60" w:type="dxa"/><w:right w:w="100" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>${grid.map(g=>`<w:gridCol w:w="${g}"/>`).join('')}</w:tblGrid>${rowsXml}</w:tbl>`+sp();
+    const TW=9360;
+    const body=n=>{ let o=''; n.childNodes.forEach(c=>{ if(c.nodeType!==1) return;
+      if(c.tagName==='H2') o+=par(inl(c,{b:1,u:1,sz:36}),{jc:'center',af:160});
+      else if(c.tagName==='H3') o+=par(inl(c,{b:1,sz:26}),{bf:120,af:40});
+      else if(c.tagName==='P') o+=par(inl(c));
+      else if(c.tagName==='TABLE'){ const trs=[...c.querySelectorAll('tr')], nc=Math.max(...trs.map(r=>r.children.length));
+        const ws=[...(trs[0]||{children:[]}).children].map(t=>{ const m=/width:\s*(\d+)%/.exec(t.getAttribute('style')||''); return m?+m[1]:0; }); const fixed=ws.reduce((a,b)=>a+b,0), free=ws.filter(w=>!w).length;
+        const grid=ws.map(w=>Math.round(TW*(w||(100-fixed)/Math.max(free,1))/100));
+        o+=tbl(trs.map(r=>`<w:tr>${[...r.children].map((t,i)=>tc(par(inl(t,t.tagName==='TH'?{b:1,sz:22}:{sz:22}),{jc:t.tagName==='TH'||c.classList.contains('doc-grid-table')?'center':'left',af:0}),grid[i]||Math.round(TW/nc),t.tagName==='TH')).join('')}</w:tr>`).join(''),grid.length?grid:Array(nc).fill(Math.round(TW/nc))); }
+      else if(c.classList.contains('cov-sign-row')){ const bs=[...c.querySelectorAll('.cov-sign')], w=Math.round(TW/bs.length);
+        o+=sp()+tbl(`<w:tr><w:trPr><w:cantSplit/></w:trPr>${bs.map(b=>tc([...b.children].map(k=>k.tagName==='B'?par(inl(k,{b:1,sz:22}),{jc:'center',af:80}):par(inl(k,{sz:22}),{af:80})).join(''),w)).join('')}</w:tr>`,bs.map(()=>w)); }
+      else o+=body(c); }); return o; };
+    try{
+      const bgRes=await fetch('assets/contract-bg.jpg'); if(!bgRes.ok) throw new Error('letterhead not found'); const img=await bgRes.arrayBuffer();
+      const NS='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+      const W=7560000,H=10692000;
+      const header=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ${NS}><w:p><w:r><w:drawing><wp:anchor distT="0" distB="0" distL="0" distR="0" simplePos="0" relativeHeight="0" behindDoc="1" locked="0" layoutInCell="1" allowOverlap="1"><wp:simplePos x="0" y="0"/><wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH><wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV><wp:extent cx="${W}" cy="${H}"/><wp:wrapNone/><wp:docPr id="1" name="letterhead"/><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="bg.jpg"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rId1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${W}" cy="${H}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:anchor></w:drawing></w:r></w:p></w:hdr>`;
+      const doc=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ${NS}><w:body>${body(root)}<w:sectPr><w:headerReference w:type="default" r:id="rId1"/><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="2300" w:right="1021" w:bottom="1300" w:left="1021" w:header="0" w:footer="0" w:gutter="0"/><w:bidi/></w:sectPr></w:body></w:document>`;
+      const R='http://schemas.openxmlformats.org/officeDocument/2006/relationships', zip=new JSZip();
+      zip.file('[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="jpg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/></Types>');
+      zip.file('_rels/.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="word/document.xml"/></Relationships>`);
+      zip.file('word/document.xml',doc); zip.file('word/header1.xml',header);
+      zip.file('word/_rels/document.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/header" Target="header1.xml"/></Relationships>`);
+      zip.file('word/_rels/header1.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/image" Target="media/bg.jpg"/></Relationships>`);
+      zip.file('word/media/bg.jpg',img);
+      const blob=await zip.generateAsync({type:'blob',mimeType:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+      covDownloadBlob(blob,covMinFile+'.docx'); showToast('تم تنزيل ملف Word (قابل للتعديل)');
+    }catch(err){ console.error(err); showToast('تعذر إنشاء ملف Word'); }
+  }
+  function invRenderRcv(){
+    const d=invData(), sel=document.getElementById('invRcvOrder'); if(!sel) return; const prev=sel.value;
+    sel.innerHTML='<option value="">— اختر أمر صرف —</option>'+[...d.issues].sort((a,b)=>String(b.date).localeCompare(String(a.date))||String(b.no).localeCompare(String(a.no))).map(x=>{ const e=employees.find(z=>String(z.id)===String(x.empId)); return `<option value="${escapeAttr(x.id)}">${escapeHtml(x.no)} — ${escapeHtml((e?e.fullname:x.empName)||'—')} — ${escapeHtml(x.item)} × ${x.qty}</option>`; }).join('');
+    if(d.issues.some(x=>x.id===prev)) sel.value=prev;
   }
   // mode: 'single' = صفحة مفصّلة لكل تغطية ، 'table' = محضر مجمّع بجدول
   function covOpenMinutes(list,mode){
