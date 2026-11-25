@@ -822,7 +822,7 @@
     const url=URL.createObjectURL(blob),a=document.createElement('a'); a.href=url; a.download=exportFileBase()+'.xls'; document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url); showToast('تم تصدير التبويب بصيغة Excel');
   }
   // وضع «ورقة واحدة كاملة» أثناء طباعة المباشرات والمستندات فقط (يعمل مع زر الطباعة وCtrl+P)
-  window.addEventListener('beforeprint',()=>{ document.body.classList.toggle('print-onepage',['documents','commencements'].includes(currentView)); });
+  window.addEventListener('beforeprint',()=>{ document.body.classList.toggle('print-onepage',['documents','commencements'].includes(currentView)); if(currentView==='documents'){ try{ fitDocPages(); }catch(_){} } });
   window.addEventListener('afterprint',()=>{ document.body.classList.remove('print-onepage'); });
   function printCurrentForExport(){
     if(currentView==='contracts'){ downloadContractPdf(); return; }
@@ -7293,11 +7293,25 @@
         <p>صافي المبلغ كتابةً: ${escapeHtml(words)}</p>
         <p>طريقة الاستلام: ☐ تحويل بنكي &nbsp;&nbsp; ☐ نقداً &nbsp;&nbsp; ☐ شيك رقم: ......................</p>
         <p>كما أقر بأنني سلّمت الشركة جميع ما كان بعهدتي من (الزي الرسمي — بطاقة التعريف — الأجهزة والمعدات — أي مستندات أو ممتلكات تخص الشركة أو العميل)، وأن ذمتي بريئة تجاهها.</p>
-        <p>وبموجب هذه المخالصة أبرئ ذمة ${blank(co)} إبراءً تاماً شاملاً من أي حقوق أو مطالبات مالية أو عمالية ناشئة عن عملي لديها، ولا أملك حق المطالبة بأي مبلغ أو تعويض بعد توقيعي على هذا الإقرار، وهذا إقرار مني بذلك،،،</p>
+        <p>وبموجب هذه المخالصة أبرئ ذمة ${blank(co)} إبراءً تاماً شاملاً من أي حقوق أو مطالبات مالية أو عمالية ناشئة عن عملي لديها، ولا أملك حق المطالبة بأي مبلغ أو تعويض بعد تحويل المبلغ المستحق المذكور أعلاه على حسابي الشخصي الموضح في المذكرة ، وهذا إقرار مني بذلك،،،</p>
+        <table class="doc-mini-table"><tbody><tr><th style="width:22%">رقم الآيبان (IBAN)</th><td dir="ltr" style="text-align:center;font-weight:700;letter-spacing:1px">${e.iban?escapeHtml(String(e.iban).replace(/\s+/g,'').toUpperCase().replace(/(.{4})/g,'$1 ').trim()):'<span class="blank">.......................................</span>'}</td>${e.bankname?`<th style="width:14%">البنك</th><td style="width:24%;text-align:center">${escapeHtml(e.bankname)}</td>`:''}</tr></tbody></table>
         ${docSign(['اسم الموظف: '+escapeHtml(e.fullname||'.................'),'التوقيع','البصمة'])}
         ${docSign(['الموارد البشرية','الحسابات','المدير العام'])}`);
     }
     sheet.innerHTML = html;
+    fitDocPages();
+  }
+  /* احتواء محتوى كل ورقة داخل A4 كاملة: يُصغَّر الخط تدريجياً فقط عند الحاجة حتى لا يُقص شيء عند الطباعة */
+  function fitDocPages(){
+    document.querySelectorAll('#docSheet .fj-doc-page').forEach(pg=>{
+      const c=pg.querySelector('.fj-doc-content'); if(!c) return;
+      c.style.fontSize=''; c.style.lineHeight=''; c.style.paddingTop=''; c.style.paddingBottom='';
+      const limit=pg.clientHeight; let fs=13.5, guard=0;
+      while(c.scrollHeight>limit && fs>9 && guard++<40){
+        fs-=0.25; c.style.fontSize=fs+'px'; c.style.lineHeight=(fs>11?1.75:1.6);
+        if(fs<12.5){ c.style.paddingTop='38mm'; c.style.paddingBottom='20mm'; }
+      }
+    });
   }
   ['offer_client','offer_project','offer_guards','offer_guard_price','offer_sups','offer_sup_price','offer_months'].forEach(id=>document.getElementById(id)?.addEventListener('input',renderDocSheet));
 
